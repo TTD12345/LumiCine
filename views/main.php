@@ -1,69 +1,69 @@
 <?php
-$title = 'Lịch ca làm việc | LumiCine';
+$title = 'Lịch làm việc | LumiCine';
 $shifts = [
     [
         'name' => 'Nguyễn Minh Anh',
         'initials' => 'MA',
-        'role' => 'Quản lý ca',
-        'department' => 'Vận hành',
+        'role' => 'Trưởng phòng nhân sự',
+        'department' => 'Hành chính - Nhân sự',
         'time' => '08:00 - 16:00',
         'hours' => '8 giờ',
-        'location' => 'Sảnh chính',
+        'location' => 'Văn phòng tầng 1',
         'status' => 'Đang diễn ra',
         'tone' => 'violet',
     ],
     [
         'name' => 'Trần Quốc Bảo',
         'initials' => 'QB',
-        'role' => 'Nhân viên bán vé',
-        'department' => 'Quầy vé',
+        'role' => 'Chuyên viên kinh doanh',
+        'department' => 'Kinh doanh',
         'time' => '09:00 - 17:00',
         'hours' => '8 giờ',
-        'location' => 'Quầy vé 01',
+        'location' => 'Văn phòng tầng 2',
         'status' => 'Đang diễn ra',
         'tone' => 'blue',
     ],
     [
         'name' => 'Lê Hoàng Yến',
         'initials' => 'HY',
-        'role' => 'Nhân viên soát vé',
-        'department' => 'Soát vé',
+        'role' => 'Chuyên viên marketing',
+        'department' => 'Marketing',
         'time' => '12:00 - 20:00',
         'hours' => '8 giờ',
-        'location' => 'Cụm phòng 1–4',
+        'location' => 'Phòng họp A',
         'status' => 'Sắp bắt đầu',
         'tone' => 'pink',
     ],
     [
         'name' => 'Phạm Đức Long',
         'initials' => 'ĐL',
-        'role' => 'Nhân viên quầy bắp nước',
-        'department' => 'F&B',
+        'role' => 'Kế toán viên',
+        'department' => 'Kế toán',
         'time' => '13:00 - 21:00',
         'hours' => '8 giờ',
-        'location' => 'Quầy bắp nước',
+        'location' => 'Văn phòng tầng 3',
         'status' => 'Sắp bắt đầu',
         'tone' => 'orange',
     ],
     [
         'name' => 'Võ Ngọc Mai',
         'initials' => 'NM',
-        'role' => 'Nhân viên vệ sinh',
-        'department' => 'Vệ sinh',
+        'role' => 'Nhân viên hành chính',
+        'department' => 'Hành chính - Nhân sự',
         'time' => '07:00 - 15:00',
         'hours' => '8 giờ',
-        'location' => 'Cụm phòng 5–8',
+        'location' => 'Khu vực lễ tân',
         'status' => 'Hoàn thành',
         'tone' => 'green',
     ],
     [
         'name' => 'Đặng Tuấn Kiệt',
         'initials' => 'TK',
-        'role' => 'Kỹ thuật viên',
-        'department' => 'Kỹ thuật',
+        'role' => 'Chuyên viên công nghệ thông tin',
+        'department' => 'Công nghệ thông tin',
         'time' => '15:00 - 23:00',
         'hours' => '8 giờ',
-        'location' => 'Phòng chiếu',
+        'location' => 'Phòng IT',
         'status' => 'Sắp bắt đầu',
         'tone' => 'teal',
     ],
@@ -459,7 +459,7 @@ $completedCount = count(array_filter($shifts, fn ($shift) => $shift['status'] ==
     <aside class="sidebar" aria-label="Điều hướng chính">
         <a class="brand" href="#overview" aria-label="LumiCine - trang chủ">
             <span class="brand-mark" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7.5h16v12H4z"/><path d="m8 7.5 2-4m4 4 2-4M7 12l4 2.5L7 17z"/></svg>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-4h4v4"/></svg>
             </span>
             <span class="brand-name">LumiCine</span>
         </a>
@@ -483,8 +483,8 @@ $completedCount = count(array_filter($shifts, fn ($shift) => $shift['status'] ==
             <div class="help-card">
                 <span class="help-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9a2.5 2.5 0 1 1 4.3 1.7c-1.1 1-1.9 1.4-1.9 3M12 17.5v.1"/></svg></span>
                 <strong>Cần hỗ trợ?</strong>
-                <p>Đội ngũ LumiCine luôn sẵn sàng giúp bạn.</p>
-                <a href="mailto:support@lumicine.vn">Liên hệ hỗ trợ →</a>
+                <p>Quản lý lịch làm việc và phân công nhân sự tại một nơi.</p>
+                <a href="#schedule-title">Xem lịch làm việc →</a>
             </div>
             <div class="profile">
                 <div class="profile-avatar" aria-hidden="true">AT</div>
@@ -502,7 +502,7 @@ $completedCount = count(array_filter($shifts, fn ($shift) => $shift['status'] ==
 
     <main class="main">
         <header class="topbar">
-            <div class="breadcrumbs"><span>Quản lý nhân sự</span><span aria-hidden="true">/</span><strong>Ca làm việc</strong></div>
+            <div class="breadcrumbs"><span>Quản lý nhân sự</span><span aria-hidden="true">/</span><strong>Lịch làm việc</strong></div>
             <div class="topbar-right">
                 <button class="top-icon" type="button" id="notifications-button" aria-label="Thông báo"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 13h4"/></svg><span class="notification-dot"></span></button>
                 <div class="top-user"><div class="profile-avatar" aria-hidden="true">AT</div><span>Anh Tuấn</span></div>
@@ -513,8 +513,8 @@ $completedCount = count(array_filter($shifts, fn ($shift) => $shift['status'] ==
             <div class="page-heading">
                 <div>
                     <div class="eyebrow">Quản lý nhân sự</div>
-                    <h1>Ca làm việc</h1>
-                    <p class="subtitle">Theo dõi và sắp xếp lịch làm việc của đội ngũ hôm nay.</p>
+                    <h1>Lịch làm việc</h1>
+                    <p class="subtitle">Theo dõi và sắp xếp lịch làm việc của đội ngũ công ty hôm nay.</p>
                 </div>
                 <button class="primary-button" type="button" id="add-shift">
                     <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
@@ -570,7 +570,7 @@ $completedCount = count(array_filter($shifts, fn ($shift) => $shift['status'] ==
                 <div class="table-wrap">
                     <table class="shift-table">
                         <thead>
-                            <tr><th>Nhân viên</th><th>Bộ phận</th><th>Thời gian</th><th>Khu vực</th><th>Trạng thái</th><th aria-label="Thao tác"></th></tr>
+                            <tr><th>Nhân viên</th><th>Bộ phận</th><th>Thời gian</th><th>Địa điểm</th><th>Trạng thái</th><th aria-label="Thao tác"></th></tr>
                         </thead>
                         <tbody id="shift-list">
                             <?php foreach ($shifts as $shift): ?>
@@ -615,11 +615,11 @@ $completedCount = count(array_filter($shifts, fn ($shift) => $shift['status'] ==
         </div>
         <div class="form-grid">
             <label class="form-field full">Tên nhân viên<input name="name" type="text" required maxlength="80" placeholder="Ví dụ: Nguyễn Minh Anh"></label>
-            <label class="form-field">Bộ phận<input name="department" type="text" required maxlength="50" placeholder="Ví dụ: Quầy vé"></label>
-            <label class="form-field">Vị trí<input name="role" type="text" required maxlength="60" placeholder="Ví dụ: Nhân viên bán vé"></label>
+            <label class="form-field">Bộ phận<input name="department" type="text" required maxlength="50" placeholder="Ví dụ: Kế toán"></label>
+            <label class="form-field">Vị trí<input name="role" type="text" required maxlength="60" placeholder="Ví dụ: Chuyên viên kinh doanh"></label>
             <label class="form-field">Bắt đầu<input name="start" type="time" value="08:00" required></label>
             <label class="form-field">Kết thúc<input name="end" type="time" value="16:00" required></label>
-            <label class="form-field full">Khu vực<input name="location" type="text" required maxlength="60" placeholder="Ví dụ: Quầy vé 01"></label>
+            <label class="form-field full">Địa điểm<input name="location" type="text" required maxlength="60" placeholder="Ví dụ: Văn phòng tầng 1"></label>
             <label class="form-field full">Trạng thái<select name="status"><option value="upcoming">Sắp bắt đầu</option><option value="active">Đang diễn ra</option><option value="completed">Hoàn thành</option></select></label>
         </div>
         <div class="dialog-actions">
@@ -891,7 +891,7 @@ $completedCount = count(array_filter($shifts, fn ($shift) => $shift['status'] ==
 
         const downloadReport = () => {
             const rows = [
-                ['Nhân viên', 'Bộ phận', 'Vị trí', 'Bắt đầu', 'Kết thúc', 'Khu vực', 'Trạng thái'],
+                ['Nhân viên', 'Bộ phận', 'Vị trí', 'Bắt đầu', 'Kết thúc', 'Địa điểm', 'Trạng thái'],
                 ...shifts.map((shift) => [
                     shift.name, shift.department, shift.role, shift.start, shift.end, shift.location, statusLabels[shift.status],
                 ]),
@@ -902,7 +902,7 @@ $completedCount = count(array_filter($shifts, fn ($shift) => $shift['status'] ==
             const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
             const link = document.createElement('a');
             link.href = url;
-            link.download = `lumicine-ca-lam-${dateInput.value}.csv`;
+            link.download = `lumicine-lich-lam-viec-${dateInput.value}.csv`;
             document.body.append(link);
             link.click();
             link.remove();
