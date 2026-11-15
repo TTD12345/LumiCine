@@ -367,41 +367,43 @@
         showToast(`Đã xuất ${filteredEmployees.length} nhân viên ra tệp Excel tương thích CSV.`);
     };
 
-    const getDailyLog = (employee) => {
-        const days = [];
+    const getDailyCalendar = (employee) => {
+        const businessDays = [];
+        const calendarDays = [];
         const date = new Date(selectedYear, selectedMonth - 1, 1);
-        let businessDay = 0;
-        while (date.getMonth() === selectedMonth - 1 && days.length < 7) {
-            const weekDay = date.getDay();
-            if (weekDay !== 0 && weekDay !== 6) {
-                let state = 'Đúng giờ';
-                let checkIn = '08:00';
-                let checkOut = '17:00';
-                if (employee.absent > 0 && businessDay === 4) {
-                    state = 'Vắng mặt';
-                    checkIn = '—';
-                    checkOut = '—';
-                } else if (employee.leave > 0 && businessDay === 2) {
-                    state = 'Nghỉ phép';
-                    checkIn = '—';
-                    checkOut = '—';
-                } else if (employee.late > 0 && businessDay < employee.late) {
-                    state = 'Đi muộn';
-                    checkIn = `08:${String(8 + (businessDay * 7) % 45).padStart(2, '0')}`;
-                }
 
-                days.push({
-                    date: new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit' }).format(date),
-                    weekday: new Intl.DateTimeFormat('vi-VN', { weekday: 'short' }).format(date),
-                    checkIn,
-                    checkOut,
-                    state,
-                });
-                businessDay += 1;
+        while (date.getMonth() === selectedMonth - 1) {
+            const weekDay = date.getDay();
+            const day = {
+                date: date.getDate(),
+                state: 'weekend',
+            };
+            if (weekDay !== 0 && weekDay !== 6) {
+                day.state = 'unrecorded';
+                businessDays.push(day);
             }
+            calendarDays.push(day);
             date.setDate(date.getDate() + 1);
         }
-        return days;
+
+        const assignState = (state, count) => {
+            const availableDays = businessDays.filter((day) => day.state === 'unrecorded');
+            const assignedCount = Math.min(count, availableDays.length);
+            for (let index = 0; index < assignedCount; index += 1) {
+                const position = Math.floor(((index + 0.5) * availableDays.length) / assignedCount);
+                availableDays[position].state = state;
+            }
+        };
+
+        assignState('absent', employee.absent);
+        assignState('leave', employee.leave);
+        assignState('late', Math.min(employee.late, employee.worked));
+        assignState('on-time', Math.max(0, employee.worked - employee.late));
+
+        const leadingEmptyDays = (new Date(selectedYear, selectedMonth - 1, 1).getDay() + 6) % 7;
+        const cells = [...Array(leadingEmptyDays).fill(null), ...calendarDays];
+        while (cells.length % 7 !== 0) cells.push(null);
+        return cells;
     };
 
     const getEmployeeInitials = (name) => {
@@ -454,41 +456,69 @@
 
         const sectionHeading = document.createElement('h3');
         sectionHeading.className = 'detail-section-title';
-        sectionHeading.textContent = 'Nhật ký chấm công';
+        sectionHeading.textContent = 'Lịch chấm công';
         const period = document.createElement('span');
-        period.textContent = 'Một số ngày trong kỳ';
+        period.textContent = `${monthNames[selectedMonth - 1]} ${selectedYear}`;
         sectionHeading.append(period);
         body.append(sectionHeading);
 
-        const table = document.createElement('table');
-        table.className = 'detail-log-table';
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        ['Ngày', 'Thứ', 'Giờ vào', 'Giờ ra', 'Ghi nhận'].forEach((label) => {
-            const th = document.createElement('th');
-            th.scope = 'col';
-            th.textContent = label;
-            headerRow.append(th);
+        const calendar = document.createElement('div');
+        calendar.className = 'attendance-calendar';
+        calendar.setAttribute('role', 'grid');
+        calendar.setAttribute('aria-label', `Lịch chấm công ${monthNames[selectedMonth - 1]} ${selectedYear}`);
+
+        ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].forEach((label) => {
+            const weekday = document.createElement('div');
+            weekday.className = 'calendar-weekday';
+            weekday.setAttribute('role', 'columnheader');
+            weekday.textContent = label;
+            calendar.append(weekday);
         });
-        thead.append(headerRow);
-        const tbody = document.createElement('tbody');
-        getDailyLog(employee).forEach((log) => {
-            const row = document.createElement('tr');
-            [log.date, log.weekday, log.checkIn, log.checkOut].forEach((value) => {
-                const cell = document.createElement('td');
-                cell.textContent = value;
-                row.append(cell);
-            });
-            const stateCell = document.createElement('td');
-            const state = document.createElement('span');
-            state.className = `log-state${log.state === 'Đi muộn' ? ' late' : log.state === 'Nghỉ phép' ? ' leave' : log.state === 'Vắng mặt' ? ' absent' : ''}`;
-            state.textContent = log.state;
-            stateCell.append(state);
-            row.append(stateCell);
-            tbody.append(row);
+
+        const stateLabels = {
+            'on-time': 'Đúng giờ',
+            late: 'Đi muộn',
+            leave: 'Nghỉ phép',
+            absent: 'Vắng mặt',
+            unrecorded: 'Chưa ghi nhận',
+            weekend: 'Cuối tuần',
+        };
+        getDailyCalendar(employee).forEach((day) => {
+            const cell = document.createElement('div');
+            cell.className = `calendar-day${day ? ` calendar-day-${day.state}` : ' calendar-day-empty'}`;
+            cell.setAttribute('role', 'gridcell');
+            if (day) {
+                const dayNumber = document.createElement('span');
+                dayNumber.className = 'calendar-day-number';
+                dayNumber.textContent = String(day.date);
+                const state = document.createElement('span');
+                state.className = 'calendar-day-state';
+                state.textContent = stateLabels[day.state];
+                cell.append(dayNumber, state);
+                cell.setAttribute('aria-label', `Ngày ${day.date}: ${stateLabels[day.state]}`);
+            }
+            calendar.append(cell);
         });
-        table.append(thead, tbody);
-        body.append(table);
+        body.append(calendar);
+
+        const legend = document.createElement('div');
+        legend.className = 'calendar-legend';
+        [
+            ['on-time', 'Đúng giờ'],
+            ['late', 'Đi muộn'],
+            ['leave', 'Nghỉ phép'],
+            ['absent', 'Vắng mặt'],
+            ['unrecorded', 'Chưa ghi nhận'],
+        ].forEach(([stateName, label]) => {
+            const item = document.createElement('span');
+            item.className = 'calendar-legend-item';
+            const marker = document.createElement('i');
+            marker.className = `calendar-legend-marker calendar-marker-${stateName}`;
+            marker.setAttribute('aria-hidden', 'true');
+            item.append(marker, document.createTextNode(label));
+            legend.append(item);
+        });
+        body.append(legend);
 
         if (window.bootstrap?.Modal) {
             modalInstance = modalInstance || new window.bootstrap.Modal(document.getElementById('employee-modal'));

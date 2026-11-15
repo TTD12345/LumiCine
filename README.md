@@ -58,6 +58,6 @@ Trang quản trị:
 - Tìm kiếm theo mã nhân viên hoặc họ tên, không phân biệt dấu.
 - Lọc theo phòng ban, chức vụ và trạng thái công.
 - Chuyển tháng/năm; dữ liệu mẫu và ngày công chuẩn được cập nhật theo kỳ.
-- Xem chi tiết nhân viên cùng nhật ký chấm công minh họa.
+- Xem chi tiết nhân viên cùng lịch chấm công minh họa theo tháng.
 - Xuất dữ liệu đang lọc thành CSV UTF-8 tương thích Excel; in báo cáo theo bố cục ngang.
 - Chọn số dòng và chuyển trang; giao diện hỗ trợ cuộn ngang trên bảng dữ liệu.
