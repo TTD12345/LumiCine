@@ -434,6 +434,11 @@
     scrim.addEventListener('click', toggleSidebar);
     sidebar.querySelectorAll('a').forEach((link) => {
         link.addEventListener('click', () => {
+            if (link.classList.contains('employee-nav-link')) {
+                document.querySelectorAll('.employee-nav-link').forEach((navLink) => {
+                    navLink.classList.toggle('active', navLink === link);
+                });
+            }
             if (window.innerWidth <= 740 && sidebar.classList.contains('is-open')) toggleSidebar();
         });
     });
