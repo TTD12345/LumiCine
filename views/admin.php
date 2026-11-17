@@ -45,6 +45,7 @@ $statusFor = static function (array $employee): array {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="assets/css/hrm.css" rel="stylesheet">
+    <link href="assets/css/overtime.css" rel="stylesheet">
 </head>
 <body>
 <div class="app-shell">
@@ -60,6 +61,7 @@ $statusFor = static function (array $employee): array {
             <a class="nav-link" href="#overview"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Tổng quan</span></a>
             <a class="nav-link" href="#employee-table"><i class="bi bi-people" aria-hidden="true"></i><span>Quản lý nhân viên</span></a>
             <a class="nav-link" href="#employee-table"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Quản lý chấm công</span></a>
+            <a class="nav-link" href="#overtime-requests"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Duyệt tăng ca</span></a>
             <a class="nav-link active" href="#employee-table" aria-current="page"><i class="bi bi-clipboard-data" aria-hidden="true"></i><span>Tổng hợp công</span><span class="active-marker"></span></a>
             <a class="nav-link" href="#employee-table"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Quản lý nghỉ phép</span></a>
             <a class="nav-link" href="#summary-cards"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Báo cáo thống kê</span></a>
@@ -172,6 +174,21 @@ $statusFor = static function (array $employee): array {
                     <div class="summary-value" id="stat-leave">0 <span>ngày</span></div>
                     <div class="summary-foot">Có lương: <strong id="stat-paid-leave">0</strong> · Không lương: <strong id="stat-unpaid-leave">0</strong></div>
                 </article>
+            </section>
+
+            <section class="overtime-card" id="overtime-requests" aria-labelledby="overtime-requests-title">
+                <div class="overtime-heading">
+                    <div><h2 id="overtime-requests-title">Đơn đăng ký tăng ca</h2><p>Xem lý do, thời gian và xử lý các đơn nhân viên gửi.</p></div>
+                    <div class="overtime-summary"><span>Chờ duyệt</span><strong id="overtime-pending-count">0</strong></div>
+                </div>
+                <p class="overtime-note">Đơn đã duyệt hoặc từ chối sẽ không thể xử lý lại. Dữ liệu minh họa được lưu trên trình duyệt này.</p>
+                <div class="overtime-feedback" id="overtime-feedback" role="status" aria-live="polite"></div>
+                <div class="overtime-table-wrap">
+                    <table class="overtime-table">
+                        <thead><tr><th>Nhân viên</th><th>Bắt đầu</th><th>Kết thúc</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                        <tbody id="admin-overtime-rows"><tr><td colspan="6">Đang tải đơn tăng ca...</td></tr></tbody>
+                    </table>
+                </div>
             </section>
 
             <section class="data-card" id="employee-table" aria-labelledby="table-title">
@@ -368,5 +385,6 @@ $statusFor = static function (array $employee): array {
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="assets/js/attendance.js" defer></script>
+<script src="assets/js/overtime.js" defer></script>
 </body>
 </html>

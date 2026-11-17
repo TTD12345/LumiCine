@@ -91,6 +91,7 @@ foreach ($shifts as $shift) {
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="assets/css/employee.css" rel="stylesheet">
+    <link href="assets/css/overtime.css" rel="stylesheet">
 </head>
 <body>
 <div class="employee-app">
@@ -105,6 +106,7 @@ foreach ($shifts as $shift) {
             <a class="employee-nav-link active" href="#schedule"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
             <a class="employee-nav-link" href="#schedule"><i class="bi bi-people" aria-hidden="true"></i><span>Ca làm việc</span></a>
             <a class="employee-nav-link" href="#schedule"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
+            <a class="employee-nav-link" href="#overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
         </nav>
         <p class="nav-caption nav-caption-spaced">QUẢN LÝ</p>
         <nav class="employee-nav">
@@ -214,6 +216,20 @@ foreach ($shifts as $shift) {
                     <div class="pagination" id="pagination" aria-label="Phân trang"></div>
                 </footer>
             </section>
+            <section class="overtime-card" id="overtime" aria-labelledby="overtime-title">
+                <div class="overtime-heading">
+                    <div><h2 id="overtime-title">Đăng ký tăng ca</h2><p>Gửi lý do và thời gian tăng ca để quản trị viên xem xét.</p></div>
+                    <button class="overtime-button overtime-button-primary" type="button" id="overtime-open-form"><i class="bi bi-plus-lg" aria-hidden="true"></i> Tạo đơn tăng ca</button>
+                </div>
+                <p class="overtime-note">Đơn đăng ký được lưu trên trình duyệt này; đây là dữ liệu minh họa, chưa đồng bộ với máy tính hoặc tài khoản khác.</p>
+                <div class="overtime-feedback" id="overtime-feedback" role="status" aria-live="polite"></div>
+                <div class="overtime-table-wrap">
+                    <table class="overtime-table">
+                        <thead><tr><th>Thời gian</th><th>Lý do</th><th>Trạng thái</th></tr></thead>
+                        <tbody id="employee-overtime-rows"><tr><td colspan="3">Đang tải đơn tăng ca...</td></tr></tbody>
+                    </table>
+                </div>
+            </section>
             <footer class="employee-footer"><span>© <?= date('Y') ?> LumiCine · Quản lý nhân sự</span><button type="button" id="export-report"><i class="bi bi-download"></i> Xuất báo cáo</button></footer>
         </div>
     </main>
@@ -234,6 +250,17 @@ foreach ($shifts as $shift) {
         <footer class="dialog-actions"><button class="secondary-button" type="button" id="cancel-dialog">Hủy</button><button class="primary-button" type="submit" id="save-shift">Lưu ca làm việc</button></footer>
     </form>
 </dialog>
+<dialog class="shift-dialog overtime-dialog" id="overtime-dialog" aria-labelledby="overtime-dialog-title">
+    <form id="overtime-form">
+        <header class="dialog-heading"><div><span class="page-kicker">ĐĂNG KÝ LÀM THÊM</span><h2 id="overtime-dialog-title">Đơn đăng ký tăng ca</h2><p>Thông tin nhân viên: <strong id="overtime-employee-name">Lan Anh</strong></p></div><button class="dialog-close" type="button" id="overtime-close-form" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>
+        <div class="dialog-grid">
+            <label class="dialog-field">Bắt đầu tăng ca<input name="start" type="datetime-local" required></label>
+            <label class="dialog-field">Kết thúc tăng ca<input name="end" type="datetime-local" required></label>
+            <label class="dialog-field full">Lý do tăng ca<textarea name="reason" required minlength="5" maxlength="1000" rows="4" placeholder="Mô tả công việc cần hoàn thành..."></textarea></label>
+        </div>
+        <footer class="dialog-actions"><button class="secondary-button" type="button" id="overtime-cancel-form">Hủy</button><button class="primary-button" type="submit">Gửi đơn</button></footer>
+    </form>
+</dialog>
 <dialog class="shift-dialog" id="account-dialog">
     <form id="account-form" method="dialog">
         <header class="dialog-heading"><div><span class="page-kicker">TÀI KHOẢN</span><h2>Thông tin hiển thị</h2><p>Thay đổi tên được hiển thị trên trang.</p></div><button class="dialog-close" type="button" id="close-account-dialog" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>
@@ -245,5 +272,6 @@ foreach ($shifts as $shift) {
 <script id="shift-data" type="application/json"><?= json_encode($shifts, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <script>window.employeeScheduleConfig = { initialDate: <?= json_encode($initialDate) ?> };</script>
 <script src="assets/js/employee.js" defer></script>
+<script src="assets/js/overtime.js" defer></script>
 </body>
 </html>
