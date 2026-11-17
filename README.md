@@ -9,10 +9,12 @@ LumiCine/
 ├── assets/
 │   ├── css/
 │   │   ├── employee.css
-│   │   └── hrm.css
+│   │   ├── hrm.css
+│   │   └── overtime.css
 │   ├── js/
 │   │   ├── employee.js
-│   │   └── attendance.js
+│   │   ├── attendance.js
+│   │   └── overtime.js
 │   └── uploads/
 ├── configs/
 ├── controllers/
@@ -51,6 +53,7 @@ Trang nhân viên:
 
 - Chuyển ngày, tìm kiếm ca và lọc theo trạng thái.
 - Thêm, sửa, xóa ca và đổi trạng thái; dữ liệu mẫu được lưu theo ngày trong trình duyệt.
+- Gửi đơn đăng ký tăng ca với lý do và thời gian bắt đầu/kết thúc; theo dõi trạng thái duyệt.
 - Xuất danh sách ca thành CSV.
 
 Trang quản trị:
@@ -59,11 +62,14 @@ Trang quản trị:
 - Lọc theo phòng ban, chức vụ và trạng thái công.
 - Chuyển tháng/năm; dữ liệu mẫu và ngày công chuẩn được cập nhật theo kỳ.
 - Xem số lượt/phút đi muộn, ngày nghỉ có lương/không lương và lịch chấm công từng ngày.
+- Duyệt hoặc từ chối các đơn đăng ký tăng ca của nhân viên.
 - Theo dõi ngày lễ đi làm và khoản lương minh họa theo mức 300%; cần thay dữ liệu lương/ngày lễ mẫu bằng cấu hình thực tế trước khi dùng tính lương.
 - Lịch ngày lễ gọi API công khai Nager.Date theo năm và quốc gia `VN`; có thể bổ sung hoặc xóa ngày lễ/ngày nghỉ bù theo thông báo chính thức từng năm.
 - Có thể bổ sung ngày nghỉ hưởng lương và ngày làm bù. Ngày bổ sung lưu trong `localStorage` của trình duyệt hiện tại, không tự đồng bộ giữa máy/người dùng. Nếu API lỗi, trang báo lỗi và vẫn dùng các ngày bổ sung đã lưu.
 - Xuất dữ liệu đang lọc thành CSV UTF-8 tương thích Excel; in báo cáo theo bố cục ngang.
 - Chọn số dòng và chuyển trang; giao diện hỗ trợ cuộn ngang trên bảng dữ liệu.
+
+Đơn tăng ca hiện lưu trong `localStorage` của trình duyệt đang dùng để minh họa luồng giữa trang nhân viên và quản trị. Dữ liệu không được chia sẻ qua thiết bị hoặc người dùng khác; cần tích hợp cơ sở dữ liệu và đăng nhập/phân quyền trước khi sử dụng thực tế.
 
 ### Luồng tải lịch nghỉ Việt Nam
 

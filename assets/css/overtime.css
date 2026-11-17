@@ -1,0 +1,35 @@
+.overtime-card { margin-top: 18px; overflow: hidden; border: 1px solid #eeedf3; border-radius: 12px; background: #fff; }
+.overtime-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 17px 19px 12px; }
+.overtime-heading h2 { margin: 0 0 4px; color: #303044; font-family: Manrope, sans-serif; font-size: 15px; font-weight: 800; }
+.overtime-heading p, .overtime-note { margin: 0; color: #89899b; font-size: 10px; line-height: 1.6; }
+.overtime-note { padding: 0 19px 12px; }
+.overtime-button { display: inline-flex; min-height: 35px; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 7px; padding: 0 11px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.overtime-button-primary { background: #6d5ce8; color: #fff; }
+.overtime-button-primary:hover { background: #5846d3; }
+.overtime-button-approve { background: #eaf8f1; color: #277b56; }
+.overtime-button-reject { background: #fff0ef; color: #b94a45; }
+.overtime-actions { display: flex; justify-content: center; gap: 6px; }
+.overtime-feedback { min-height: 0; padding: 0 19px; color: #277b56; font-size: 10px; }
+.overtime-feedback:not(:empty) { padding-bottom: 10px; }
+.overtime-feedback.error { color: #b94a45; }
+.overtime-table-wrap { overflow-x: auto; border-top: 1px solid #f0eff4; }
+.overtime-table { width: 100%; min-width: 650px; border-collapse: collapse; text-align: left; }
+.overtime-table th { height: 37px; background: #fafafd; padding: 0 12px; color: #9998a8; font-size: 8px; font-weight: 700; letter-spacing: .35px; text-transform: uppercase; white-space: nowrap; }
+.overtime-table td { min-height: 48px; border-top: 1px solid #f2f1f5; padding: 10px 12px; color: #68687c; font-size: 10px; vertical-align: middle; }
+.overtime-table th:first-child, .overtime-table td:first-child { padding-left: 19px; }
+.overtime-reason { min-width: 170px; max-width: 360px; white-space: normal; line-height: 1.6; }
+.overtime-status { display: inline-flex; align-items: center; border-radius: 20px; padding: 5px 8px; font-size: 9px; font-weight: 700; white-space: nowrap; }
+.overtime-status-pending { background: #fff4e5; color: #a76b16; }
+.overtime-status-approved { background: #eaf8f1; color: #277b56; }
+.overtime-status-rejected { background: #fff0ef; color: #b94a45; }
+.overtime-summary { display: grid; justify-items: end; gap: 2px; color: #89899b; font-size: 9px; }
+.overtime-summary strong { color: #a76b16; font-family: Manrope, sans-serif; font-size: 20px; }
+.overtime-dialog textarea { width: 100%; resize: vertical; border: 1px solid #eeedf3; border-radius: 7px; outline: 0; padding: 9px; color: #202033; font: inherit; font-size: 10px; }
+.overtime-dialog textarea:focus { border-color: #a59bf2; box-shadow: 0 0 0 3px #6d5ce81a; }
+.overtime-dialog .dialog-heading strong { color: #55556b; }
+.overtime-dialog .dialog-grid { margin-top: 12px; }
+
+@media (max-width: 520px) {
+    .overtime-heading { align-items: flex-start; flex-direction: column; }
+    .overtime-heading > .overtime-summary { align-self: flex-end; }
+}
