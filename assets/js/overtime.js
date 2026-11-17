@@ -2,7 +2,6 @@
     'use strict';
 
     const storageKey = 'lumicine-overtime-requests';
-    const accountStorageKey = 'lumicine-admin-name';
     const statusLabels = {
         pending: 'Chờ duyệt',
         approved: 'Đã duyệt',
@@ -19,12 +18,8 @@
     };
 
     const getAccountName = () => {
-        try {
-            return window.localStorage.getItem(accountStorageKey) || 'Lan Anh';
-        } catch (error) {
-            showMessage('Không thể đọc thông tin tài khoản trên trình duyệt.', true);
-            return null;
-        }
+        const accountName = document.getElementById('overtime-employee-name');
+        return accountName ? accountName.textContent.trim() : null;
     };
 
     const normalizeRequest = (request) => {
@@ -227,10 +222,6 @@
 
     window.addEventListener('storage', (event) => {
         if (event.key === storageKey) loadRequests();
-        if (event.key === accountStorageKey && employeeRows) {
-            document.getElementById('overtime-employee-name').textContent = getAccountName() || 'Chưa xác định';
-            render();
-        }
     });
 
     loadRequests();

@@ -5,7 +5,6 @@
     const initialDate = config.initialDate;
     const initialShifts = JSON.parse(document.getElementById('shift-data').textContent);
     const storagePrefix = 'lumicine-shifts:';
-    const accountStorageKey = 'lumicine-admin-name';
     const statusLabels = {
         active: 'Đang diễn ra',
         upcoming: 'Sắp bắt đầu',
@@ -373,43 +372,7 @@
         menu.hidden = !menu.hidden;
     });
 
-    const accountDialog = document.getElementById('account-dialog');
-    const accountForm = document.getElementById('account-form');
-    const accountName = document.getElementById('account-name');
     const accountMenu = document.getElementById('account-menu');
-    const profileNames = [
-        document.getElementById('sidebar-account-name'),
-        document.getElementById('top-account-name'),
-    ];
-    try {
-        const savedAccountName = localStorage.getItem(accountStorageKey);
-        if (savedAccountName) profileNames.forEach((element) => { element.textContent = savedAccountName; });
-    } catch (error) {
-        notify('Không thể đọc tên tài khoản đã lưu.', true);
-    }
-
-    document.getElementById('edit-account').addEventListener('click', () => {
-        accountMenu.hidden = true;
-        accountName.value = profileNames[0].textContent;
-        accountDialog.showModal();
-    });
-    document.getElementById('close-account-dialog').addEventListener('click', () => accountDialog.close());
-    document.getElementById('cancel-account-dialog').addEventListener('click', () => accountDialog.close());
-    accountForm.addEventListener('submit', (event) => {
-        event.preventDefault();
-        const name = accountName.value.trim();
-        if (!name) return;
-        try {
-            localStorage.setItem(accountStorageKey, name);
-        } catch (error) {
-            notify('Không thể lưu tên tài khoản trong trình duyệt.', true);
-            return;
-        }
-        profileNames.forEach((element) => { element.textContent = name; });
-        accountDialog.close();
-        notify('Đã cập nhật tên hiển thị.');
-    });
-
     document.getElementById('reset-sample-data').addEventListener('click', () => {
         accountMenu.hidden = true;
         if (!window.confirm('Khôi phục danh sách ca mẫu cho ngày hiện tại? Dữ liệu đã lưu của ngày này sẽ bị thay thế.')) return;

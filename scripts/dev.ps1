@@ -20,5 +20,23 @@ if (-not $phpPath) {
     exit 1
 }
 
-& $phpPath -S 127.0.0.1:8000
+$serverArguments = @()
+$loadedExtensions = & $phpPath -m
+if ($LASTEXITCODE -ne 0) {
+    exit $LASTEXITCODE
+}
+
+if ($loadedExtensions -notcontains 'pdo_mysql') {
+    $extensionDirectory = Join-Path (Split-Path $phpPath) 'ext'
+    $pdoMysqlExtension = Join-Path $extensionDirectory 'php_pdo_mysql.dll'
+    if (-not (Test-Path -LiteralPath $pdoMysqlExtension)) {
+        Write-Error "PDO_MYSQL is required to use the database, but php_pdo_mysql.dll was not found under $extensionDirectory."
+        exit 1
+    }
+
+    $serverArguments += @('-d', "extension=$pdoMysqlExtension")
+}
+
+$serverArguments += @('-S', '127.0.0.1:8000')
+& $phpPath @serverArguments
 exit $LASTEXITCODE

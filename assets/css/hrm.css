@@ -82,6 +82,8 @@ a { color: inherit; }
 .sidebar-nav .nav-link:hover i { color: var(--blue); }
 .sidebar-nav .nav-link.active { background: #edf5ff; color: #236bb7; font-weight: 700; }
 .sidebar-nav .nav-link.active i { color: #2874c8; }
+.sidebar-logout-form { margin: 0; }
+.sidebar-logout-form .nav-link { width: 100%; border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .active-marker { position: absolute; top: 9px; right: 0; width: 3px; height: 25px; border-radius: 3px 0 0 3px; background: #2874c8; }
 
 .sidebar-bottom { margin-top: auto; padding-top: 24px; }
