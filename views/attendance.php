@@ -76,7 +76,7 @@ $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'U
                     <div>
                         <span class="attendance-kicker"><span class="attendance-live-dot"></span> CHẤM CÔNG CỦA TÔI</span>
                         <h2 id="attendance-title">Xin chào, <span id="attendance-name">Lan Anh</span></h2>
-                        <p>Ghi nhận giờ làm việc cho ca hành chính của bạn.</p>
+                        <p>Chấm công vào, ra linh hoạt trong ngày; giờ vào sớm nhất và giờ ra muộn nhất sẽ được lưu.</p>
                     </div>
                 </div>
                 <div class="attendance-card-body">
@@ -94,12 +94,12 @@ $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'U
                         <div class="attendance-events">
                             <div class="attendance-event">
                                 <span class="attendance-event-icon checkin-icon"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i></span>
-                                <span><strong>Giờ vào</strong><small id="attendance-check-in">Chưa ghi nhận</small></span>
+                                <span><strong>Giờ vào đầu tiên</strong><small id="attendance-check-in">Chưa ghi nhận</small></span>
                                 <span class="attendance-event-state" id="attendance-check-in-state">Chờ chấm công</span>
                             </div>
                             <div class="attendance-event">
                                 <span class="attendance-event-icon checkout-icon"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></span>
-                                <span><strong>Giờ ra</strong><small id="attendance-check-out">Chưa ghi nhận</small></span>
+                                <span><strong>Giờ ra cuối cùng</strong><small id="attendance-check-out">Chưa ghi nhận</small></span>
                                 <span class="attendance-event-state" id="attendance-check-out-state">Chờ chấm công</span>
                             </div>
                         </div>

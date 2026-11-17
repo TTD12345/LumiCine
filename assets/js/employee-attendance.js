@@ -24,7 +24,9 @@
 
     const validateRecord = (record) => {
         if (!record || typeof record.checkIn !== 'string' || typeof record.checkOut !== 'string' ||
-            (record.checkOut && !record.checkIn)) {
+            (record.checkOut && !record.checkIn) ||
+            (record.lastPunchType !== undefined &&
+                record.lastPunchType !== 'checkIn' && record.lastPunchType !== 'checkOut')) {
             throw new Error('Dữ liệu chấm công đã lưu không đúng định dạng.');
         }
         return record;
@@ -55,6 +57,11 @@
         return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     };
 
+    const getNextPunchType = (record) => {
+        if (record.lastPunchType) return record.lastPunchType === 'checkIn' ? 'checkOut' : 'checkIn';
+        return record.checkIn && !record.checkOut ? 'checkOut' : 'checkIn';
+    };
+
     const formatMinutes = (minutes) => {
         if (minutes <= 0) return '0';
         const hours = Math.floor(minutes / 60);
@@ -71,8 +78,9 @@
 
     const renderAttendance = () => {
         const { checkIn, checkOut } = attendanceRecord;
-        const isWorking = Boolean(checkIn) && !checkOut;
-        const isComplete = Boolean(checkIn) && Boolean(checkOut);
+        const nextPunchType = getNextPunchType(attendanceRecord);
+        const isWorking = Boolean(checkIn) && nextPunchType === 'checkOut';
+        const isComplete = Boolean(checkOut) && !isWorking;
         const status = document.getElementById('attendance-status');
         const punchButton = document.getElementById('attendance-punch');
         const checkInState = document.getElementById('attendance-check-in-state');
@@ -87,11 +95,11 @@
         status.textContent = isComplete ? 'Đã hoàn thành' : isWorking ? 'Đang làm việc' : 'Chưa bắt đầu';
         status.classList.toggle('is-working', isWorking);
         status.classList.toggle('is-complete', isComplete);
-        punchButton.disabled = isComplete;
-        punchButton.querySelector('span').textContent = isComplete
-            ? 'Ca làm đã hoàn thành'
-            : isWorking ? 'Chấm công ra' : 'Chấm công vào';
-        punchButton.querySelector('i').className = `bi ${isWorking ? 'bi-box-arrow-right' : 'bi-box-arrow-in-right'}`;
+        punchButton.disabled = false;
+        punchButton.querySelector('span').textContent = nextPunchType === 'checkOut'
+            ? 'Chấm công ra'
+            : 'Chấm công vào';
+        punchButton.querySelector('i').className = `bi ${nextPunchType === 'checkOut' ? 'bi-box-arrow-right' : 'bi-box-arrow-in-right'}`;
         document.getElementById('attendance-status-summary').textContent = status.textContent;
     };
 
@@ -168,15 +176,17 @@
     const recordTime = () => {
         const previousRecord = { ...attendanceRecord };
         const now = getCurrentTime();
-        if (!attendanceRecord.checkIn) {
-            attendanceRecord.checkIn = now;
-        } else {
-            if (now <= attendanceRecord.checkIn) {
-                notify('Giờ ra phải sau giờ vào ca.', true);
-                return;
+        const punchType = getNextPunchType(attendanceRecord);
+        if (punchType === 'checkIn') {
+            if (!attendanceRecord.checkIn || now < attendanceRecord.checkIn) {
+                attendanceRecord.checkIn = now;
             }
-            attendanceRecord.checkOut = now;
+        } else {
+            if (!attendanceRecord.checkOut || now > attendanceRecord.checkOut) {
+                attendanceRecord.checkOut = now;
+            }
         }
+        attendanceRecord.lastPunchType = punchType;
 
         try {
             localStorage.setItem(`${storagePrefix}${dateInput.value}`, JSON.stringify(attendanceRecord));
@@ -188,9 +198,9 @@
         }
 
         loadAttendance();
-        notify(attendanceRecord.checkOut
-            ? `Đã ghi nhận giờ ra lúc ${attendanceRecord.checkOut}.`
-            : `Đã ghi nhận giờ vào lúc ${attendanceRecord.checkIn}.`);
+        notify(punchType === 'checkOut'
+            ? `Đã ghi nhận chấm công ra. Giờ ra cuối cùng: ${attendanceRecord.checkOut}.`
+            : `Đã ghi nhận chấm công vào. Giờ vào đầu tiên: ${attendanceRecord.checkIn}.`);
     };
 
     const updateAccountName = () => {
