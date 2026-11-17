@@ -1,4 +1,9 @@
 <?php
+if (!defined('APP_BOOTSTRAPPED')) {
+    http_response_code(404);
+    exit;
+}
+
 $month = filter_input(INPUT_GET, 'month', FILTER_VALIDATE_INT);
 $year = filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT);
 $month = ($month !== false && $month >= 1 && $month <= 12) ? $month : (int) date('n');
@@ -70,7 +75,11 @@ $statusFor = static function (array $employee): array {
         <p class="nav-caption nav-caption-settings">HỆ THỐNG</p>
         <nav class="nav flex-column sidebar-nav">
             <a class="nav-link" href="#filters"><i class="bi bi-gear" aria-hidden="true"></i><span>Cài đặt</span></a>
-            <a class="nav-link" href="?action=/"><i class="bi bi-person-workspace" aria-hidden="true"></i><span>Trang nhân viên</span></a>
+            <a class="nav-link" href="index.php"><i class="bi bi-person-workspace" aria-hidden="true"></i><span>Trang nhân viên</span></a>
+            <form class="sidebar-logout-form" action="index.php?action=logout" method="post">
+                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                <button class="nav-link" type="submit"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span>Đăng xuất</span></button>
+            </form>
         </nav>
 
         <div class="sidebar-bottom">
@@ -81,8 +90,8 @@ $statusFor = static function (array $employee): array {
                 <a href="mailto:hr@example.com">Trung tâm trợ giúp <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
             </div>
             <div class="sidebar-profile">
-                <span class="avatar avatar-admin">LA</span>
-                <span class="profile-copy"><strong>Lan Anh</strong><small>Quản trị viên</small></span>
+                <span class="avatar avatar-admin"><?= htmlspecialchars($currentUser['initials'], ENT_QUOTES, 'UTF-8') ?></span>
+                <span class="profile-copy"><strong><?= htmlspecialchars($currentUser['display_name'], ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars($roleLabel, ENT_QUOTES, 'UTF-8') ?></small></span>
                 <button class="profile-more" type="button" aria-label="Tùy chọn tài khoản"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
             </div>
         </div>
@@ -108,9 +117,9 @@ $statusFor = static function (array $employee): array {
                     <i class="bi bi-bell" aria-hidden="true"></i><span class="notification-indicator"></span>
                 </button>
                 <span class="topbar-divider"></span>
-                <button class="user-menu" type="button" aria-label="Tài khoản Lan Anh">
-                    <span class="avatar avatar-admin">LA</span>
-                    <span class="user-copy"><strong>Lan Anh</strong><small>Quản trị viên</small></span>
+                <button class="user-menu" type="button" aria-label="Tài khoản <?= htmlspecialchars($currentUser['display_name'], ENT_QUOTES, 'UTF-8') ?>">
+                    <span class="avatar avatar-admin"><?= htmlspecialchars($currentUser['initials'], ENT_QUOTES, 'UTF-8') ?></span>
+                    <span class="user-copy"><strong><?= htmlspecialchars($currentUser['display_name'], ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars($roleLabel, ENT_QUOTES, 'UTF-8') ?></small></span>
                     <i class="bi bi-chevron-down user-chevron" aria-hidden="true"></i>
                 </button>
             </div>

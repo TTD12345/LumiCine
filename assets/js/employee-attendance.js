@@ -2,7 +2,6 @@
     'use strict';
 
     const storagePrefix = 'lumicine-attendance:';
-    const accountStorageKey = 'lumicine-admin-name';
     const dateInput = document.getElementById('attendance-date');
     const rowsElement = document.getElementById('attendance-history');
     const emptyState = document.getElementById('attendance-history-empty');
@@ -203,18 +202,6 @@
             : `Đã ghi nhận chấm công vào. Giờ vào đầu tiên: ${attendanceRecord.checkIn}.`);
     };
 
-    const updateAccountName = () => {
-        try {
-            const savedName = localStorage.getItem(accountStorageKey);
-            if (savedName) {
-                ['sidebar-account-name', 'top-account-name', 'attendance-name', 'attendance-profile-name']
-                    .forEach((id) => { document.getElementById(id).textContent = savedName; });
-            }
-        } catch (error) {
-            notify('Không thể đọc tên tài khoản đã lưu.', true);
-        }
-    };
-
     dateInput.addEventListener('change', loadAttendance);
     document.getElementById('attendance-punch').addEventListener('click', recordTime);
     document.getElementById('notifications-button').addEventListener('click', () => {
@@ -235,7 +222,6 @@
         });
     });
 
-    updateAccountName();
     updateClock();
     window.setInterval(updateClock, 1000);
     loadAttendance();

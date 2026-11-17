@@ -1,6 +1,13 @@
 <?php
+if (!defined('APP_BOOTSTRAPPED')) {
+    http_response_code(404);
+    exit;
+}
+
 $today = date('Y-m-d');
 $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+$currentUserName = $escape($currentUser['display_name']);
+$currentUserInitials = $escape($currentUser['initials']);
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -35,10 +42,16 @@ $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'U
             <a class="employee-nav-link" href="?action=/#schedule"><i class="bi bi-graph-up" aria-hidden="true"></i><span>Báo cáo</span></a>
         </nav>
         <div class="employee-sidebar-bottom">
-            <a class="employee-admin-link" href="?action=admin"><i class="bi bi-shield-lock" aria-hidden="true"></i> Trang quản trị HRM</a>
+            <?php if (in_array($currentUser['role'], ['accountant', 'hr', 'chairman'], true)): ?>
+                <a class="employee-admin-link" href="admin.php"><i class="bi bi-shield-lock" aria-hidden="true"></i> Trang quản trị HRM</a>
+            <?php endif; ?>
+            <form class="employee-logout-form" action="index.php?action=logout" method="post">
+                <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                <button class="employee-logout-button" type="submit"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Đăng xuất</button>
+            </form>
             <div class="employee-profile">
-                <span class="profile-avatar">LA</span>
-                <span class="profile-text"><strong id="sidebar-account-name">Lan Anh</strong><small>Nhân viên</small></span>
+                <span class="profile-avatar"><?= $currentUserInitials ?></span>
+                <span class="profile-text"><strong id="sidebar-account-name"><?= $currentUserName ?></strong><small><?= $escape($roleLabel) ?></small></span>
             </div>
         </div>
     </aside>
@@ -53,7 +66,7 @@ $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'U
             <div class="topbar-trailing">
                 <button class="notification-button" type="button" id="notifications-button" aria-label="Thông báo"><i class="bi bi-bell" aria-hidden="true"></i><span></span></button>
                 <span class="topbar-divider"></span>
-                <span class="topbar-profile"><span class="profile-avatar">LA</span><strong id="top-account-name">Lan Anh</strong><i class="bi bi-chevron-down"></i></span>
+                <span class="topbar-profile"><span class="profile-avatar"><?= $currentUserInitials ?></span><strong id="top-account-name"><?= $currentUserName ?></strong><i class="bi bi-chevron-down"></i></span>
             </div>
         </header>
 
@@ -75,6 +88,8 @@ $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'U
                 <div class="attendance-card-top">
                     <div>
                         <span class="attendance-kicker"><span class="attendance-live-dot"></span> CHẤM CÔNG CỦA TÔI</span>
+                        <h2 id="attendance-title">Xin chào, <span id="attendance-name"><?= $currentUserName ?></span></h2>
+                        <p>Ghi nhận giờ làm việc cho ca hành chính của bạn.</p>
                         <h2 id="attendance-title">Xin chào, <span id="attendance-name">Lan Anh</span></h2>
                         <p>Chấm công vào, ra linh hoạt trong ngày; giờ vào sớm nhất và giờ ra muộn nhất sẽ được lưu.</p>
                     </div>
@@ -82,8 +97,8 @@ $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'U
                 <div class="attendance-card-body">
                     <div class="attendance-details">
                         <div class="attendance-employee">
-                            <span class="attendance-employee-avatar">LA</span>
-                            <div><strong id="attendance-profile-name">Lan Anh</strong><span>Nhân viên · LumiCine</span></div>
+                            <span class="attendance-employee-avatar"><?= $currentUserInitials ?></span>
+                            <div><strong id="attendance-profile-name"><?= $currentUserName ?></strong><span><?= $escape($roleLabel) ?> · LumiCine</span></div>
                             <span class="attendance-status" id="attendance-status">Chưa bắt đầu</span>
                         </div>
                         <div class="attendance-shift-info">
