@@ -1,0 +1,223 @@
+.lich-ta-datepicker {
+  --lichta-primary: #d4a373;
+  --lichta-bg: #fffcf7;
+  --lichta-surface: #ffffff;
+  --lichta-popover-bg: #ffffff;
+  --lichta-text: #2c1810;
+  --lichta-text-muted: #8b7355;
+  --lichta-text-dim: #c4b5a0;
+  --lichta-border: #e8ddd0;
+  --lichta-hover-bg: #f5e6d3;
+  --lichta-today-text: #a0522d;
+  --lichta-selected-bg: #a0522d;
+  --lichta-selected-text: #ffffff;
+  --lichta-lunar-text: #b08968;
+  --lichta-first-lunar: #c2185b;
+  --lichta-radius: 8px;
+  --lichta-font: inherit;
+  --lichta-max-width: 420px;
+
+  position: relative;
+  display: inline-block;
+  width: 100%;
+  max-width: var(--lichta-max-width);
+  font-family: var(--lichta-font);
+  box-sizing: border-box;
+}
+
+.lich-ta-datepicker-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border: 1px solid var(--lichta-border);
+  border-radius: var(--lichta-radius);
+  background: var(--lichta-surface);
+  color: var(--lichta-text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.lich-ta-datepicker-input::placeholder {
+  color: var(--lichta-text-muted);
+}
+
+.lich-ta-datepicker-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.lich-ta-datepicker-input:focus-visible {
+  outline: 2px solid var(--lichta-primary);
+  outline-offset: 1px;
+}
+
+.lich-ta-datepicker-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 50;
+  background: var(--lichta-popover-bg);
+  border: 1px solid var(--lichta-border);
+  border-radius: calc(var(--lichta-radius) + 4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  padding: 8px;
+}
+
+/* ── Lưới lịch riêng cho DatePicker (không dùng chung UI với Calendar) ──── */
+
+.lich-ta-datepicker-calendar {
+  width: 260px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  user-select: none;
+}
+
+.lich-ta-datepicker-calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.lich-ta-datepicker-calendar-nav {
+  background: none;
+  border: 1px solid var(--lichta-border);
+  border-radius: var(--lichta-radius);
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--lichta-text);
+  font-size: 0.7rem;
+  transition: all 0.15s ease;
+}
+
+.lich-ta-datepicker-calendar-nav:hover {
+  background: var(--lichta-hover-bg);
+  border-color: var(--lichta-primary);
+}
+
+.lich-ta-datepicker-calendar-title {
+  text-align: center;
+}
+
+.lich-ta-datepicker-calendar-month-year {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--lichta-text);
+}
+
+.lich-ta-datepicker-calendar-canchi {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--lichta-text-muted);
+  margin-top: 1px;
+}
+
+.lich-ta-datepicker-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-bottom: 2px;
+}
+
+.lich-ta-datepicker-calendar-weekday {
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--lichta-text-muted);
+  padding: 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.lich-ta-datepicker-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+}
+
+.lich-ta-datepicker-calendar-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  padding: 2px;
+  border: none;
+  border-radius: var(--lichta-radius);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  font-family: inherit;
+}
+
+.lich-ta-datepicker-calendar-day:hover {
+  background: var(--lichta-hover-bg);
+}
+
+.lich-ta-datepicker-calendar-day:focus-visible {
+  outline: 2px solid var(--lichta-primary);
+  outline-offset: 1px;
+}
+
+.lich-ta-datepicker-calendar-day .solar-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 65%;
+  max-width: 26px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--lichta-text);
+  line-height: 1;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+.lich-ta-datepicker-calendar-day .lunar-day {
+  font-size: 0.58rem;
+  color: var(--lichta-lunar-text);
+  line-height: 1;
+}
+
+.lich-ta-datepicker-calendar-day.is-today .solar-day {
+  color: var(--lichta-today-text);
+  font-weight: 700;
+}
+
+.lich-ta-datepicker-calendar-day.is-today .lunar-day {
+  color: var(--lichta-today-text);
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.lich-ta-datepicker-calendar-day.is-selected .solar-day {
+  background: var(--lichta-selected-bg);
+  color: var(--lichta-selected-text);
+}
+
+.lich-ta-datepicker-calendar-day.is-selected .lunar-day {
+  color: var(--lichta-selected-bg);
+}
+
+.lich-ta-datepicker-calendar-day.is-other-month .solar-day,
+.lich-ta-datepicker-calendar-day.is-other-month .lunar-day {
+  color: var(--lichta-text-dim);
+  opacity: 0.6;
+}
+
+.lich-ta-datepicker-calendar-day.is-first-lunar .lunar-day {
+  color: var(--lichta-first-lunar);
+  font-weight: 600;
+}

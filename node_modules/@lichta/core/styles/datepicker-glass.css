@@ -1,0 +1,27 @@
+/* ── LichTa DatePicker Glassmorphism Theme ───────── */
+.lich-ta-datepicker.lichta-theme-glass {
+  --lichta-primary: #FBBF24 !important;
+  --lichta-bg: transparent !important;
+  --lichta-surface: rgba(255, 255, 255, 0.05) !important;
+  --lichta-popover-bg: rgba(24, 24, 27, 0.92) !important;
+  --lichta-text: #F8FAFC !important;
+  --lichta-text-muted: #94A3B8 !important;
+  --lichta-text-dim: rgba(255, 255, 255, 0.25) !important;
+  --lichta-border: rgba(255, 255, 255, 0.08) !important;
+  --lichta-hover-bg: rgba(255, 255, 255, 0.08) !important;
+  --lichta-today-text: #FBBF24 !important;
+  --lichta-selected-bg: rgba(251, 191, 36, 0.3) !important;
+  --lichta-selected-text: #FBBF24 !important;
+  --lichta-lunar-text: rgba(255, 255, 255, 0.55) !important;
+  --lichta-first-lunar: #FBBF24 !important;
+  --lichta-radius: 12px !important;
+  --lichta-font: 'Outfit', sans-serif !important;
+}
+
+.lich-ta-datepicker.lichta-theme-glass .lich-ta-datepicker-input:hover {
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.lich-ta-datepicker.lichta-theme-glass .lich-ta-datepicker-calendar-nav:hover {
+  color: #FBBF24;
+}

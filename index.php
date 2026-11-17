@@ -1,6 +1,4 @@
-<?php 
-
-session_start();
+<?php
 
 spl_autoload_register(function ($class) {    
     $fileName = "$class.php";

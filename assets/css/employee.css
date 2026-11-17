@@ -53,6 +53,7 @@ a { color: inherit; }
 .topbar-trailing { gap: 14px; }
 .notification-button { position: relative; display: grid; width: 34px; height: 34px; place-items: center; border: 1px solid var(--employee-line); border-radius: 9px; background: #fff; color: #77778b; font-size: 14px; }
 .notification-button > span { position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border: 1px solid #fff; border-radius: 50%; background: #f07e79; }
+
 .topbar-divider { width: 1px; height: 25px; background: var(--employee-line); }
 .topbar-profile { gap: 8px; }
 .topbar-profile .profile-avatar { width: 31px; height: 31px; flex-basis: 31px; font-size: 9px; }

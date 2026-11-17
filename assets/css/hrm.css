@@ -176,14 +176,6 @@ h1, h2, p { margin-top: 0; }
 .working-day-note { display: flex; align-items: center; gap: 6px; border-radius: 7px; background: #f5f8fb; padding: 8px 10px; color: #7c8da0; font-size: 9px; }
 .working-day-note i { color: #4f8ac3; }
 .working-day-note strong { color: #49627c; font-weight: 700; }
-.holiday-source-tools { display: flex; align-items: center; gap: 8px; }
-#holiday-source-status { max-width: 290px; color: #8492a2; font-size: 8px; line-height: 1.5; text-align: right; }
-#holiday-source-status[data-state="error"] { color: #b45b4e; }
-#holiday-source-status[data-state="success"] { color: #4b8c68; }
-#holiday-source-status[data-state="warning"] { color: #a37a37; }
-#holiday-source-status[data-state="loading"] { color: #70869a; }
-.holiday-source-tools .button { min-height: 31px; font-size: 9px; }
-
 .filter-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid #eff2f5; border-bottom: 1px solid #eff2f5; background: #fbfcfe; padding: 12px 19px; }
 .search-control, .filter-select { display: flex; height: 35px; align-items: center; gap: 7px; border: 1px solid #e3e9ef; border-radius: 7px; background: #fff; padding: 0 9px; color: #8291a2; }
 .search-control { min-width: 220px; flex: 1 1 220px; }
@@ -294,12 +286,6 @@ h1, h2, p { margin-top: 0; }
 .calendar-day-unpaid-leave .calendar-day-state, .calendar-marker-unpaid-leave { color: #a97945; }
 .calendar-day-absent { border-color: #f1dedd; background: #fff5f4; }
 .calendar-day-absent .calendar-day-state, .calendar-marker-absent { color: #bf615b; }
-.calendar-day-holiday-off { border-color: #e6e1f7; background: #f8f6ff; }
-.calendar-day-holiday-off .calendar-day-state, .calendar-marker-holiday-off { color: #7667ad; }
-.calendar-day-holiday-worked { border-color: #f0dfc8; background: #fff8ec; }
-.calendar-day-holiday-worked .calendar-day-state, .calendar-marker-holiday-worked { color: #b37a31; }
-.calendar-day-makeup-workday { border-color: #d7e8f4; background: #f2f8fc; }
-.calendar-day-makeup-workday .calendar-day-state, .calendar-marker-makeup-workday { color: #4a7fa9; }
 .calendar-day-unrecorded .calendar-day-state, .calendar-marker-unrecorded { color: #8996a3; }
 .calendar-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px; }
 .calendar-legend-item { display: inline-flex; align-items: center; gap: 5px; color: #73869a; font-size: 8px; }
@@ -309,27 +295,6 @@ h1, h2, p { margin-top: 0; }
 .detail-modal-footer > span i { margin-right: 4px; color: #6e99bf; }
 .detail-modal-footer .button { min-height: 31px; font-size: 9px; }
 .toast-container { z-index: 1100; }
-.holiday-dialog { width: min(590px, calc(100% - 28px)); max-height: min(85vh, 760px); overflow: auto; border: 1px solid #e2eaf1; border-radius: 13px; padding: 0; color: var(--ink); box-shadow: 0 20px 65px #1835532b; }
-.holiday-dialog::backdrop { background: #10243b77; backdrop-filter: blur(2px); }
-.holiday-dialog-content { padding: 19px 21px; }
-.holiday-dialog .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; border-bottom: 1px solid #edf1f5; padding-bottom: 13px; }
-.holiday-dialog .dialog-heading h2 { margin: 0 0 5px; color: #29435e; font-family: Manrope, sans-serif; font-size: 16px; font-weight: 800; }
-.holiday-dialog .dialog-heading p { max-width: 440px; margin: 0; color: #8492a2; font-size: 9px; line-height: 1.6; }
-.holiday-reload-button { margin-top: 7px; border: 0; background: transparent; padding: 0; color: #397bb3; font-size: 8px; font-weight: 600; }
-.holiday-dialog .dialog-close { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid #e6ecf2; border-radius: 7px; background: #fff; color: #74869a; }
-.holiday-dialog-body { padding-top: 14px; }
-.holiday-source-note { margin: 0 0 12px; border-left: 3px solid #e5b970; border-radius: 5px; background: #fff9ef; padding: 9px 11px; color: #88734e; font-size: 9px; line-height: 1.65; }
-.holiday-list { display: grid; gap: 7px; max-height: 240px; overflow-y: auto; margin: 0; padding: 0; list-style: none; }
-.holiday-list-item { display: flex; align-items: center; gap: 8px; border: 1px solid #edf1f5; border-radius: 7px; padding: 8px 9px; }
-.holiday-list-item > span:first-child { min-width: 80px; color: #607891; font-size: 8px; font-weight: 700; }
-.holiday-list-name { flex: 1; color: #435b73; font-size: 9px; font-weight: 600; }
-.holiday-list-source { color: #8292a2; font-size: 8px; }
-.holiday-list-item button { border: 0; background: transparent; color: #b66a61; font-size: 9px; }
-.holiday-list-empty { padding: 15px; color: #8998a8; font-size: 9px; text-align: center; }
-.holiday-add-form { display: grid; grid-template-columns: 1fr 1.4fr 1.1fr auto; align-items: end; gap: 8px; margin-top: 13px; border-top: 1px solid #edf1f5; padding-top: 13px; }
-.holiday-add-form .dialog-field { display: grid; gap: 5px; color: #6f8296; font-size: 9px; font-weight: 600; }
-.holiday-add-form input, .holiday-add-form select { width: 100%; min-width: 0; height: 35px; border: 1px solid #e1e8ef; border-radius: 7px; background: #fff; padding: 0 9px; color: #435b73; font-size: 9px; }
-.holiday-add-form .button { min-height: 35px; font-size: 9px; }
 .hrm-toast { border: 1px solid #dce8f3; border-radius: 9px; background: #fff; padding: 12px 14px; box-shadow: 0 8px 28px #173a5a20; color: #4e657d; font-size: 10px; }
 .hrm-toast i { margin-right: 7px; color: #3a8b67; }
 .sidebar-backdrop { display: none; }
@@ -370,8 +335,6 @@ h1, h2, p { margin-top: 0; }
     .data-card { margin-top: 15px; }
     .data-card-heading { padding-right: 14px; padding-left: 14px; }
     .data-card-tools { width: 100%; justify-items: stretch; }
-    .holiday-source-tools { justify-content: space-between; }
-    #holiday-source-status { text-align: left; }
     .filter-panel { padding-right: 13px; padding-left: 13px; }
     .search-control { flex-basis: 100%; }
     .filter-select { flex: 1 1 30%; max-width: none; }
@@ -405,9 +368,6 @@ h1, h2, p { margin-top: 0; }
     .filter-buttons .button { flex: 1; }
     .table-toolbar-note { max-width: 105px; text-align: right; line-height: 1.4; }
     .detail-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .holiday-dialog-content { padding: 15px; }
-    .holiday-add-form { grid-template-columns: 1fr 1fr; }
-    .holiday-add-form .button { grid-column: 1 / -1; }
     .detail-profile { align-items: flex-start; flex-wrap: wrap; }
     .detail-profile .status-badge { margin-left: 58px; }
     .detail-modal .modal-body { padding: 15px; }

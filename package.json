@@ -4,5 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev.ps1"
+  },
+  "dependencies": {
+    "@lichta/core": "^3.0.1"
   }
 }

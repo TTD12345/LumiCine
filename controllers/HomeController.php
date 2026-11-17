@@ -16,4 +16,5 @@ class HomeController
     {
         require_once PATH_VIEW . 'attendance.php';
     }
+
 }
