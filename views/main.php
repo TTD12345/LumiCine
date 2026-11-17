@@ -103,10 +103,11 @@ foreach ($shifts as $shift) {
         <p class="nav-caption">TỔNG QUAN</p>
         <nav class="employee-nav">
             <a class="employee-nav-link" href="#overview"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Bảng điều khiển</span></a>
-            <a class="employee-nav-link active" href="#schedule"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
+            <a class="employee-nav-link active" href="#schedule" aria-current="page"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
             <a class="employee-nav-link" href="#schedule"><i class="bi bi-people" aria-hidden="true"></i><span>Ca làm việc</span></a>
             <a class="employee-nav-link" href="#schedule"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
             <a class="employee-nav-link" href="#overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
+            <a class="employee-nav-link" href="?action=attendance"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
         </nav>
         <p class="nav-caption nav-caption-spaced">QUẢN LÝ</p>
         <nav class="employee-nav">

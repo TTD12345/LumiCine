@@ -11,4 +11,9 @@ class HomeController
     {
         require_once PATH_VIEW . 'admin.php';
     }
+
+    public function attendance()
+    {
+        require_once PATH_VIEW . 'attendance.php';
+    }
 }
