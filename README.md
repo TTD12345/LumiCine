@@ -42,6 +42,8 @@ LumiCine/
 
 Tạo database `data_employments` (hoặc chọn tên khác), rồi import `database/schema.sql` để tạo bảng tài khoản. PHP phải bật extension `PDO_MYSQL` để kết nối MySQL. Nếu dùng tên database khác hoặc thông tin kết nối khác, cấu hình các biến môi trường `LUMICINE_DB_NAME`, `LUMICINE_DB_HOST`, `LUMICINE_DB_PORT`, `LUMICINE_DB_USERNAME` và `LUMICINE_DB_PASSWORD` trước khi chạy PHP. Các giá trị mặc định dùng MySQL cục bộ, user `root`, mật khẩu trống.
 
+Nếu database đã có bảng `nhan_vien`, chạy `database/migrations/2026-11-18-add-nhan-vien-chuc-vu.sql` để bổ sung cột chức vụ `chuc_vu`.
+
 ## Tạo tài khoản đăng nhập
 
 Tạo password hash trên máy chủ cục bộ bằng PHP CLI (thay chuỗi mẫu bằng mật khẩu do bạn chọn), sau đó chèn tài khoản vào MySQL. Không lưu mật khẩu rõ vào database hoặc mã nguồn:
