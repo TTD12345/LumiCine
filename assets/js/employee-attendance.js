@@ -207,6 +207,19 @@
     document.getElementById('notifications-button').addEventListener('click', () => {
         notify('Dữ liệu chấm công của bạn được lưu trên trình duyệt này.');
     });
+    document.addEventListener('click', (event) => {
+        const menu = document.getElementById('account-menu');
+        const button = document.getElementById('account-menu-button');
+        if (!event.target.closest('.topbar-account')) {
+            menu.hidden = true;
+            button.setAttribute('aria-expanded', 'false');
+        }
+    });
+    document.getElementById('account-menu-button').addEventListener('click', () => {
+        const menu = document.getElementById('account-menu');
+        menu.hidden = !menu.hidden;
+        document.getElementById('account-menu-button').setAttribute('aria-expanded', String(!menu.hidden));
+    });
 
     const sidebar = document.getElementById('employee-sidebar');
     const scrim = document.getElementById('sidebar-scrim');

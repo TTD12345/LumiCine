@@ -56,25 +56,25 @@ $statusFor = static function (array $employee): array {
 <div class="app-shell">
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar" aria-label="Điều hướng chính">
-        <a class="brand" href="#overview" aria-label="HRM - trang chủ">
+        <a class="brand" href="index.php?action=admin-overview" aria-label="HRM - trang chủ">
             <span class="brand-mark"><i class="bi bi-buildings-fill" aria-hidden="true"></i></span>
             <span><strong>HRM</strong><small>PEOPLE MANAGEMENT</small></span>
         </a>
 
         <p class="nav-caption">KHÔNG GIAN LÀM VIỆC</p>
         <nav class="nav flex-column sidebar-nav">
-            <a class="nav-link" href="#overview"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Tổng quan</span></a>
-            <a class="nav-link" href="#employee-table"><i class="bi bi-people" aria-hidden="true"></i><span>Quản lý nhân viên</span></a>
-            <a class="nav-link" href="#employee-table"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Quản lý chấm công</span></a>
-            <a class="nav-link" href="#overtime-requests"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Duyệt tăng ca</span></a>
-            <a class="nav-link active" href="#employee-table" aria-current="page"><i class="bi bi-clipboard-data" aria-hidden="true"></i><span>Tổng hợp công</span><span class="active-marker"></span></a>
-            <a class="nav-link" href="#employee-table"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Quản lý nghỉ phép</span></a>
-            <a class="nav-link" href="#summary-cards"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Báo cáo thống kê</span></a>
+            <a class="nav-link" href="index.php?action=admin-overview"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Tổng quan</span></a>
+            <a class="nav-link" href="index.php?action=admin-employees"><i class="bi bi-people" aria-hidden="true"></i><span>Quản lý nhân viên</span></a>
+            <a class="nav-link" href="index.php?action=admin-attendance"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Quản lý chấm công</span></a>
+            <a class="nav-link" href="index.php?action=admin-overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Duyệt tăng ca</span></a>
+            <a class="nav-link active" href="index.php?action=admin-summary" aria-current="page"><i class="bi bi-clipboard-data" aria-hidden="true"></i><span>Tổng hợp công</span><span class="active-marker"></span></a>
+            <a class="nav-link" href="index.php?action=admin-leave"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Quản lý nghỉ phép</span></a>
+            <a class="nav-link" href="index.php?action=admin-reports"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Báo cáo thống kê</span></a>
         </nav>
 
         <p class="nav-caption nav-caption-settings">HỆ THỐNG</p>
         <nav class="nav flex-column sidebar-nav">
-            <a class="nav-link" href="#filters"><i class="bi bi-gear" aria-hidden="true"></i><span>Cài đặt</span></a>
+            <a class="nav-link" href="index.php?action=admin-settings"><i class="bi bi-gear" aria-hidden="true"></i><span>Cài đặt</span></a>
             <a class="nav-link" href="index.php"><i class="bi bi-person-workspace" aria-hidden="true"></i><span>Trang nhân viên</span></a>
             <form class="sidebar-logout-form" action="index.php?action=logout" method="post">
                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
@@ -106,22 +106,28 @@ $statusFor = static function (array $employee): array {
                 <div class="topbar-title">
                     <strong>Bảng tổng hợp công</strong>
                     <div class="breadcrumbs" aria-label="Breadcrumb">
-                        <a href="#overview">Trang chủ</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
-                        <a href="#employee-table">Chấm công</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
+                        <a href="index.php?action=admin-overview">Trang chủ</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
+                        <a href="index.php?action=admin-attendance">Chấm công</a><i class="bi bi-chevron-right" aria-hidden="true"></i>
                         <span>Tổng hợp công</span>
                     </div>
                 </div>
             </div>
             <div class="topbar-actions">
                 <button class="icon-button notification-button" type="button" id="notification-button" aria-label="Thông báo">
-                    <i class="bi bi-bell" aria-hidden="true"></i><span class="notification-indicator"></span>
+                    <i class="bi bi-bell" aria-hidden="true"></i><span class="notification-indicator" id="notification-indicator" hidden></span>
                 </button>
                 <span class="topbar-divider"></span>
-                <button class="user-menu" type="button" aria-label="Tài khoản <?= htmlspecialchars($currentUser['display_name'], ENT_QUOTES, 'UTF-8') ?>">
+                <button class="user-menu" type="button" id="admin-account-menu-button" aria-haspopup="menu" aria-expanded="false" aria-label="Tài khoản <?= htmlspecialchars($currentUser['display_name'], ENT_QUOTES, 'UTF-8') ?>">
                     <span class="avatar avatar-admin"><?= htmlspecialchars($currentUser['initials'], ENT_QUOTES, 'UTF-8') ?></span>
                     <span class="user-copy"><strong><?= htmlspecialchars($currentUser['display_name'], ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars($roleLabel, ENT_QUOTES, 'UTF-8') ?></small></span>
                     <i class="bi bi-chevron-down user-chevron" aria-hidden="true"></i>
                 </button>
+                <div class="admin-account-menu" id="admin-account-menu" role="menu" hidden>
+                    <form action="index.php?action=logout" method="post">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
+                        <button type="submit" role="menuitem"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Đăng xuất</button>
+                    </form>
+                </div>
             </div>
         </header>
 
@@ -183,21 +189,6 @@ $statusFor = static function (array $employee): array {
                     <div class="summary-value" id="stat-leave">0 <span>ngày</span></div>
                     <div class="summary-foot">Có lương: <strong id="stat-paid-leave">0</strong> · Không lương: <strong id="stat-unpaid-leave">0</strong></div>
                 </article>
-            </section>
-
-            <section class="overtime-card" id="overtime-requests" aria-labelledby="overtime-requests-title">
-                <div class="overtime-heading">
-                    <div><h2 id="overtime-requests-title">Đơn đăng ký tăng ca</h2><p>Xem lý do, thời gian và xử lý các đơn nhân viên gửi.</p></div>
-                    <div class="overtime-summary"><span>Chờ duyệt</span><strong id="overtime-pending-count">0</strong></div>
-                </div>
-                <p class="overtime-note">Đơn đã duyệt hoặc từ chối sẽ không thể xử lý lại. Dữ liệu minh họa được lưu trên trình duyệt này.</p>
-                <div class="overtime-feedback" id="overtime-feedback" role="status" aria-live="polite"></div>
-                <div class="overtime-table-wrap">
-                    <table class="overtime-table">
-                        <thead><tr><th>Nhân viên</th><th>Bắt đầu</th><th>Kết thúc</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
-                        <tbody id="admin-overtime-rows"><tr><td colspan="6">Đang tải đơn tăng ca...</td></tr></tbody>
-                    </table>
-                </div>
             </section>
 
             <section class="data-card" id="employee-table" aria-labelledby="table-title">
@@ -394,6 +385,5 @@ $statusFor = static function (array $employee): array {
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="assets/js/attendance.js" defer></script>
-<script src="assets/js/overtime.js" defer></script>
 </body>
 </html>

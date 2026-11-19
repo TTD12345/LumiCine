@@ -43,6 +43,29 @@ class HomeController
         require_once PATH_VIEW . 'attendance.php';
     }
 
+    public function employeeSection(string $section)
+    {
+        $currentUser = $this->requireUser();
+        $roleLabel = self::ROLE_LABELS[$currentUser['role']];
+        $csrfToken = $this->csrfToken();
+        require_once PATH_VIEW . 'employee_section.php';
+    }
+
+    public function adminSection(string $section)
+    {
+        $currentUser = $this->requireUser();
+        if (!in_array($currentUser['role'], self::ADMIN_ROLES, true)) {
+            http_response_code(403);
+            $csrfToken = $this->csrfToken();
+            require_once PATH_VIEW . 'forbidden.php';
+            return;
+        }
+
+        $roleLabel = self::ROLE_LABELS[$currentUser['role']];
+        $csrfToken = $this->csrfToken();
+        require_once PATH_VIEW . 'admin_section.php';
+    }
+
     public function login()
     {
         $currentUser = $this->authenticatedUser();

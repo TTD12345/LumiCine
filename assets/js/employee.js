@@ -160,6 +160,8 @@
         document.getElementById('summary-active').textContent = String(counts.active);
         document.getElementById('summary-upcoming').textContent = String(counts.upcoming);
         document.getElementById('summary-completed').textContent = String(counts.completed);
+        const notificationIndicator = document.getElementById('notification-indicator');
+        if (notificationIndicator) notificationIndicator.hidden = counts.upcoming === 0;
         document.querySelectorAll('[data-count]').forEach((element) => {
             const status = element.dataset.count;
             element.textContent = String(status === 'all' ? shifts.length : counts[status]);
@@ -359,8 +361,10 @@
 
     document.addEventListener('click', (event) => {
         if (!event.target.closest('.shift-actions')) closeRowMenus();
-        if (!event.target.closest('.employee-profile')) {
-            document.getElementById('account-menu').hidden = true;
+        if (!event.target.closest('.topbar-account')) {
+            const menu = document.getElementById('account-menu');
+            if (menu) menu.hidden = true;
+            document.getElementById('account-menu-button').setAttribute('aria-expanded', 'false');
         }
     });
     document.getElementById('notifications-button').addEventListener('click', () => {
@@ -370,6 +374,7 @@
     document.getElementById('account-menu-button').addEventListener('click', () => {
         const menu = document.getElementById('account-menu');
         menu.hidden = !menu.hidden;
+        document.getElementById('account-menu-button').setAttribute('aria-expanded', String(!menu.hidden));
     });
 
     const accountMenu = document.getElementById('account-menu');
