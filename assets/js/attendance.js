@@ -997,6 +997,20 @@
             if (window.innerWidth <= 760 && sidebar.classList.contains('is-open')) toggleSidebar();
         });
     });
+    const accountMenuButton = document.getElementById('admin-account-menu-button');
+    const accountMenu = document.getElementById('admin-account-menu');
+    if (accountMenuButton && accountMenu) {
+        accountMenuButton.addEventListener('click', () => {
+            accountMenu.hidden = !accountMenu.hidden;
+            accountMenuButton.setAttribute('aria-expanded', String(!accountMenu.hidden));
+        });
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('.topbar-actions')) {
+                accountMenu.hidden = true;
+                accountMenuButton.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
 
     manualHolidays = readManualHolidays();
     fillFilterOptions(departmentFilter, baseEmployees.map((employee) => employee.department), 'Tất cả phòng ban');

@@ -98,29 +98,29 @@ foreach ($shifts as $shift) {
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="assets/css/employee.css" rel="stylesheet">
-    <link href="assets/css/overtime.css" rel="stylesheet">
 </head>
 <body>
 <div class="employee-app">
     <aside class="employee-sidebar" id="employee-sidebar" aria-label="Điều hướng chính">
-        <a class="employee-brand" href="#overview">
+        <a class="employee-brand" href="index.php?action=dashboard">
             <span class="brand-icon"><i class="bi bi-buildings-fill" aria-hidden="true"></i></span>
             <span class="brand-title">LumiCine<small>QUẢN LÝ NHÂN SỰ</small></span>
         </a>
         <p class="nav-caption">TỔNG QUAN</p>
         <nav class="employee-nav">
-            <a class="employee-nav-link" href="#overview"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Bảng điều khiển</span></a>
-            <a class="employee-nav-link active" href="#schedule" aria-current="page"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
-            <a class="employee-nav-link" href="#schedule"><i class="bi bi-people" aria-hidden="true"></i><span>Ca làm việc</span></a>
-            <a class="employee-nav-link" href="#schedule"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
-            <a class="employee-nav-link" href="#overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
-            <a class="employee-nav-link" href="?action=attendance"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
+            <a class="employee-nav-link" href="index.php?action=dashboard"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Bảng điều khiển</span></a>
+            <a class="employee-nav-link active" href="index.php?action=schedule" aria-current="page"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
+            <a class="employee-nav-link" href="index.php?action=shift"><i class="bi bi-people" aria-hidden="true"></i><span>Ca làm việc</span></a>
+            <a class="employee-nav-link" href="index.php?action=overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
+            <a class="employee-nav-link" href="index.php?action=attendance"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
         </nav>
-        <p class="nav-caption nav-caption-spaced">QUẢN LÝ</p>
-        <nav class="employee-nav">
-            <a class="employee-nav-link" href="#schedule"><i class="bi bi-person-vcard" aria-hidden="true"></i><span>Nhân viên</span></a>
-            <a class="employee-nav-link" href="#schedule"><i class="bi bi-graph-up" aria-hidden="true"></i><span>Báo cáo</span></a>
-        </nav>
+        <?php if ($currentUser['role'] !== 'employee'): ?>
+            <p class="nav-caption nav-caption-spaced">QUẢN LÝ</p>
+            <nav class="employee-nav">
+                <a class="employee-nav-link" href="index.php?action=employees"><i class="bi bi-person-vcard" aria-hidden="true"></i><span>Nhân viên</span></a>
+                <a class="employee-nav-link" href="index.php?action=reports"><i class="bi bi-graph-up" aria-hidden="true"></i><span>Báo cáo</span></a>
+            </nav>
+        <?php endif; ?>
         <div class="employee-sidebar-bottom">
             <?php if (in_array($currentUser['role'], ['accountant', 'hr', 'chairman'], true)): ?>
                 <a class="employee-admin-link" href="admin.php"><i class="bi bi-shield-lock" aria-hidden="true"></i> Trang quản trị HRM</a>
@@ -129,14 +129,6 @@ foreach ($shifts as $shift) {
                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
                 <button class="employee-logout-button" type="submit"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Đăng xuất</button>
             </form>
-            <div class="employee-profile">
-                <span class="profile-avatar"><?= $currentUserInitials ?></span>
-                <span class="profile-text"><strong id="sidebar-account-name"><?= $currentUserName ?></strong><small><?= $escape($roleLabel) ?></small></span>
-                <button class="profile-more" type="button" id="account-menu-button" aria-label="Tùy chọn tài khoản"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
-                <div class="account-menu" id="account-menu" hidden>
-                    <button type="button" id="reset-sample-data">Khôi phục dữ liệu mẫu</button>
-                </div>
-            </div>
         </div>
     </aside>
     <div class="sidebar-scrim" id="sidebar-scrim"></div>
@@ -145,12 +137,28 @@ foreach ($shifts as $shift) {
         <header class="employee-topbar">
             <div class="topbar-leading">
                 <button class="mobile-menu" type="button" id="mobile-menu-button" aria-label="Mở menu"><i class="bi bi-list" aria-hidden="true"></i></button>
-                <div><strong>Lịch làm việc</strong><div class="breadcrumbs"><a href="#overview">Trang chủ</a><i class="bi bi-chevron-right"></i><span>Lịch làm việc</span></div></div>
+                <div><strong>Lịch làm việc</strong><div class="breadcrumbs"><a href="?action=dashboard">Trang chủ</a><i class="bi bi-chevron-right"></i><span>Lịch làm việc</span></div></div>
             </div>
             <div class="topbar-trailing">
-                <button class="notification-button" type="button" id="notifications-button" aria-label="Thông báo"><i class="bi bi-bell" aria-hidden="true"></i><span></span></button>
+                <button class="notification-button" type="button" id="notifications-button" aria-label="Thông báo"><i class="bi bi-bell" aria-hidden="true"></i><span id="notification-indicator" hidden></span></button>
                 <span class="topbar-divider"></span>
-                <span class="topbar-profile"><span class="profile-avatar"><?= $currentUserInitials ?></span><strong id="top-account-name"><?= $currentUserName ?></strong><i class="bi bi-chevron-down"></i></span>
+                <div class="topbar-account">
+                    <button class="topbar-profile" type="button" id="account-menu-button" aria-haspopup="menu" aria-expanded="false" aria-label="Tùy chọn tài khoản">
+                        <span class="profile-avatar"><?= $currentUserInitials ?></span>
+                        <span class="topbar-profile-copy">
+                            <strong id="top-account-name"><?= $currentUserName ?></strong>
+                            <small><?= $escape($roleLabel) ?></small>
+                        </span>
+                        <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    </button>
+                    <div class="account-menu" id="account-menu" role="menu" hidden>
+                        <button type="button" id="reset-sample-data" role="menuitem">Khôi phục dữ liệu mẫu</button>
+                        <form action="index.php?action=logout" method="post">
+                            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                            <button type="submit" role="menuitem"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Đăng xuất</button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -229,20 +237,6 @@ foreach ($shifts as $shift) {
                     <div class="pagination" id="pagination" aria-label="Phân trang"></div>
                 </footer>
             </section>
-            <section class="overtime-card" id="overtime" aria-labelledby="overtime-title">
-                <div class="overtime-heading">
-                    <div><h2 id="overtime-title">Đăng ký tăng ca</h2><p>Gửi lý do và thời gian tăng ca để quản trị viên xem xét.</p></div>
-                    <button class="overtime-button overtime-button-primary" type="button" id="overtime-open-form"><i class="bi bi-plus-lg" aria-hidden="true"></i> Tạo đơn tăng ca</button>
-                </div>
-                <p class="overtime-note">Đơn đăng ký được lưu trên trình duyệt này; đây là dữ liệu minh họa, chưa đồng bộ với máy tính hoặc tài khoản khác.</p>
-                <div class="overtime-feedback" id="overtime-feedback" role="status" aria-live="polite"></div>
-                <div class="overtime-table-wrap">
-                    <table class="overtime-table">
-                        <thead><tr><th>Thời gian</th><th>Lý do</th><th>Trạng thái</th></tr></thead>
-                        <tbody id="employee-overtime-rows"><tr><td colspan="3">Đang tải đơn tăng ca...</td></tr></tbody>
-                    </table>
-                </div>
-            </section>
             <footer class="employee-footer"><span>© <?= date('Y') ?> LumiCine · Quản lý nhân sự</span><button type="button" id="export-report"><i class="bi bi-download"></i> Xuất báo cáo</button></footer>
         </div>
     </main>
@@ -263,21 +257,9 @@ foreach ($shifts as $shift) {
         <footer class="dialog-actions"><button class="secondary-button" type="button" id="cancel-dialog">Hủy</button><button class="primary-button" type="submit" id="save-shift">Lưu ca làm việc</button></footer>
     </form>
 </dialog>
-<dialog class="shift-dialog overtime-dialog" id="overtime-dialog" aria-labelledby="overtime-dialog-title">
-    <form id="overtime-form">
-        <header class="dialog-heading"><div><span class="page-kicker">ĐĂNG KÝ LÀM THÊM</span><h2 id="overtime-dialog-title">Đơn đăng ký tăng ca</h2><p>Thông tin nhân viên: <strong id="overtime-employee-name"><?= $currentUserName ?></strong></p></div><button class="dialog-close" type="button" id="overtime-close-form" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>
-        <div class="dialog-grid">
-            <label class="dialog-field">Bắt đầu tăng ca<input name="start" type="datetime-local" required></label>
-            <label class="dialog-field">Kết thúc tăng ca<input name="end" type="datetime-local" required></label>
-            <label class="dialog-field full">Lý do tăng ca<textarea name="reason" required minlength="5" maxlength="1000" rows="4" placeholder="Mô tả công việc cần hoàn thành..."></textarea></label>
-        </div>
-        <footer class="dialog-actions"><button class="secondary-button" type="button" id="overtime-cancel-form">Hủy</button><button class="primary-button" type="submit">Gửi đơn</button></footer>
-    </form>
-</dialog>
 <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
 <script id="shift-data" type="application/json"><?= json_encode($shifts, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <script>window.employeeScheduleConfig = { initialDate: <?= json_encode($initialDate) ?> };</script>
 <script src="assets/js/employee.js" defer></script>
-<script src="assets/js/overtime.js" defer></script>
 </body>
 </html>

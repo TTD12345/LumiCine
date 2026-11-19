@@ -31,16 +31,19 @@ $currentUserInitials = $escape($currentUser['initials']);
         </a>
         <p class="nav-caption">TỔNG QUAN</p>
         <nav class="employee-nav">
-            <a class="employee-nav-link" href="?action=/#overview"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Bảng điều khiển</span></a>
-            <a class="employee-nav-link" href="?action=/#schedule"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
-            <a class="employee-nav-link" href="?action=/#schedule"><i class="bi bi-people" aria-hidden="true"></i><span>Ca làm việc</span></a>
-            <a class="employee-nav-link active" href="?action=attendance" aria-current="page"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
+            <a class="employee-nav-link" href="index.php?action=dashboard"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Bảng điều khiển</span></a>
+            <a class="employee-nav-link" href="index.php?action=schedule"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
+            <a class="employee-nav-link" href="index.php?action=shift"><i class="bi bi-people" aria-hidden="true"></i><span>Ca làm việc</span></a>
+            <a class="employee-nav-link" href="index.php?action=overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
+            <a class="employee-nav-link active" href="index.php?action=attendance" aria-current="page"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
         </nav>
-        <p class="nav-caption nav-caption-spaced">QUẢN LÝ</p>
-        <nav class="employee-nav">
-            <a class="employee-nav-link" href="?action=/#schedule"><i class="bi bi-person-vcard" aria-hidden="true"></i><span>Nhân viên</span></a>
-            <a class="employee-nav-link" href="?action=/#schedule"><i class="bi bi-graph-up" aria-hidden="true"></i><span>Báo cáo</span></a>
-        </nav>
+        <?php if ($currentUser['role'] !== 'employee'): ?>
+            <p class="nav-caption nav-caption-spaced">QUẢN LÝ</p>
+            <nav class="employee-nav">
+                <a class="employee-nav-link" href="index.php?action=employees"><i class="bi bi-person-vcard" aria-hidden="true"></i><span>Nhân viên</span></a>
+                <a class="employee-nav-link" href="index.php?action=reports"><i class="bi bi-graph-up" aria-hidden="true"></i><span>Báo cáo</span></a>
+            </nav>
+        <?php endif; ?>
         <div class="employee-sidebar-bottom">
             <?php if (in_array($currentUser['role'], ['accountant', 'hr', 'chairman'], true)): ?>
                 <a class="employee-admin-link" href="admin.php"><i class="bi bi-shield-lock" aria-hidden="true"></i> Trang quản trị HRM</a>
@@ -49,10 +52,6 @@ $currentUserInitials = $escape($currentUser['initials']);
                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
                 <button class="employee-logout-button" type="submit"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Đăng xuất</button>
             </form>
-            <div class="employee-profile">
-                <span class="profile-avatar"><?= $currentUserInitials ?></span>
-                <span class="profile-text"><strong id="sidebar-account-name"><?= $currentUserName ?></strong><small><?= $escape($roleLabel) ?></small></span>
-            </div>
         </div>
     </aside>
     <div class="sidebar-scrim" id="sidebar-scrim"></div>
@@ -64,9 +63,24 @@ $currentUserInitials = $escape($currentUser['initials']);
                 <div><strong>Chấm công</strong><div class="breadcrumbs"><a href="?action=/">Trang chủ</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span>Chấm công</span></div></div>
             </div>
             <div class="topbar-trailing">
-                <button class="notification-button" type="button" id="notifications-button" aria-label="Thông báo"><i class="bi bi-bell" aria-hidden="true"></i><span></span></button>
+                <button class="notification-button" type="button" id="notifications-button" aria-label="Thông báo"><i class="bi bi-bell" aria-hidden="true"></i></button>
                 <span class="topbar-divider"></span>
-                <span class="topbar-profile"><span class="profile-avatar"><?= $currentUserInitials ?></span><strong id="top-account-name"><?= $currentUserName ?></strong><i class="bi bi-chevron-down"></i></span>
+                <div class="topbar-account">
+                    <button class="topbar-profile" type="button" id="account-menu-button" aria-haspopup="menu" aria-expanded="false" aria-label="Tùy chọn tài khoản">
+                        <span class="profile-avatar"><?= $currentUserInitials ?></span>
+                        <span class="topbar-profile-copy">
+                            <strong id="top-account-name"><?= $currentUserName ?></strong>
+                            <small><?= $escape($roleLabel) ?></small>
+                        </span>
+                        <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                    </button>
+                    <div class="account-menu" id="account-menu" role="menu" hidden>
+                        <form action="index.php?action=logout" method="post">
+                            <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
+                            <button type="submit" role="menuitem"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Đăng xuất</button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -90,8 +104,6 @@ $currentUserInitials = $escape($currentUser['initials']);
                         <span class="attendance-kicker"><span class="attendance-live-dot"></span> CHẤM CÔNG CỦA TÔI</span>
                         <h2 id="attendance-title">Xin chào, <span id="attendance-name"><?= $currentUserName ?></span></h2>
                         <p>Ghi nhận giờ làm việc cho ca hành chính của bạn.</p>
-                        <h2 id="attendance-title">Xin chào, <span id="attendance-name">Lan Anh</span></h2>
-                        <p>Chấm công vào, ra linh hoạt trong ngày; giờ vào sớm nhất và giờ ra muộn nhất sẽ được lưu.</p>
                     </div>
                 </div>
                 <div class="attendance-card-body">
@@ -158,7 +170,7 @@ $currentUserInitials = $escape($currentUser['initials']);
                 </div>
                 <footer class="schedule-footer"><span id="attendance-history-count">Chưa có dữ liệu chấm công</span><span class="history-storage-note">Dữ liệu bản thử nghiệm lưu trong trình duyệt.</span></footer>
             </section>
-            <footer class="employee-footer"><span>© <?= date('Y') ?> LumiCine · Quản lý nhân sự</span><a href="?action=/#schedule">Quay lại lịch làm việc</a></footer>
+            <footer class="employee-footer"><span>© <?= date('Y') ?> LumiCine · Quản lý nhân sự</span><a href="?action=schedule">Quay lại lịch làm việc</a></footer>
         </div>
     </main>
 </div>

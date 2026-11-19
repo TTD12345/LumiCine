@@ -1,0 +1,118 @@
+<?php
+if (!defined('APP_BOOTSTRAPPED')) {
+    http_response_code(404);
+    exit;
+}
+
+$escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+$pages = [
+    'overview' => ['title' => 'Tổng quan', 'kicker' => 'KHÔNG GIAN LÀM VIỆC', 'description' => 'Tổng quan hoạt động nhân sự và chấm công.'],
+    'employees' => ['title' => 'Quản lý nhân viên', 'kicker' => 'NHÂN SỰ', 'description' => 'Quản lý thông tin và hồ sơ nhân viên.'],
+    'attendance' => ['title' => 'Quản lý chấm công', 'kicker' => 'CHẤM CÔNG', 'description' => 'Theo dõi và quản lý dữ liệu chấm công nhân viên.'],
+    'overtime' => ['title' => 'Duyệt tăng ca', 'kicker' => 'TĂNG CA', 'description' => 'Xem và xử lý các đơn đăng ký tăng ca.'],
+    'leave' => ['title' => 'Quản lý nghỉ phép', 'kicker' => 'NGHỈ PHÉP', 'description' => 'Theo dõi và xử lý đơn nghỉ phép.'],
+    'reports' => ['title' => 'Báo cáo thống kê', 'kicker' => 'BÁO CÁO', 'description' => 'Xem thống kê và xuất báo cáo nhân sự.'],
+    'settings' => ['title' => 'Cài đặt', 'kicker' => 'HỆ THỐNG', 'description' => 'Cấu hình thông tin và tham số hệ thống.'],
+];
+$page = $pages[$section] ?? $pages['overview'];
+$isOvertime = $section === 'overtime';
+$employees = [
+    ['id' => 'NV001', 'name' => 'Nguyễn Minh Anh', 'department' => 'Hành chính - Nhân sự', 'position' => 'Trưởng phòng nhân sự', 'worked' => 22, 'leave' => 0, 'late' => 0],
+    ['id' => 'NV002', 'name' => 'Trần Quốc Bảo', 'department' => 'Kinh doanh', 'position' => 'Chuyên viên kinh doanh', 'worked' => 20, 'leave' => 1, 'late' => 3],
+    ['id' => 'NV003', 'name' => 'Lê Hoàng Yến', 'department' => 'Marketing', 'position' => 'Chuyên viên marketing', 'worked' => 19, 'leave' => 2, 'late' => 1],
+    ['id' => 'NV004', 'name' => 'Phạm Đức Long', 'department' => 'Kế toán', 'position' => 'Kế toán viên', 'worked' => 18, 'leave' => 0, 'late' => 2],
+    ['id' => 'NV005', 'name' => 'Võ Ngọc Mai', 'department' => 'Hành chính - Nhân sự', 'position' => 'Nhân viên hành chính', 'worked' => 21, 'leave' => 1, 'late' => 1],
+    ['id' => 'NV006', 'name' => 'Đặng Tuấn Kiệt', 'department' => 'Công nghệ thông tin', 'position' => 'Chuyên viên IT', 'worked' => 22, 'leave' => 0, 'late' => 0],
+];
+?>
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?= $escape($page['title']) ?> | LumiCine HRM</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="assets/css/hrm.css" rel="stylesheet">
+    <?php if ($isOvertime): ?><link href="assets/css/overtime.css" rel="stylesheet"><?php endif; ?>
+</head>
+<body>
+<div class="app-shell">
+    <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
+    <aside class="sidebar" id="sidebar" aria-label="Điều hướng quản trị">
+        <a class="brand" href="?action=admin-overview"><span class="brand-mark"><i class="bi bi-buildings-fill"></i></span><span><strong>HRM</strong><small>PEOPLE MANAGEMENT</small></span></a>
+        <p class="nav-caption">KHÔNG GIAN LÀM VIỆC</p>
+        <nav class="nav flex-column sidebar-nav">
+            <a class="nav-link <?= $section === 'overview' ? 'active' : '' ?>" href="?action=admin-overview"><i class="bi bi-grid-1x2"></i><span>Tổng quan</span></a>
+            <a class="nav-link <?= $section === 'employees' ? 'active' : '' ?>" href="?action=admin-employees"><i class="bi bi-people"></i><span>Quản lý nhân viên</span></a>
+            <a class="nav-link <?= $section === 'attendance' ? 'active' : '' ?>" href="?action=admin-attendance"><i class="bi bi-calendar2-check"></i><span>Quản lý chấm công</span></a>
+            <a class="nav-link <?= $section === 'overtime' ? 'active' : '' ?>" href="?action=admin-overtime"><i class="bi bi-clock-history"></i><span>Duyệt tăng ca</span></a>
+            <a class="nav-link" href="?action=admin-summary"><i class="bi bi-clipboard-data"></i><span>Tổng hợp công</span></a>
+            <a class="nav-link <?= $section === 'leave' ? 'active' : '' ?>" href="?action=admin-leave"><i class="bi bi-calendar2-minus"></i><span>Quản lý nghỉ phép</span></a>
+            <a class="nav-link <?= $section === 'reports' ? 'active' : '' ?>" href="?action=admin-reports"><i class="bi bi-bar-chart-line"></i><span>Báo cáo thống kê</span></a>
+        </nav>
+        <p class="nav-caption nav-caption-settings">HỆ THỐNG</p>
+        <nav class="nav flex-column sidebar-nav">
+            <a class="nav-link <?= $section === 'settings' ? 'active' : '' ?>" href="?action=admin-settings"><i class="bi bi-gear"></i><span>Cài đặt</span></a>
+            <a class="nav-link" href="index.php"><i class="bi bi-person-workspace"></i><span>Trang nhân viên</span></a>
+        </nav>
+        <div class="sidebar-bottom">
+            <div class="sidebar-profile">
+                <span class="avatar avatar-admin"><?= $escape($currentUser['initials']) ?></span>
+                <span class="profile-copy"><strong><?= $escape($currentUser['display_name']) ?></strong><small><?= $escape($roleLabel) ?></small></span>
+            </div>
+        </div>
+    </aside>
+    <main class="main-content">
+        <header class="topbar">
+            <div class="topbar-left"><button class="mobile-menu-button" type="button" id="sidebar-toggle"><i class="bi bi-list"></i></button><div class="topbar-title"><strong><?= $escape($page['title']) ?></strong><div class="breadcrumbs"><a href="?action=admin-overview">Trang chủ</a><i class="bi bi-chevron-right"></i><span><?= $escape($page['title']) ?></span></div></div></div>
+            <div class="topbar-actions">
+                <button class="icon-button notification-button" type="button" id="notification-button" aria-label="Thông báo"><i class="bi bi-bell"></i><span class="notification-indicator" id="notification-indicator" hidden></span></button>
+                <span class="topbar-divider"></span>
+                <button class="user-menu" type="button" id="admin-account-menu-button" aria-haspopup="menu" aria-expanded="false"><span class="avatar avatar-admin"><?= $escape($currentUser['initials']) ?></span><span class="user-copy"><strong><?= $escape($currentUser['display_name']) ?></strong><small><?= $escape($roleLabel) ?></small></span><i class="bi bi-chevron-down user-chevron"></i></button>
+                <div class="admin-account-menu" id="admin-account-menu" role="menu" hidden>
+                    <form action="index.php?action=logout" method="post"><input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><button type="submit" role="menuitem"><i class="bi bi-box-arrow-right"></i> Đăng xuất</button></form>
+                </div>
+            </div>
+        </header>
+        <div class="page-container">
+            <section class="page-intro"><div><div class="page-kicker"><span></span> <?= $escape($page['kicker']) ?></div><h1><?= $escape($page['title']) ?></h1><p><?= $escape($page['description']) ?></p></div></section>
+            <?php if ($isOvertime): ?>
+                <section class="overtime-card" id="overtime-requests" aria-labelledby="overtime-requests-title">
+                    <div class="overtime-heading"><div><h2 id="overtime-requests-title">Đơn đăng ký tăng ca</h2><p>Xem lý do, thời gian và xử lý các đơn nhân viên gửi.</p></div><div class="overtime-summary"><span>Chờ duyệt</span><strong id="overtime-pending-count">0</strong></div></div>
+                    <div class="overtime-feedback" id="overtime-feedback" role="status" aria-live="polite"></div>
+                    <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Nhân viên</th><th>Bắt đầu</th><th>Kết thúc</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="admin-overtime-rows"><tr><td colspan="6">Đang tải đơn tăng ca...</td></tr></tbody></table></div>
+                </section>
+            <?php elseif ($section === 'overview'): ?>
+                <section class="summary-grid">
+                    <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-blue"><i class="bi bi-people-fill"></i></span></div><p class="summary-label">Nhân viên</p><div class="summary-value"><?= count($employees) ?> <span>người</span></div></article>
+                    <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-green"><i class="bi bi-calendar2-check-fill"></i></span></div><p class="summary-label">Ngày công</p><div class="summary-value"><?= array_sum(array_column($employees, 'worked')) ?> <span>ngày</span></div></article>
+                    <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-orange"><i class="bi bi-clock-history"></i></span></div><p class="summary-label">Đi muộn</p><div class="summary-value"><?= array_sum(array_column($employees, 'late')) ?> <span>lượt</span></div></article>
+                    <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-purple"><i class="bi bi-calendar2-heart-fill"></i></span></div><p class="summary-label">Nghỉ phép</p><div class="summary-value"><?= array_sum(array_column($employees, 'leave')) ?> <span>ngày</span></div></article>
+                </section>
+            <?php elseif (in_array($section, ['employees', 'attendance', 'leave', 'reports'], true)): ?>
+                <?php if ($section === 'leave'): ?>
+                    <section class="data-card"><div class="table-card-header"><div><h2>Danh sách nghỉ phép</h2><p>Thông tin nghỉ phép của nhân viên.</p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Nhân viên</th><th>Bộ phận</th><th>Ngày nghỉ</th><th>Trạng thái</th></tr></thead><tbody><?php foreach ($employees as $employee): ?><?php if ($employee['leave'] > 0): ?><tr><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= (int) $employee['leave'] ?> ngày</td><td><span class="status-badge status-paid">Đã ghi nhận</span></td></tr><?php endif; ?><?php endforeach; ?></tbody></table></div></section>
+                <?php elseif ($section === 'reports'): ?>
+                    <section class="summary-grid">
+                        <article class="summary-card"><p class="summary-label">Tổng nhân viên</p><div class="summary-value"><?= count($employees) ?></div></article>
+                        <article class="summary-card"><p class="summary-label">Tổng ngày công</p><div class="summary-value"><?= array_sum(array_column($employees, 'worked')) ?></div></article>
+                        <article class="summary-card"><p class="summary-label">Lượt đi muộn</p><div class="summary-value"><?= array_sum(array_column($employees, 'late')) ?></div></article>
+                        <article class="summary-card"><p class="summary-label">Ngày nghỉ phép</p><div class="summary-value"><?= array_sum(array_column($employees, 'leave')) ?></div></article>
+                    </section>
+                <?php else: ?>
+                    <section class="data-card"><div class="table-card-header"><div><h2><?= $section === 'attendance' ? 'Dữ liệu chấm công' : 'Danh sách nhân viên' ?></h2><p><?= $section === 'attendance' ? 'Tổng hợp ngày công theo nhân viên.' : 'Thông tin nhân viên trong hệ thống.' ?></p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th><?php if ($section === 'attendance'): ?><th>Ngày công</th><th>Đi muộn</th><?php endif; ?></tr></thead><tbody><?php foreach ($employees as $employee): ?><tr><td><?= $escape($employee['id']) ?></td><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= $escape($employee['position']) ?></td><?php if ($section === 'attendance'): ?><td><?= (int) $employee['worked'] ?> ngày</td><td><?= (int) $employee['late'] ?> lượt</td><?php endif; ?></tr><?php endforeach; ?></tbody></table></div></section>
+                <?php endif; ?>
+            <?php elseif ($section === 'settings'): ?>
+                <section class="data-card"><div class="table-card-header"><div><h2>Cài đặt hệ thống</h2><p>Cấu hình chung cho LumiCine HRM.</p></div></div><div class="settings-grid"><label>Giờ bắt đầu ca<input type="time" value="08:00"></label><label>Giờ kết thúc ca<input type="time" value="17:00"></label><label>Ngày công chuẩn/tháng<input type="number" min="1" max="31" value="22"></label><button class="button button-primary" type="button">Lưu cài đặt</button></div></section>
+            <?php else: ?>
+                <section class="data-card section-placeholder"><div class="table-card-header"><div><h2><?= $escape($page['title']) ?></h2><p>Chức năng này đã được đặt trên trang riêng.</p></div></div></section>
+            <?php endif; ?>
+        </div>
+    </main>
+</div>
+<div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container" aria-live="polite"></div>
+<script src="assets/js/admin-section.js" defer></script>
+<?php if ($isOvertime): ?><script src="assets/js/overtime.js" defer></script><?php endif; ?>
+</body>
+</html>
