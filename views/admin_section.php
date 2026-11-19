@@ -79,9 +79,9 @@ $employees = [
             <section class="page-intro"><div><div class="page-kicker"><span></span> <?= $escape($page['kicker']) ?></div><h1><?= $escape($page['title']) ?></h1><p><?= $escape($page['description']) ?></p></div></section>
             <?php if ($isOvertime): ?>
                 <section class="overtime-card" id="overtime-requests" aria-labelledby="overtime-requests-title">
-                    <div class="overtime-heading"><div><h2 id="overtime-requests-title">Đơn đăng ký tăng ca</h2><p>Xem lý do, thời gian và xử lý các đơn nhân viên gửi.</p></div><div class="overtime-summary"><span>Chờ duyệt</span><strong id="overtime-pending-count">0</strong></div></div>
+                    <div class="overtime-heading"><div><h2 id="overtime-requests-title">Đơn đăng ký tăng ca</h2><p>Xem bộ phận, lý do, thời gian và xử lý các đơn nhân viên gửi. Chỉ đơn chờ duyệt mới có nút thao tác.</p></div><div class="overtime-summary"><span>Chờ duyệt</span><strong id="overtime-pending-count">0</strong></div></div>
                     <div class="overtime-feedback" id="overtime-feedback" role="status" aria-live="polite"></div>
-                    <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Nhân viên</th><th>Bắt đầu</th><th>Kết thúc</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="admin-overtime-rows"><tr><td colspan="6">Đang tải đơn tăng ca...</td></tr></tbody></table></div>
+                    <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Nhân viên</th><th>Bộ phận</th><th>Bắt đầu</th><th>Kết thúc</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="admin-overtime-rows"><tr><td colspan="7">Đang tải đơn tăng ca...</td></tr></tbody></table></div>
                 </section>
             <?php elseif ($section === 'overview'): ?>
                 <section class="summary-grid">

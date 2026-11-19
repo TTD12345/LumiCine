@@ -2,6 +2,8 @@
     'use strict';
 
     const storageKey = 'lumicine-overtime-requests';
+    const officeStartHour = 8;
+    const officeEndHour = 17;
     const statusLabels = {
         pending: 'Chờ duyệt',
         approved: 'Đã duyệt',
@@ -30,7 +32,12 @@
             Date.parse(request.end) <= Date.parse(request.start)) {
             throw new Error('Dữ liệu đơn tăng ca đã lưu không đúng định dạng.');
         }
-        return request;
+        return {
+            ...request,
+            department: typeof request.department === 'string' && request.department.trim() !== ''
+                ? request.department
+                : 'Chưa cập nhật',
+        };
     };
 
     const readRequests = () => {
@@ -65,6 +72,28 @@
         timeStyle: 'short',
     }).format(new Date(value));
 
+    const overlapsOfficeHours = (startValue, endValue) => {
+        const start = Date.parse(startValue);
+        const end = Date.parse(endValue);
+        if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return false;
+        if (end - start >= 24 * 60 * 60 * 1000) return true;
+
+        const day = new Date(start);
+        day.setHours(0, 0, 0, 0);
+        const lastDay = new Date(end);
+        lastDay.setHours(0, 0, 0, 0);
+
+        while (day <= lastDay) {
+            const officeStart = new Date(day);
+            officeStart.setHours(officeStartHour, 0, 0, 0);
+            const officeEnd = new Date(day);
+            officeEnd.setHours(officeEndHour, 0, 0, 0);
+            if (start < officeEnd.getTime() && end > officeStart.getTime()) return true;
+            day.setDate(day.getDate() + 1);
+        }
+        return false;
+    };
+
     const createStatus = (status) => {
         const badge = document.createElement('span');
         badge.className = `overtime-status overtime-status-${status}`;
@@ -82,13 +111,14 @@
         if (ownRequests.length === 0) {
             const row = employeeRows.insertRow();
             makeCell(row, 'Bạn chưa có đơn đăng ký tăng ca nào.');
-            row.cells[0].colSpan = 3;
+            row.cells[0].colSpan = 4;
             return;
         }
 
         ownRequests.slice().reverse().forEach((request) => {
             const row = employeeRows.insertRow();
             makeCell(row, `${formatDateTime(request.start)} – ${formatDateTime(request.end)}`);
+            makeCell(row, request.department);
             makeCell(row, request.reason, 'overtime-reason');
             row.insertCell().append(createStatus(request.status));
         });
@@ -104,20 +134,21 @@
         if (requests.length === 0) {
             const row = adminRows.insertRow();
             makeCell(row, 'Chưa có đơn đăng ký tăng ca.');
-            row.cells[0].colSpan = 6;
+            row.cells[0].colSpan = 7;
             return;
         }
 
         requests.slice().reverse().forEach((request) => {
             const row = adminRows.insertRow();
             makeCell(row, request.employeeName);
+            makeCell(row, request.department);
             makeCell(row, formatDateTime(request.start));
             makeCell(row, formatDateTime(request.end));
             makeCell(row, request.reason, 'overtime-reason');
             row.insertCell().append(createStatus(request.status));
             const actionCell = row.insertCell();
             if (request.status !== 'pending') {
-                actionCell.textContent = '—';
+                actionCell.textContent = 'Đã xử lý';
                 return;
             }
             const actions = document.createElement('div');
@@ -157,10 +188,38 @@
         const form = document.getElementById('overtime-form');
         const employeeName = document.getElementById('overtime-employee-name');
         employeeName.textContent = getAccountName() || 'Chưa xác định';
+        const showFormMessage = (message, isError = false) => {
+            const formFeedback = document.getElementById('overtime-form-feedback');
+            formFeedback.textContent = message;
+            formFeedback.classList.toggle('error', isError);
+        };
+        const validateTimeRange = () => {
+            const start = form.elements.start.value;
+            const end = form.elements.end.value;
+            if (!start || !end) {
+                showFormMessage('');
+                return true;
+            }
+            if (Date.parse(end) <= Date.parse(start)) {
+                showFormMessage('Thời gian kết thúc phải sau thời gian bắt đầu.', true);
+                return false;
+            }
+            if (overlapsOfficeHours(start, end)) {
+                showFormMessage('Thời gian tăng ca không được trùng giờ hành chính (08:00–17:00).', true);
+                return false;
+            }
+            showFormMessage('');
+            return true;
+        };
 
         document.getElementById('overtime-open-form').addEventListener('click', () => {
             const start = new Date();
-            start.setHours(start.getHours() + 1, 0, 0, 0);
+            if (start.getHours() < officeEndHour) {
+                start.setHours(officeEndHour, 0, 0, 0);
+            } else {
+                start.setMinutes(0, 0, 0);
+                start.setHours(start.getHours() + 1);
+            }
             const end = new Date(start.getTime() + 60 * 60 * 1000);
             const toLocalInput = (date) => [
                 date.getFullYear(),
@@ -169,7 +228,12 @@
             ].join('-') + `T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
             form.elements.start.value = toLocalInput(start);
             form.elements.end.value = toLocalInput(end);
+            showFormMessage('');
             dialog.showModal();
+        });
+        ['input', 'change'].forEach((eventName) => {
+            form.elements.start.addEventListener(eventName, validateTimeRange);
+            form.elements.end.addEventListener(eventName, validateTimeRange);
         });
         ['overtime-close-form', 'overtime-cancel-form'].forEach((id) => {
             document.getElementById(id).addEventListener('click', () => dialog.close());
@@ -179,22 +243,28 @@
             const name = getAccountName();
             const start = form.elements.start.value;
             const end = form.elements.end.value;
+            const department = form.elements.department.value.trim();
             const reason = form.elements.reason.value.trim();
-            if (!name || !reason || reason.length < 5 || !start || !end ||
+            if (!name || !department || !reason || reason.length < 5 || !start || !end ||
                 Date.parse(end) <= Date.parse(start)) {
-                showMessage('Vui lòng nhập lý do (ít nhất 5 ký tự) và thời gian kết thúc sau thời gian bắt đầu.', true);
+                showFormMessage('Vui lòng nhập bộ phận, lý do (ít nhất 5 ký tự) và thời gian kết thúc sau thời gian bắt đầu.', true);
                 return;
             }
+            if (!validateTimeRange()) return;
             const request = {
                 id: `overtime-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
                 employeeName: name.trim(),
+                department,
                 start,
                 end,
                 reason,
                 status: 'pending',
                 submittedAt: new Date().toISOString(),
             };
-            if (!persistRequests([...requests, request])) return;
+            if (!persistRequests([...requests, request])) {
+                showFormMessage('Không thể lưu đơn tăng ca trên trình duyệt. Hãy kiểm tra dung lượng lưu trữ và thử lại.', true);
+                return;
+            }
             form.reset();
             dialog.close();
             showMessage('Đã gửi đơn đăng ký tăng ca để quản trị viên xem xét.');

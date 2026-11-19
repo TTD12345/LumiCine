@@ -43,6 +43,7 @@ LumiCine/
 Tạo database `data_employments` (hoặc chọn tên khác), rồi import `database/schema.sql` để tạo bảng tài khoản. PHP phải bật extension `PDO_MYSQL` để kết nối MySQL. Nếu dùng tên database khác hoặc thông tin kết nối khác, cấu hình các biến môi trường `LUMICINE_DB_NAME`, `LUMICINE_DB_HOST`, `LUMICINE_DB_PORT`, `LUMICINE_DB_USERNAME` và `LUMICINE_DB_PASSWORD` trước khi chạy PHP. Các giá trị mặc định dùng MySQL cục bộ, user `root`, mật khẩu trống.
 
 Nếu database đã có bảng `nhan_vien`, chạy `database/migrations/2026-11-18-add-nhan-vien-chuc-vu.sql` để bổ sung cột chức vụ `chuc_vu`.
+Chạy `database/migrations/2026-11-19-link-nhan-vien-user.sql` để liên kết hồ sơ nhân viên với tài khoản đăng nhập bằng cột `nhan_vien.user_id -> lumicine_users.id`. Mỗi tài khoản chỉ liên kết tối đa một hồ sơ nhân viên, nhưng cột liên kết có thể để trống cho nhân viên chưa có tài khoản.
 
 ## Tạo tài khoản đăng nhập
 
@@ -77,7 +78,7 @@ Trang nhân viên:
 
 - Chuyển ngày, tìm kiếm ca và lọc theo trạng thái.
 - Thêm, sửa, xóa ca và đổi trạng thái; dữ liệu mẫu được lưu theo ngày trong trình duyệt.
-- Gửi đơn đăng ký tăng ca với lý do và thời gian bắt đầu/kết thúc; theo dõi trạng thái duyệt.
+- Gửi đơn đăng ký tăng ca với bộ phận, lý do và thời gian bắt đầu/kết thúc; không cho thời gian đơn trùng giờ hành chính 08:00–17:00 và theo dõi trạng thái duyệt.
 - Xuất danh sách ca thành CSV.
 
 Trang quản trị:
