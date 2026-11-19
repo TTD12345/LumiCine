@@ -643,7 +643,7 @@
 
         assignState('absent', employee.absent);
         assignState('paid-leave', employee.paidLeave);
-        assignState('unpaid-leave', employee.unpaidLeave);
+        assignState('absent', employee.unpaidLeave);
         const assignLate = (state, count) => {
             const availableDays = businessDays.filter((day) => day.state === 'unrecorded');
             const assignedCount = Math.min(count, availableDays.length);
@@ -670,7 +670,7 @@
         return parts.slice(-2).map((part) => Array.from(part)[0]).join('');
     };
 
-    const appendDetailMetric = (container, label, value) => {
+    const appendDetailMetric = (container, label, value, note = '') => {
         const metric = document.createElement('div');
         metric.className = 'detail-metric';
         const title = document.createElement('span');
@@ -678,6 +678,11 @@
         const amount = document.createElement('strong');
         amount.textContent = String(value);
         metric.append(title, amount);
+        if (note) {
+            const detail = document.createElement('small');
+            detail.textContent = note;
+            metric.append(detail);
+        }
         container.append(metric);
     };
 
@@ -709,21 +714,16 @@
         metrics.className = 'detail-metrics';
         appendDetailMetric(metrics, 'Ngày công thực tế', `${employee.worked}/${employee.workingDays}`);
         appendDetailMetric(metrics, 'Nghỉ có lương', `${employee.paidLeave} ngày`);
-        appendDetailMetric(metrics, 'Nghỉ không lương', `${employee.unpaidLeave} ngày`);
-        appendDetailMetric(metrics, 'Nghỉ không phép', `${employee.absent} ngày`);
+        appendDetailMetric(metrics, 'Nghỉ không phép', `${employee.absent + employee.unpaidLeave} ngày`);
         appendDetailMetric(metrics, 'Đi muộn', `${employee.late} lượt · ${employee.lateMinutes} phút`);
         appendDetailMetric(metrics, 'Ngày lễ nghỉ theo lịch', `${employee.holidayRestDays} ngày`);
-        appendDetailMetric(metrics, 'Ngày lễ đi làm', `${employee.holidayWorkDays} ngày`);
-        appendDetailMetric(metrics, 'Ngày làm bù', `${employee.makeupWorkDates.length} ngày`);
-        appendDetailMetric(metrics, 'Tiền làm ngày lễ ước tính', formatCurrency(employee.estimatedHolidayPay));
-        appendDetailMetric(metrics, 'Tăng ca', `${formatNumber(employee.overtime)} giờ`);
+        appendDetailMetric(
+            metrics,
+            'Tăng ca',
+            `${formatNumber(employee.overtime)} giờ`,
+            `Lễ đi làm: ${employee.holidayWorkDays} ngày · Làm bù: ${employee.makeupWorkDates.length} ngày · Tiền lễ ước tính: ${formatCurrency(employee.estimatedHolidayPay)}`,
+        );
         body.append(metrics);
-
-        const holidayNote = document.createElement('p');
-        holidayNote.className = 'detail-note';
-        holidayNote.textContent =
-            'Ngày lễ lấy từ API Nager.Date và ngày bổ sung trên trình duyệt này. API có thể thiếu Tết, Giỗ Tổ hoặc ngày nghỉ bù; hãy đối chiếu thông báo chính thức từng năm. Nghỉ ngày lễ được hưởng nguyên lương nếu đủ điều kiện. Nếu đi làm ngày lễ, mức tối thiểu thường là 300% tiền lương ngày làm việc, chưa kể tiền lương ngày lễ đối với người hưởng lương ngày. Tiền ở đây chỉ ước tính 300% × lương ngày mẫu; cần đối chiếu hợp đồng, ca đêm và quy định áp dụng thực tế.';
-        body.append(holidayNote);
 
         const sectionHeading = document.createElement('h3');
         sectionHeading.className = 'detail-section-title';
@@ -732,6 +732,28 @@
         period.textContent = `${monthNames[selectedMonth - 1]} ${selectedYear}`;
         sectionHeading.append(period);
         body.append(sectionHeading);
+
+        const legend = document.createElement('div');
+        legend.className = 'calendar-legend';
+        [
+            ['on-time', 'Đúng giờ'],
+            ['late', 'Đi muộn'],
+            ['paid-leave', 'Nghỉ có lương'],
+            ['absent', 'Nghỉ không phép'],
+            ['holiday-off', 'Nghỉ lễ'],
+            ['holiday-worked', 'Đi làm ngày lễ'],
+            ['makeup-workday', 'Ngày làm bù'],
+            ['unrecorded', 'Chưa ghi nhận'],
+        ].forEach(([stateName, label]) => {
+            const item = document.createElement('span');
+            item.className = `calendar-legend-item calendar-legend-${stateName}`;
+            const marker = document.createElement('i');
+            marker.className = `calendar-legend-marker calendar-marker-${stateName}`;
+            marker.setAttribute('aria-hidden', 'true');
+            item.append(marker, document.createTextNode(label));
+            legend.append(item);
+        });
+        body.append(legend);
 
         const calendar = document.createElement('div');
         calendar.className = 'attendance-calendar';
@@ -750,8 +772,7 @@
             'on-time': 'Đúng giờ',
             late: `Muộn ${employee.lateMinutesPerOccurrence} phút`,
             'paid-leave': 'Nghỉ có lương',
-            'unpaid-leave': 'Nghỉ không lương',
-            absent: 'Vắng mặt',
+            absent: 'Nghỉ không phép',
             unrecorded: 'Chưa ghi nhận',
             weekend: 'Cuối tuần',
             'holiday-off': 'Nghỉ lễ',
@@ -785,29 +806,6 @@
             calendar.append(cell);
         });
         body.append(calendar);
-
-        const legend = document.createElement('div');
-        legend.className = 'calendar-legend';
-        [
-            ['on-time', 'Đúng giờ'],
-            ['late', 'Đi muộn'],
-            ['paid-leave', 'Nghỉ có lương'],
-            ['unpaid-leave', 'Nghỉ không lương'],
-            ['absent', 'Vắng mặt'],
-            ['holiday-off', 'Nghỉ lễ'],
-            ['holiday-worked', 'Đi làm ngày lễ'],
-            ['makeup-workday', 'Ngày làm bù'],
-            ['unrecorded', 'Chưa ghi nhận'],
-        ].forEach(([stateName, label]) => {
-            const item = document.createElement('span');
-            item.className = 'calendar-legend-item';
-            const marker = document.createElement('i');
-            marker.className = `calendar-legend-marker calendar-marker-${stateName}`;
-            marker.setAttribute('aria-hidden', 'true');
-            item.append(marker, document.createTextNode(label));
-            legend.append(item);
-        });
-        body.append(legend);
 
         if (window.bootstrap?.Modal) {
             modalInstance = modalInstance || new window.bootstrap.Modal(document.getElementById('employee-modal'));
