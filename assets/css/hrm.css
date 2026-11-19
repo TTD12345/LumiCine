@@ -283,7 +283,7 @@ h1, h2, p { margin-top: 0; }
 .detail-metric { border: 1px solid #edf1f5; border-radius: 8px; background: #fafbfd; padding: 10px; }
 .detail-metric span { display: block; color: #8b99a8; font-size: 8px; }
 .detail-metric strong { display: block; margin-top: 5px; color: #39536d; font-family: Manrope, sans-serif; font-size: 15px; }
-.detail-note { margin: -5px 0 17px; border-left: 3px solid #8bb5df; border-radius: 5px; background: #f3f8fd; padding: 9px 11px; color: #6f8295; font-size: 9px; line-height: 1.7; }
+.detail-metric small { display: block; margin-top: 5px; color: #71859a; font-size: 8px; line-height: 1.5; }
 .detail-section-title { display: flex; align-items: center; justify-content: space-between; margin: 0 0 8px; color: #425970; font-size: 10px; font-weight: 700; }
 .detail-section-title span { color: #99a5b1; font-size: 8px; font-weight: 500; }
 .attendance-calendar { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
@@ -294,24 +294,24 @@ h1, h2, p { margin-top: 0; }
 .calendar-day-number { color: #435b73; font-size: 9px; font-weight: 700; }
 .calendar-day-state { overflow: hidden; color: #73869a; font-size: 7px; text-overflow: ellipsis; white-space: nowrap; }
 .calendar-day-on-time { border-color: #dceee3; background: #f3faf5; }
-.calendar-day-on-time .calendar-day-state, .calendar-marker-on-time { color: #4a9367; }
+.calendar-day-on-time .calendar-day-state, .calendar-marker-on-time, .calendar-legend-on-time { color: #4a9367; }
 .calendar-day-late { border-color: #f2e4cf; background: #fff9f0; }
-.calendar-day-late .calendar-day-state, .calendar-marker-late { color: #b67a31; }
+.calendar-day-late .calendar-day-state, .calendar-marker-late, .calendar-legend-late { color: #b67a31; }
 .calendar-day-paid-leave { border-color: #dce9f5; background: #f2f7fc; }
-.calendar-day-paid-leave .calendar-day-state, .calendar-marker-paid-leave { color: #4c83b6; }
+.calendar-day-paid-leave .calendar-day-state, .calendar-marker-paid-leave, .calendar-legend-paid-leave { color: #4c83b6; }
 .calendar-day-unpaid-leave { border-color: #eee2d5; background: #fff8f1; }
-.calendar-day-unpaid-leave .calendar-day-state, .calendar-marker-unpaid-leave { color: #a97945; }
+.calendar-day-unpaid-leave .calendar-day-state, .calendar-marker-unpaid-leave, .calendar-legend-unpaid-leave { color: #a97945; }
 .calendar-day-absent { border-color: #f1dedd; background: #fff5f4; }
-.calendar-day-absent .calendar-day-state, .calendar-marker-absent { color: #bf615b; }
+.calendar-day-absent .calendar-day-state, .calendar-marker-absent, .calendar-legend-absent { color: #bf615b; }
 .calendar-day-holiday-off { border-color: #e6e1f7; background: #f8f6ff; }
-.calendar-day-holiday-off .calendar-day-state, .calendar-marker-holiday-off { color: #7667ad; }
+.calendar-day-holiday-off .calendar-day-state, .calendar-marker-holiday-off, .calendar-legend-holiday-off { color: #7667ad; }
 .calendar-day-holiday-worked { border-color: #f0dfc8; background: #fff8ec; }
-.calendar-day-holiday-worked .calendar-day-state, .calendar-marker-holiday-worked { color: #b37a31; }
+.calendar-day-holiday-worked .calendar-day-state, .calendar-marker-holiday-worked, .calendar-legend-holiday-worked { color: #b37a31; }
 .calendar-day-makeup-workday { border-color: #d7e8f4; background: #f2f8fc; }
-.calendar-day-makeup-workday .calendar-day-state, .calendar-marker-makeup-workday { color: #4a7fa9; }
-.calendar-day-unrecorded .calendar-day-state, .calendar-marker-unrecorded { color: #8996a3; }
-.calendar-legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px; }
-.calendar-legend-item { display: inline-flex; align-items: center; gap: 5px; color: #73869a; font-size: 8px; }
+.calendar-day-makeup-workday .calendar-day-state, .calendar-marker-makeup-workday, .calendar-legend-makeup-workday { color: #4a7fa9; }
+.calendar-day-unrecorded .calendar-day-state, .calendar-marker-unrecorded, .calendar-legend-unrecorded { color: #8996a3; }
+.calendar-legend { display: flex; flex-wrap: wrap; gap: 7px 12px; margin: 0 0 12px; border: 1px solid #edf1f5; border-radius: 7px; background: #fbfcfd; padding: 9px 10px; }
+.calendar-legend-item { display: inline-flex; align-items: center; gap: 5px; font-size: 8px; font-weight: 600; }
 .calendar-legend-marker { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .detail-modal-footer { justify-content: space-between; border-top-color: #edf1f5; padding: 12px 21px; }
 .detail-modal-footer > span { color: #8d9aa8; font-size: 8px; }
