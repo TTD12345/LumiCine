@@ -3,7 +3,7 @@
 
     const dataElement = document.getElementById('attendance-data');
     const config = window.hrmAttendanceConfig;
-    const baseEmployees = JSON.parse(dataElement.textContent);
+    let baseEmployees = JSON.parse(dataElement.textContent);
     const monthSelect = document.getElementById('month-select');
     const yearSelect = document.getElementById('year-select');
     const searchInput = document.getElementById('employee-search');
@@ -20,7 +20,6 @@
     const holidayApiStatus = document.getElementById('holiday-api-status');
     const holidayList = document.getElementById('holiday-list');
     const holidayDialog = document.getElementById('holiday-dialog');
-    const holidayStorageKey = 'hrm-vietnam-holiday-overrides';
     const monthNames = [
         'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
         'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12',
@@ -47,12 +46,6 @@
     const formatNumber = (value) => new Intl.NumberFormat('vi-VN', {
         maximumFractionDigits: 1,
     }).format(value);
-    const formatCurrency = (value) => new Intl.NumberFormat('vi-VN', {
-        style: 'currency',
-        currency: 'VND',
-        maximumFractionDigits: 0,
-    }).format(value);
-
     const isValidHolidayRecord = (record) =>
         record &&
         typeof record.date === 'string' &&
@@ -61,25 +54,17 @@
         typeof record.name === 'string' &&
         record.name.trim().length > 0;
 
-    const readManualHolidays = () => {
+    const loadManualHolidays = async (year) => {
         try {
-            const stored = window.localStorage.getItem(holidayStorageKey);
-            if (!stored) return [];
-            const parsed = JSON.parse(stored);
-            if (!Array.isArray(parsed) || !parsed.every((holiday) =>
-                isValidHolidayRecord(holiday) &&
-                (holiday.type === undefined || ['holiday', 'workday'].includes(holiday.type)))) {
-                throw new Error('Dữ liệu ngày lễ bổ sung không hợp lệ.');
-            }
-            return parsed.map((holiday) => ({
-                date: holiday.date,
-                name: holiday.name.trim(),
-                type: holiday.type || 'holiday',
+            const result = await window.lumiCineApi('holidays', { query: { year } });
+            manualHolidays = result.holidays.map((holiday) => ({
+                ...holiday,
                 source: 'manual',
             }));
+            manualHolidayError = '';
         } catch (error) {
             manualHolidayError = error instanceof Error ? error.message : 'Không đọc được lịch bổ sung.';
-            return [];
+            manualHolidays = [];
         }
     };
 
@@ -112,14 +97,17 @@
         getYearHolidays(year).filter((holiday) => holiday.date.slice(5, 7) === String(month).padStart(2, '0'));
 
     const loadHolidays = async (year) => {
+        await loadManualHolidays(year);
         if (holidayDataByYear.has(year)) {
             const previousError = holidayErrorsByYear.get(year);
             if (year === selectedYear) {
                 setHolidaySourceStatus(
-                    previousError
-                        ? `Không tải được API ngày lễ (${previousError}); đang dùng ngày bổ sung trong trình duyệt.`
-                        : `Đã tải lịch ${year} (${holidayDataByYear.get(year).length} ngày); bổ sung Tết/ngày nghỉ bù còn thiếu.`,
-                    previousError ? 'error' : 'warning',
+                    manualHolidayError
+                        ? `Không tải được ngày nghỉ từ database (${manualHolidayError}).`
+                        : previousError
+                            ? `Không tải được API ngày lễ (${previousError}); đang dùng ngày nghỉ trong database.`
+                            : `Đã tải lịch ${year}; ngày nghỉ bổ sung được đồng bộ từ database.`,
+                    manualHolidayError ? 'error' : previousError ? 'warning' : 'warning',
                 );
                 renderHolidayList(year);
             }
@@ -163,14 +151,17 @@
             holidayDataByYear.set(year, holidays);
             holidayErrorsByYear.delete(year);
             if (year === selectedYear) {
-                setHolidaySourceStatus(`Đã tải ${holidays.length} ngày từ Nager.Date ${year}; bổ sung Tết/ngày nghỉ bù còn thiếu.`, 'warning');
+                setHolidaySourceStatus(
+                    manualHolidayError || `Đã tải ${holidays.length} ngày từ Nager.Date ${year}; ngày bổ sung được đồng bộ từ database.`,
+                    manualHolidayError ? 'error' : 'warning',
+                );
             }
         } catch (error) {
             holidayDataByYear.set(year, []);
             const message = error instanceof Error ? error.message : 'Lỗi không xác định khi tải API.';
             holidayErrorsByYear.set(year, message);
             if (year === selectedYear) {
-                setHolidaySourceStatus(`Không tải được API ngày lễ (${message}); đang dùng ngày bổ sung trong trình duyệt.`, 'error');
+                setHolidaySourceStatus(`Không tải được API ngày lễ (${message}); đang dùng ngày bổ sung trong database.`, 'error');
             }
         }
         if (year === selectedYear) {
@@ -230,74 +221,34 @@
         .replace(/Đ/g, 'D')
         .toLocaleLowerCase('vi');
 
-    const getWorkingDays = (year, month) => {
-        let count = 0;
-        const holidays = getPublicHolidays(year, month);
-        const makeupWorkdays = getYearWorkdays(year).filter((workday) =>
-            workday.date.slice(5, 7) === String(month).padStart(2, '0'));
-        const date = new Date(year, month - 1, 1);
-        while (date.getMonth() === month - 1) {
-            const day = date.getDay();
-            const isHoliday = holidays.some((holiday) => holiday.day === date.getDate());
-            const isMakeupWorkday = makeupWorkdays.some((workday) => workday.day === date.getDate());
-            if (!isHoliday && (isMakeupWorkday || (day !== 0 && day !== 6))) {
-                count += 1;
-            }
-            date.setDate(date.getDate() + 1);
-        }
-        return count;
-    };
-
     const getStatus = (employee, workingDays) => {
         if (employee.absent >= 2) return 'absent';
         if (employee.leave >= 2 && employee.worked < workingDays - 1) return 'leave';
-        if (employee.absent === 0 && employee.leave === 0 && employee.worked >= workingDays - 1) {
+        if (workingDays > 0 && employee.absent === 0 && employee.leave === 0 && employee.worked >= workingDays) {
             return 'complete';
         }
         return 'incomplete';
     };
 
-    // Điều chỉnh dữ liệu mẫu theo số ngày làm việc của tháng đang chọn.
     const buildMonthlyEmployees = () => {
-        const workingDays = getWorkingDays(selectedYear, selectedMonth);
-        const monthOffset = selectedMonth - 1;
-
-        return baseEmployees.map((employee, index) => {
-            const variation = ((monthOffset + index) % 3) - 1;
-            const paidLeave = employee.paidLeave;
-            const unpaidLeave = employee.unpaidLeave;
-            const leave = paidLeave + unpaidLeave;
-            const absent = Math.max(0, employee.absent + ((monthOffset + index) % 7 === 0 ? 1 : 0));
-            const availableDays = Math.max(0, workingDays - leave - absent);
-            const worked = Math.min(availableDays, Math.max(0, employee.worked + variation));
-            const late = Math.max(0, employee.late + ((monthOffset + index) % 4 === 0 ? 1 : 0));
+        return baseEmployees.map((employee) => {
             const holidayDates = getPublicHolidays(selectedYear, selectedMonth);
+            const dailyRecords = employee.dailyRecords || [];
             const holidayWorkedDates = holidayDates
-                .filter((day, holidayIndex) => (index + holidayIndex) % 2 === 0)
+                .filter((holiday) => dailyRecords.some((record) =>
+                    record.date === holiday.date && record.checkIn))
                 .map((holiday) => holiday.date);
             const makeupWorkDates = getYearWorkdays(selectedYear)
                 .filter((workday) => workday.date.slice(5, 7) === String(selectedMonth).padStart(2, '0'))
                 .map((workday) => workday.date);
-            const workedDaysIncludingHolidays = worked + holidayWorkedDates.length;
-
             const monthlyEmployee = {
                 ...employee,
-                workingDays,
-                worked: workedDaysIncludingHolidays,
-                leave,
-                paidLeave,
-                unpaidLeave,
-                absent,
-                late,
-                lateMinutes: late * employee.lateMinutesPerOccurrence,
                 holidayWorkedDates,
                 holidayWorkDays: holidayWorkedDates.length,
                 holidayRestDays: holidayDates.length - holidayWorkedDates.length,
                 makeupWorkDates,
-                estimatedHolidayPay: holidayWorkedDates.length * employee.dailyWage * 3,
-                overtime: Math.max(0, employee.overtime + ((monthOffset + index) % 2 === 0 ? 0.5 : 0)),
             };
-            monthlyEmployee.status = getStatus(monthlyEmployee, workingDays);
+            monthlyEmployee.status = getStatus(monthlyEmployee, monthlyEmployee.workingDays);
             return monthlyEmployee;
         });
     };
@@ -342,8 +293,8 @@
         addCell(row, employee.position, 'position-cell');
         addCell(row, String(employee.workingDays), 'text-center');
         addCell(row, String(employee.worked), 'text-center actual-days');
-        addCell(row, String(employee.paidLeave), 'text-center');
-        addCell(row, String(employee.unpaidLeave), 'text-center');
+        addCell(row, employee.leaveDataAvailable ? String(employee.paidLeave) : '—', 'text-center');
+        addCell(row, employee.leaveDataAvailable ? String(employee.unpaidLeave) : '—', 'text-center');
         addCell(row, String(employee.absent), 'text-center');
         addCell(row, String(employee.late), 'text-center');
         addCell(row, String(employee.lateMinutes), 'text-center');
@@ -396,8 +347,8 @@
         [
             total.expected,
             total.worked,
-            total.paidLeave,
-            total.unpaidLeave,
+            '—',
+            '—',
             total.absent,
             total.late,
             total.lateMinutes,
@@ -507,9 +458,9 @@
         setStat('stat-employees', employees.length, 'người');
         setStat('stat-workdays', totals.worked, 'ngày');
         setStat('stat-late', totals.late, 'lượt');
-        setStat('stat-leave', totals.leave, 'ngày');
-        document.getElementById('stat-paid-leave').textContent = formatNumber(totals.paidLeave);
-        document.getElementById('stat-unpaid-leave').textContent = formatNumber(totals.unpaidLeave);
+        setStat('stat-leave', '—', '');
+        document.getElementById('stat-paid-leave').textContent = '—';
+        document.getElementById('stat-unpaid-leave').textContent = '—';
         document.getElementById('standard-workdays').textContent =
             `${employees[0]?.workingDays || 0} ngày`;
         document.getElementById('period-caption').textContent =
@@ -525,14 +476,33 @@
         url.searchParams.set('year', String(selectedYear));
         window.history.replaceState({}, '', url);
 
-        await loadHolidays(selectedYear);
-        if (requestId !== periodUpdateId) return;
+        try {
+            await loadHolidays(selectedYear);
+            if (requestId !== periodUpdateId) return false;
 
-        employees = buildMonthlyEmployees();
-        renderStatistics();
-        applyFilters();
+            const result = await window.lumiCineApi('report', {
+                query: { month: selectedMonth, year: selectedYear },
+            });
+            if (requestId !== periodUpdateId) return false;
+            baseEmployees = result.employees;
+            employees = buildMonthlyEmployees();
+            renderStatistics();
+            applyFilters();
 
-        if (announce) showToast(`Đang xem dữ liệu mẫu ${monthNames[selectedMonth - 1]} năm ${selectedYear}.`);
+            if (announce) showToast(`Đang xem dữ liệu database ${monthNames[selectedMonth - 1]} năm ${selectedYear}.`);
+            return true;
+        } catch (error) {
+            if (requestId !== periodUpdateId) return false;
+            baseEmployees = [];
+            employees = [];
+            renderStatistics();
+            applyFilters();
+            setHolidaySourceStatus(
+                error instanceof Error ? error.message : 'Không tải được dữ liệu báo cáo từ database.',
+                'error',
+            );
+            return false;
+        }
     };
 
     const fillFilterOptions = (select, values, placeholder) => {
@@ -568,7 +538,6 @@
             'Ngày công quy định', 'Ngày công thực tế', 'Nghỉ có lương',
             'Nghỉ không lương', 'Nghỉ không phép', 'Số lần đi muộn',
             'Tổng phút đi muộn', 'Ngày lễ nghỉ theo lịch', 'Ngày lễ đi làm',
-            'Tiền làm ngày lễ ước tính',
             'Tổng giờ tăng ca', 'Trạng thái',
         ];
         const lines = [headers, ...filteredEmployees.map((employee) => [
@@ -578,14 +547,13 @@
             employee.position,
             employee.workingDays,
             employee.worked,
-            employee.paidLeave,
-            employee.unpaidLeave,
+            employee.leaveDataAvailable ? employee.paidLeave : '',
+            employee.leaveDataAvailable ? employee.unpaidLeave : '',
             employee.absent,
             employee.late,
             employee.lateMinutes,
             employee.holidayRestDays,
             employee.holidayWorkDays,
-            employee.estimatedHolidayPay,
             employee.overtime,
             statusLabels[employee.status],
         ])].map((line) => line.map(csvSafe).join(','));
@@ -609,10 +577,17 @@
         const holidayDates = getPublicHolidays(selectedYear, selectedMonth);
         const makeupWorkdays = getYearWorkdays(selectedYear)
             .filter((workday) => workday.date.slice(5, 7) === String(selectedMonth).padStart(2, '0'));
+        const attendanceByDate = new Map((employee.dailyRecords || []).map((record) => [record.date, record]));
         const date = new Date(selectedYear, selectedMonth - 1, 1);
 
         while (date.getMonth() === selectedMonth - 1) {
             const weekDay = date.getDay();
+            const dateKey = [
+                selectedYear,
+                String(selectedMonth).padStart(2, '0'),
+                String(date.getDate()).padStart(2, '0'),
+            ].join('-');
+            const attendance = attendanceByDate.get(dateKey);
             const day = {
                 date: date.getDate(),
                 state: 'weekend',
@@ -620,7 +595,7 @@
             const holiday = holidayDates.find((item) => item.day === day.date);
             const makeupWorkday = makeupWorkdays.find((item) => item.day === day.date);
             if (holiday) {
-                day.state = employee.holidayWorkedDates.includes(holiday.date) ? 'holiday-worked' : 'holiday-off';
+                day.state = attendance?.checkIn ? 'holiday-worked' : 'holiday-off';
                 day.holidayName = holiday.name;
             } else if (makeupWorkday || (weekDay !== 0 && weekDay !== 6)) {
                 day.state = 'unrecorded';
@@ -628,33 +603,18 @@
                 if (makeupWorkday) day.holidayName = makeupWorkday.name;
                 businessDays.push(day);
             }
+            if (attendance) {
+                if (attendance.state === 'absent') {
+                    day.state = 'absent';
+                } else if (attendance.checkIn) {
+                    day.state = attendance.state;
+                    day.lateMinutes = attendance.lateMinutes;
+                }
+            }
             calendarDays.push(day);
             date.setDate(date.getDate() + 1);
         }
 
-        const assignState = (state, count) => {
-            const availableDays = businessDays.filter((day) => day.state === 'unrecorded');
-            const assignedCount = Math.min(count, availableDays.length);
-            for (let index = 0; index < assignedCount; index += 1) {
-                const position = Math.floor(((index + 0.5) * availableDays.length) / assignedCount);
-                availableDays[position].state = state;
-            }
-        };
-
-        assignState('absent', employee.absent);
-        assignState('paid-leave', employee.paidLeave);
-        assignState('absent', employee.unpaidLeave);
-        const assignLate = (state, count) => {
-            const availableDays = businessDays.filter((day) => day.state === 'unrecorded');
-            const assignedCount = Math.min(count, availableDays.length);
-            for (let index = 0; index < assignedCount; index += 1) {
-                const position = Math.floor(((index + 0.5) * availableDays.length) / assignedCount);
-                availableDays[position].state = state;
-                availableDays[position].lateMinutes = employee.lateMinutesPerOccurrence;
-            }
-        };
-        assignLate('late', Math.min(employee.late, employee.worked));
-        assignState('on-time', Math.max(0, employee.worked - employee.holidayWorkDays - employee.late));
         businessDays.forEach((day) => {
             if (day.makeupWorkday && day.state === 'unrecorded') day.state = 'makeup-workday';
         });
@@ -713,15 +673,15 @@
         const metrics = document.createElement('div');
         metrics.className = 'detail-metrics';
         appendDetailMetric(metrics, 'Ngày công thực tế', `${employee.worked}/${employee.workingDays}`);
-        appendDetailMetric(metrics, 'Nghỉ có lương', `${employee.paidLeave} ngày`);
-        appendDetailMetric(metrics, 'Nghỉ không phép', `${employee.absent + employee.unpaidLeave} ngày`);
+        appendDetailMetric(metrics, 'Nghỉ có lương', employee.leaveDataAvailable ? `${employee.paidLeave} ngày` : 'Chưa có dữ liệu');
+        appendDetailMetric(metrics, 'Vắng mặt', `${employee.absent} ngày`);
         appendDetailMetric(metrics, 'Đi muộn', `${employee.late} lượt · ${employee.lateMinutes} phút`);
         appendDetailMetric(metrics, 'Ngày lễ nghỉ theo lịch', `${employee.holidayRestDays} ngày`);
         appendDetailMetric(
-            metrics,
-            'Tăng ca',
-            `${formatNumber(employee.overtime)} giờ`,
-            `Lễ đi làm: ${employee.holidayWorkDays} ngày · Làm bù: ${employee.makeupWorkDates.length} ngày · Tiền lễ ước tính: ${formatCurrency(employee.estimatedHolidayPay)}`,
+        metrics,
+        'Tăng ca',
+        `${formatNumber(employee.overtime)} giờ`,
+        `Lễ đi làm: ${employee.holidayWorkDays} ngày · Làm bù: ${employee.makeupWorkDates.length} ngày · Chưa cấu hình dữ liệu lương trong database.`,
         );
         body.append(metrics);
 
@@ -938,40 +898,42 @@
             return;
         }
 
-        const updatedHolidays = [...manualHolidays, { date, name, type: typeInput.value, source: 'manual' }];
         try {
-            window.localStorage.setItem(holidayStorageKey, JSON.stringify(updatedHolidays));
+            await window.lumiCineApi('holidays', {
+                method: 'POST',
+                body: { date, name, type: typeInput.value },
+            });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Lỗi lưu trữ không xác định.';
-            setHolidaySourceStatus(`Không thể lưu ngày bổ sung vào trình duyệt (${message}).`, 'error');
+            const message = error instanceof Error ? error.message : 'Không thể lưu ngày nghỉ.';
+            setHolidaySourceStatus(message, 'error');
             return;
         }
-        manualHolidays = updatedHolidays;
         nameInput.value = '';
-        renderHolidayList(dateYear);
-        await updatePeriod();
-        showToast(`Đã thêm ${name} vào lịch ${dateYear} trên trình duyệt này.`);
+        if (await updatePeriod()) {
+            showToast(`Đã thêm ${name} vào lịch database ${dateYear}.`);
+        } else {
+            setHolidaySourceStatus('Ngày nghỉ đã được lưu, nhưng không thể tải lại báo cáo từ database.', 'error');
+        }
     });
     holidayList.addEventListener('click', async (event) => {
         const button = event.target.closest('[data-remove-holiday]');
         if (!button) return;
         const date = button.dataset.removeHoliday;
-        const updatedHolidays = manualHolidays.filter((holiday) => holiday.date !== date);
         try {
-            if (updatedHolidays.length === 0) {
-                window.localStorage.removeItem(holidayStorageKey);
-            } else {
-                window.localStorage.setItem(holidayStorageKey, JSON.stringify(updatedHolidays));
-            }
+            await window.lumiCineApi('holidays', {
+                method: 'POST',
+                body: { operation: 'remove', date },
+            });
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Lỗi lưu trữ không xác định.';
-            setHolidaySourceStatus(`Không thể cập nhật lịch bổ sung (${message}).`, 'error');
+            const message = error instanceof Error ? error.message : 'Không thể xóa ngày nghỉ.';
+            setHolidaySourceStatus(message, 'error');
             return;
         }
-        manualHolidays = updatedHolidays;
-        renderHolidayList(Number(yearSelect.value));
-        await updatePeriod();
-        showToast('Đã xóa ngày bổ sung khỏi lịch.');
+        if (await updatePeriod()) {
+            showToast('Đã xóa ngày bổ sung khỏi database.');
+        } else {
+            setHolidaySourceStatus('Ngày nghỉ đã được xóa, nhưng không thể tải lại báo cáo từ database.', 'error');
+        }
     });
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') closeFallbackModal();
@@ -1010,7 +972,6 @@
         });
     }
 
-    manualHolidays = readManualHolidays();
     fillFilterOptions(departmentFilter, baseEmployees.map((employee) => employee.department), 'Tất cả phòng ban');
     fillFilterOptions(positionFilter, baseEmployees.map((employee) => employee.position), 'Tất cả chức vụ');
     updatePeriod();

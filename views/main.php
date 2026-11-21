@@ -4,75 +4,6 @@ if (!defined('APP_BOOTSTRAPPED')) {
     exit;
 }
 
-$initialDate = date('Y-m-d');
-$shifts = [
-    [
-        'name' => 'Nguyễn Minh Anh',
-        'role' => 'Trưởng phòng nhân sự',
-        'department' => 'Hành chính - Nhân sự',
-        'start' => '08:00',
-        'end' => '16:00',
-        'location' => 'Văn phòng tầng 1',
-        'status' => 'active',
-        'tone' => 'violet',
-    ],
-    [
-        'name' => 'Trần Quốc Bảo',
-        'role' => 'Chuyên viên kinh doanh',
-        'department' => 'Kinh doanh',
-        'start' => '09:00',
-        'end' => '17:00',
-        'location' => 'Văn phòng tầng 2',
-        'status' => 'active',
-        'tone' => 'blue',
-    ],
-    [
-        'name' => 'Lê Hoàng Yến',
-        'role' => 'Chuyên viên marketing',
-        'department' => 'Marketing',
-        'start' => '12:00',
-        'end' => '20:00',
-        'location' => 'Phòng họp A',
-        'status' => 'upcoming',
-        'tone' => 'pink',
-    ],
-    [
-        'name' => 'Phạm Đức Long',
-        'role' => 'Kế toán viên',
-        'department' => 'Kế toán',
-        'start' => '13:00',
-        'end' => '21:00',
-        'location' => 'Văn phòng tầng 3',
-        'status' => 'upcoming',
-        'tone' => 'orange',
-    ],
-    [
-        'name' => 'Võ Ngọc Mai',
-        'role' => 'Nhân viên hành chính',
-        'department' => 'Hành chính - Nhân sự',
-        'start' => '07:00',
-        'end' => '15:00',
-        'location' => 'Khu vực lễ tân',
-        'status' => 'completed',
-        'tone' => 'green',
-    ],
-    [
-        'name' => 'Đặng Tuấn Kiệt',
-        'role' => 'Chuyên viên công nghệ thông tin',
-        'department' => 'Công nghệ thông tin',
-        'start' => '15:00',
-        'end' => '23:00',
-        'location' => 'Phòng IT',
-        'status' => 'upcoming',
-        'tone' => 'teal',
-    ],
-];
-
-foreach ($shifts as $index => &$shift) {
-    $shift['id'] = 'sample-' . ($index + 1);
-}
-unset($shift);
-
 $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $currentUserName = $escape($currentUser['display_name']);
 $currentUserInitials = $escape($currentUser['initials']);
@@ -152,7 +83,6 @@ foreach ($shifts as $shift) {
                         <i class="bi bi-chevron-down" aria-hidden="true"></i>
                     </button>
                     <div class="account-menu" id="account-menu" role="menu" hidden>
-                        <button type="button" id="reset-sample-data" role="menuitem">Khôi phục dữ liệu mẫu</button>
                         <form action="index.php?action=logout" method="post">
                             <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">
                             <button type="submit" role="menuitem"><i class="bi bi-box-arrow-right" aria-hidden="true"></i> Đăng xuất</button>
@@ -169,7 +99,7 @@ foreach ($shifts as $shift) {
                     <h1>Lịch làm việc</h1>
                     <p>Theo dõi và sắp xếp lịch làm việc của đội ngũ theo từng ngày.</p>
                 </div>
-                <button class="primary-button" type="button" id="add-shift"><i class="bi bi-plus-lg" aria-hidden="true"></i>Tạo ca mới</button>
+                <?php if ($canManageShifts): ?><button class="primary-button" type="button" id="add-shift"><i class="bi bi-plus-lg" aria-hidden="true"></i>Tạo ca mới</button><?php endif; ?>
             </section>
 
             <section class="employee-stats" aria-label="Tổng quan ca làm việc">
@@ -220,7 +150,7 @@ foreach ($shifts as $shift) {
                             <?php foreach ($shifts as $shift): ?>
                                 <?php $firstInitial = preg_match('/^./u', $shift['name'], $initialMatch) === 1 ? $initialMatch[0] : '?'; ?>
                                 <tr>
-                                    <td><div class="employee-cell"><span class="employee-avatar <?= $escape($shift['tone']) ?>"><?= $escape($firstInitial) ?></span><span class="employee-identity"><strong><?= $escape($shift['name']) ?></strong><small><?= $escape($shift['role']) ?></small></span></div></td>
+                                    <td><div class="employee-cell"><span class="employee-avatar <?= ['violet', 'blue', 'pink', 'orange', 'green', 'teal'][$index % 6] ?>"><?= $escape($firstInitial) ?></span><span class="employee-identity"><strong><?= $escape($shift['name']) ?></strong><small><?= $escape($shift['role']) ?></small></span></div></td>
                                     <td><?= $escape($shift['department']) ?></td>
                                     <td><strong class="shift-time"><?= $escape($shift['start']) ?> – <?= $escape($shift['end']) ?></strong><small class="shift-duration">8 giờ</small></td>
                                     <td><?= $escape($shift['location']) ?></td>
@@ -233,7 +163,7 @@ foreach ($shifts as $shift) {
                     <div class="empty-state" id="empty-state" hidden><i class="bi bi-search"></i><strong>Không tìm thấy ca làm việc</strong><span>Hãy thử đổi từ khóa hoặc trạng thái lọc.</span></div>
                 </div>
                 <footer class="schedule-footer">
-                    <span id="result-count">Hiển thị 1–6 trong 6 ca</span>
+                    <span id="result-count">Hiển thị <?= $shifts ? 1 : 0 ?>–<?= min(6, count($shifts)) ?> trong <?= count($shifts) ?> ca</span>
                     <div class="pagination" id="pagination" aria-label="Phân trang"></div>
                 </footer>
             </section>
@@ -246,20 +176,17 @@ foreach ($shifts as $shift) {
     <form id="shift-form" method="dialog">
         <header class="dialog-heading"><div><span class="page-kicker">QUẢN LÝ LỊCH</span><h2 id="dialog-title">Tạo ca làm việc</h2><p>Thêm thông tin ca làm việc cho nhân viên.</p></div><button class="dialog-close" type="button" id="close-dialog" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>
         <div class="dialog-grid">
-            <label class="dialog-field full">Tên nhân viên<input name="name" required maxlength="80" placeholder="Ví dụ: Nguyễn Minh Anh"></label>
-            <label class="dialog-field">Bộ phận<input name="department" required maxlength="50" placeholder="Ví dụ: Kế toán"></label>
-            <label class="dialog-field">Vị trí<input name="role" required maxlength="60" placeholder="Ví dụ: Kế toán viên"></label>
+            <label class="dialog-field full">Nhân viên<select name="employeeId" required><?php foreach ($employees as $employee): ?><option value="<?= (int) $employee['id'] ?>"><?= $escape($employee['name']) ?> · <?= $escape($employee['code']) ?></option><?php endforeach; ?></select></label>
             <label class="dialog-field">Bắt đầu<input name="start" type="time" value="08:00" required></label>
             <label class="dialog-field">Kết thúc<input name="end" type="time" value="16:00" required></label>
-            <label class="dialog-field full">Địa điểm<input name="location" required maxlength="60" placeholder="Ví dụ: Văn phòng tầng 1"></label>
-            <label class="dialog-field full">Trạng thái<select name="status"><option value="upcoming">Sắp bắt đầu</option><option value="active">Đang diễn ra</option><option value="completed">Hoàn thành</option></select></label>
+            <label class="dialog-field full">Địa điểm<input name="location" required maxlength="100" placeholder="Ví dụ: Văn phòng tầng 1"></label>
         </div>
         <footer class="dialog-actions"><button class="secondary-button" type="button" id="cancel-dialog">Hủy</button><button class="primary-button" type="submit" id="save-shift">Lưu ca làm việc</button></footer>
     </form>
 </dialog>
 <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
-<script id="shift-data" type="application/json"><?= json_encode($shifts, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
-<script>window.employeeScheduleConfig = { initialDate: <?= json_encode($initialDate) ?> };</script>
+<script>window.employeeScheduleConfig = { initialDate: <?= json_encode($initialDate) ?>, canManage: <?= $canManageShifts ? 'true' : 'false' ?> };</script>
+<?php require PATH_VIEW . 'api-config.php'; ?>
 <script src="assets/js/employee.js" defer></script>
 </body>
 </html>

@@ -138,7 +138,7 @@ $currentUserInitials = $escape($currentUser['initials']);
                         <button class="attendance-punch-button" id="attendance-punch" type="button"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i><span>Chấm công vào</span></button>
                     </div>
                 </div>
-                <div class="attendance-card-foot"><i class="bi bi-info-circle" aria-hidden="true"></i> Bản xem thử · Ghi nhận được lưu trên trình duyệt này.</div>
+                <div class="attendance-card-foot"><i class="bi bi-info-circle" aria-hidden="true"></i> Dữ liệu chấm công được lưu tập trung trong database.</div>
             </section>
 
             <section class="employee-stats attendance-overview" aria-label="Tổng quan chấm công">
@@ -168,13 +168,14 @@ $currentUserInitials = $escape($currentUser['initials']);
                     </table>
                     <div class="empty-state" id="attendance-history-empty" hidden><i class="bi bi-calendar2-x" aria-hidden="true"></i><strong>Chưa có lịch sử chấm công</strong><span>Các ngày đã chấm công sẽ được hiển thị tại đây.</span></div>
                 </div>
-                <footer class="schedule-footer"><span id="attendance-history-count">Chưa có dữ liệu chấm công</span><span class="history-storage-note">Dữ liệu bản thử nghiệm lưu trong trình duyệt.</span></footer>
+                <footer class="schedule-footer"><span id="attendance-history-count">Đang tải dữ liệu...</span><span class="history-storage-note">Lịch sử được đồng bộ từ database.</span></footer>
             </section>
             <footer class="employee-footer"><span>© <?= date('Y') ?> LumiCine · Quản lý nhân sự</span><a href="?action=schedule">Quay lại lịch làm việc</a></footer>
         </div>
     </main>
 </div>
 <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
+<?php require PATH_VIEW . 'api-config.php'; ?>
 <script src="assets/js/employee-attendance.js" defer></script>
 </body>
 </html>

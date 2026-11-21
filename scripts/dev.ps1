@@ -16,8 +16,22 @@ if (-not $phpPath) {
 }
 
 if (-not $phpPath) {
-    Write-Error 'PHP CLI was not found. Install PHP 8.4 with winget install --id PHP.PHP.8.4 --exact, then run npm run dev again.'
-    exit 1
+    $directory = Get-Item -LiteralPath $PSScriptRoot
+    while ($directory -and -not $phpPath) {
+        $laragonPhp = Join-Path $directory.FullName 'bin\php'
+        if (Test-Path -LiteralPath $laragonPhp) {
+            $phpPackage = Get-ChildItem -LiteralPath $laragonPhp -Directory |
+                Sort-Object Name -Descending |
+                Where-Object { Test-Path (Join-Path $_.FullName 'php.exe') } |
+                Select-Object -First 1
+
+            if ($phpPackage) {
+                $phpPath = Join-Path $phpPackage.FullName 'php.exe'
+            }
+        }
+
+        $directory = $directory.Parent
+    }
 }
 
 $serverArguments = @()

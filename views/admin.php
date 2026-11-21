@@ -4,34 +4,15 @@ if (!defined('APP_BOOTSTRAPPED')) {
     exit;
 }
 
-$month = filter_input(INPUT_GET, 'month', FILTER_VALIDATE_INT);
-$year = filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT);
-$month = ($month !== false && $month >= 1 && $month <= 12) ? $month : (int) date('n');
-$year = ($year !== false && $year >= 2020 && $year <= 2100) ? $year : (int) date('Y');
-
-// Dữ liệu minh họa thay cho truy vấn MySQL trong giai đoạn dựng giao diện.
-$employees = [
-    ['id' => 'NV001', 'name' => 'Nguyễn Minh Anh', 'department' => 'Hành chính - Nhân sự', 'position' => 'Trưởng phòng nhân sự', 'worked' => 22, 'leave' => 0, 'paidLeave' => 0, 'unpaidLeave' => 0, 'absent' => 0, 'late' => 0, 'lateMinutesPerOccurrence' => 8, 'overtime' => 12.5, 'dailyWage' => 600000],
-    ['id' => 'NV002', 'name' => 'Trần Quốc Bảo', 'department' => 'Kinh doanh', 'position' => 'Chuyên viên kinh doanh', 'worked' => 20, 'leave' => 1, 'paidLeave' => 1, 'unpaidLeave' => 0, 'absent' => 0, 'late' => 3, 'lateMinutesPerOccurrence' => 12, 'overtime' => 8, 'dailyWage' => 450000],
-    ['id' => 'NV003', 'name' => 'Lê Hoàng Yến', 'department' => 'Marketing', 'position' => 'Chuyên viên marketing', 'worked' => 19, 'leave' => 2, 'paidLeave' => 1, 'unpaidLeave' => 1, 'absent' => 0, 'late' => 1, 'lateMinutesPerOccurrence' => 8, 'overtime' => 4.5, 'dailyWage' => 430000],
-    ['id' => 'NV004', 'name' => 'Phạm Đức Long', 'department' => 'Kế toán', 'position' => 'Kế toán viên', 'worked' => 18, 'leave' => 0, 'paidLeave' => 0, 'unpaidLeave' => 0, 'absent' => 3, 'late' => 2, 'lateMinutesPerOccurrence' => 20, 'overtime' => 6, 'dailyWage' => 420000],
-    ['id' => 'NV005', 'name' => 'Võ Ngọc Mai', 'department' => 'Hành chính - Nhân sự', 'position' => 'Nhân viên hành chính', 'worked' => 21, 'leave' => 1, 'paidLeave' => 1, 'unpaidLeave' => 0, 'absent' => 0, 'late' => 1, 'lateMinutesPerOccurrence' => 5, 'overtime' => 2, 'dailyWage' => 400000],
-    ['id' => 'NV006', 'name' => 'Đặng Tuấn Kiệt', 'department' => 'Công nghệ thông tin', 'position' => 'Chuyên viên IT', 'worked' => 22, 'leave' => 0, 'paidLeave' => 0, 'unpaidLeave' => 0, 'absent' => 0, 'late' => 0, 'lateMinutesPerOccurrence' => 12, 'overtime' => 15, 'dailyWage' => 500000],
-    ['id' => 'NV007', 'name' => 'Bùi Thùy Dương', 'department' => 'Kinh doanh', 'position' => 'Nhân viên kinh doanh', 'worked' => 19, 'leave' => 1, 'paidLeave' => 0, 'unpaidLeave' => 1, 'absent' => 1, 'late' => 4, 'lateMinutesPerOccurrence' => 15, 'overtime' => 3.5, 'dailyWage' => 400000],
-    ['id' => 'NV008', 'name' => 'Hoàng Gia Huy', 'department' => 'Công nghệ thông tin', 'position' => 'Lập trình viên', 'worked' => 19, 'leave' => 0, 'paidLeave' => 0, 'unpaidLeave' => 0, 'absent' => 2, 'late' => 2, 'lateMinutesPerOccurrence' => 10, 'overtime' => 10, 'dailyWage' => 480000],
-    ['id' => 'NV009', 'name' => 'Đỗ Khánh Linh', 'department' => 'Marketing', 'position' => 'Thiết kế đồ họa', 'worked' => 22, 'leave' => 0, 'paidLeave' => 0, 'unpaidLeave' => 0, 'absent' => 0, 'late' => 0, 'lateMinutesPerOccurrence' => 6, 'overtime' => 5, 'dailyWage' => 430000],
-    ['id' => 'NV010', 'name' => 'Ngô Thành Nam', 'department' => 'Kế toán', 'position' => 'Kế toán tổng hợp', 'worked' => 21, 'leave' => 0, 'paidLeave' => 0, 'unpaidLeave' => 0, 'absent' => 0, 'late' => 1, 'lateMinutesPerOccurrence' => 10, 'overtime' => 7.5, 'dailyWage' => 500000],
-];
-
 $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $statusFor = static function (array $employee): array {
     if ($employee['absent'] >= 2) {
         return ['Vắng mặt', 'absent'];
     }
-    if ($employee['leave'] >= 2 && $employee['worked'] < 21) {
+    if ($employee['leave'] >= 2 && $employee['worked'] < $employee['workingDays'] - 1) {
         return ['Nghỉ phép', 'leave'];
     }
-    if ($employee['worked'] >= 21 && $employee['absent'] === 0) {
+    if ($employee['workingDays'] > 0 && $employee['worked'] >= $employee['workingDays'] && $employee['absent'] === 0) {
         return ['Đủ công', 'complete'];
     }
     return ['Thiếu công', 'incomplete'];
@@ -168,7 +149,7 @@ $statusFor = static function (array $employee): array {
                 <article class="summary-card">
                     <div class="summary-heading"><span class="summary-icon icon-blue"><i class="bi bi-people-fill" aria-hidden="true"></i></span><span class="summary-trend"><i class="bi bi-arrow-up-right" aria-hidden="true"></i> Nhân sự</span></div>
                     <p class="summary-label">Tổng số nhân viên</p>
-                    <div class="summary-value" id="stat-employees">10 <span>người</span></div>
+                    <div class="summary-value" id="stat-employees"><?= count($employees) ?> <span>người</span></div>
                     <div class="summary-foot">Đang được theo dõi trong kỳ</div>
                 </article>
                 <article class="summary-card">
@@ -198,7 +179,7 @@ $statusFor = static function (array $employee): array {
                         <p id="period-caption">Tổng hợp công nhân viên trong kỳ đã chọn</p>
                     </div>
                     <div class="data-card-tools">
-                        <div class="working-day-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Ngày công chuẩn: <strong id="standard-workdays">22 ngày</strong></div>
+                        <div class="working-day-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Số ca được phân: <strong id="standard-workdays"><?= (int) ($employees[0]['workingDays'] ?? 0) ?> ngày</strong></div>
                         <div class="holiday-source-tools">
                             <span id="holiday-source-status" role="status" aria-live="polite">Đang chờ tải lịch lễ Việt Nam...</span>
                             <button class="button button-outline" id="manage-holidays" type="button"><i class="bi bi-calendar2-heart" aria-hidden="true"></i><span>Lịch nghỉ Việt Nam</span></button>
@@ -240,7 +221,7 @@ $statusFor = static function (array $employee): array {
                 </div>
 
                 <div class="table-toolbar">
-                    <div><span class="table-toolbar-mark"><i class="bi bi-list-check" aria-hidden="true"></i></span><strong>Danh sách nhân viên</strong><span class="record-badge" id="toolbar-count">10</span></div>
+                    <div><span class="table-toolbar-mark"><i class="bi bi-list-check" aria-hidden="true"></i></span><strong>Danh sách nhân viên</strong><span class="record-badge" id="toolbar-count"><?= count($employees) ?></span></div>
                     <span class="table-toolbar-note"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Vuốt hoặc kéo ngang để xem thêm cột</span>
                 </div>
 
@@ -281,14 +262,14 @@ $statusFor = static function (array $employee): array {
                                     </td>
                                     <td class="department-cell"><?= $escape($employee['department']) ?></td>
                                     <td class="position-cell"><?= $escape($employee['position']) ?></td>
-                                    <td class="text-center">22</td>
+                                    <td class="text-center"><?= (int) $employee['workingDays'] ?></td>
                                     <td class="text-center"><strong class="actual-days"><?= $employee['worked'] ?></strong></td>
-                                    <td class="text-center"><?= $employee['paidLeave'] ?></td>
-                                    <td class="text-center"><?= $employee['unpaidLeave'] ?></td>
+                                    <td class="text-center">—</td>
+                                    <td class="text-center">—</td>
                                     <td class="text-center"><?= $employee['absent'] ?></td>
                                     <td class="text-center"><?= $employee['late'] ?></td>
                                     <td class="text-center"><?= $employee['late'] * $employee['lateMinutesPerOccurrence'] ?></td>
-                                    <td class="text-center">0</td>
+                                    <td class="text-center"><?= (int) $employee['holidayWorkDays'] ?></td>
                                     <td class="text-center"><?= number_format($employee['overtime'], 1) ?></td>
                                     <td><span class="status-badge status-<?= $statusClass ?>"><?= $escape($statusLabel) ?></span></td>
                                     <td class="text-center"><button class="view-button" type="button" aria-label="Xem chi tiết <?= $escape($employee['name']) ?>"><i class="bi bi-eye" aria-hidden="true"></i><span>Xem</span></button></td>
@@ -306,7 +287,7 @@ $statusFor = static function (array $employee): array {
 
                 <footer class="table-footer">
                     <div class="table-footer-left">
-                        <span id="record-range">Hiển thị 1–10 trong 10 nhân viên</span>
+                        <span id="record-range">Hiển thị <?= $employees ? 1 : 0 ?>–<?= min(10, count($employees)) ?> trong <?= count($employees) ?> nhân viên</span>
                         <label class="page-size-control">Hiển thị
                             <select id="page-size" aria-label="Số dòng mỗi trang">
                                 <option value="8">8</option>
@@ -322,7 +303,7 @@ $statusFor = static function (array $employee): array {
 
             <footer class="page-footer">
                 <span>© <?= date('Y') ?> <strong>HRM</strong> · Hệ thống quản lý nhân sự</span>
-                <span><i class="bi bi-shield-check" aria-hidden="true"></i> Dữ liệu mẫu dùng để minh họa giao diện</span>
+                <span><i class="bi bi-shield-check" aria-hidden="true"></i> Dữ liệu chấm công từ database</span>
             </footer>
         </div>
     </main>
@@ -340,7 +321,7 @@ $statusFor = static function (array $employee): array {
             </div>
             <div class="modal-body" id="employee-modal-body"></div>
             <div class="modal-footer detail-modal-footer">
-                <span><i class="bi bi-info-circle" aria-hidden="true"></i> Dữ liệu minh họa · <span id="modal-period"></span></span>
+                <span><i class="bi bi-info-circle" aria-hidden="true"></i> Dữ liệu database · <span id="modal-period"></span></span>
                 <button type="button" class="button button-primary" data-bs-dismiss="modal">Đóng</button>
             </div>
         </div>
@@ -358,7 +339,7 @@ $statusFor = static function (array $employee): array {
             <button class="dialog-close" type="button" id="close-holiday-dialog" aria-label="Đóng"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
         </header>
         <div class="holiday-dialog-body">
-            <p class="holiday-source-note">Lịch API là dữ liệu tham khảo. Nager.Date hiện thiếu một số lịch nghỉ Việt Nam như Tết, Giỗ Tổ và lịch nghỉ/làm bù; hãy đối chiếu thông báo chính thức từng năm. Ngày bổ sung chỉ lưu trên trình duyệt này.</p>
+            <p class="holiday-source-note">Lịch API là dữ liệu tham khảo. Nager.Date hiện thiếu một số lịch nghỉ Việt Nam như Tết, Giỗ Tổ và lịch nghỉ/làm bù; hãy đối chiếu thông báo chính thức từng năm. Ngày bổ sung được lưu trong database và dùng chung giữa người quản trị.</p>
             <ul class="holiday-list" id="holiday-list" aria-label="Danh sách ngày lễ"></ul>
             <div class="holiday-add-form">
                 <label class="dialog-field">Ngày<input type="date" id="holiday-date" required></label>
@@ -384,6 +365,7 @@ $statusFor = static function (array $employee): array {
     };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<?php require PATH_VIEW . 'api-config.php'; ?>
 <script src="assets/js/attendance.js" defer></script>
 </body>
 </html>

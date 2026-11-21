@@ -31,4 +31,35 @@
         document.getElementById('toast-container').append(toast);
         window.setTimeout(() => toast.remove(), 4000);
     });
+
+    const mappingTable = document.getElementById('employee-account-mappings');
+    const mappingFeedback = document.getElementById('mapping-feedback');
+    if (mappingTable && mappingFeedback) {
+        mappingTable.addEventListener('click', async (event) => {
+            const button = event.target.closest('[data-save-mapping]');
+            if (!button) {
+                return;
+            }
+
+            const row = button.closest('[data-mapping-row]');
+            const employeeCode = row.querySelector('[data-employee-code]').value;
+            button.disabled = true;
+            mappingFeedback.textContent = '';
+
+            try {
+                await window.lumiCineApi('user-mappings', {
+                    method: 'POST',
+                    body: {
+                        userId: Number(row.dataset.userId),
+                        employeeCode: employeeCode || null,
+                    },
+                });
+                mappingFeedback.textContent = 'Đã lưu liên kết. Nhân viên cần đăng xuất rồi đăng nhập lại để áp dụng.';
+            } catch (error) {
+                mappingFeedback.textContent = error.message;
+            } finally {
+                button.disabled = false;
+            }
+        });
+    }
 })();
