@@ -525,13 +525,6 @@
         window.setTimeout(() => toast.remove(), 3500);
     };
 
-    // Giữ CSV UTF-8 tương thích Excel và tránh ô dữ liệu bị hiểu là công thức.
-    const csvSafe = (value) => {
-        const text = String(value);
-        const safeText = /^[\s]*[=+\-@]/.test(text) ? `'${text}` : text;
-        return `"${safeText.replace(/"/g, '""')}"`;
-    };
-
     const exportReport = () => {
         const headers = [
             'Mã nhân viên', 'Họ và tên', 'Phòng ban', 'Chức vụ',
@@ -540,7 +533,7 @@
             'Tổng phút đi muộn', 'Ngày lễ nghỉ theo lịch', 'Ngày lễ đi làm',
             'Tổng giờ tăng ca', 'Trạng thái',
         ];
-        const lines = [headers, ...filteredEmployees.map((employee) => [
+        const rows = filteredEmployees.map((employee) => [
             employee.id,
             employee.name,
             employee.department,
@@ -556,19 +549,75 @@
             employee.holidayWorkDays,
             employee.overtime,
             statusLabels[employee.status],
-        ])].map((line) => line.map(csvSafe).join(','));
-
-        const csv = `\uFEFF${lines.join('\r\n')}`;
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+        ]);
+        const columnColors = [
+            ['#dbeafe', '#1e40af'],
+            ['#dcfce7', '#166534'],
+            ['#fef3c7', '#92400e'],
+            ['#ffedd5', '#9a3412'],
+            ['#ccfbf1', '#115e59'],
+            ['#ede9fe', '#5b21b6'],
+            ['#e0e7ff', '#3730a3'],
+        ];
+        const colorLegend = [
+            ['Thông tin nhân sự', 4],
+            ['Ngày công', 2],
+            ['Nghỉ phép / vắng', 3],
+            ['Đi muộn', 2],
+            ['Ngày lễ', 2],
+            ['Tăng ca', 1],
+            ['Trạng thái', 1],
+        ];
+        const columnGroups = [0, 0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 6];
+        const escapeHtml = (value) => String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+        const cellHtml = (value, columnIndex, isHeader = false) => {
+            const [fill, color] = columnColors[columnGroups[columnIndex]];
+            const tag = isHeader ? 'th' : 'td';
+            const style = [
+                `background-color:${fill}`,
+                `color:${color}`,
+                'border:1px solid #cbd5e1',
+                'padding:7px 9px',
+                isHeader ? 'font-weight:bold;text-align:center' : 'vertical-align:middle',
+                isHeader ? '' : typeof value === 'number' && Number.isFinite(value)
+                    ? 'mso-number-format:0.##'
+                    : 'mso-number-format:"\\@"',
+                columnIndex === 4 || columnIndex === 6 || columnIndex === 9 || columnIndex === 11 || columnIndex === 13
+                    ? 'border-left:2px solid #94a3b8'
+                    : '',
+            ].filter(Boolean).join(';');
+            const text = typeof value === 'string' && /^[\s]*[=+\-@]/.test(value)
+                ? `'${value}`
+                : value;
+            return `<${tag} style="${style}">${escapeHtml(text ?? '')}</${tag}>`;
+        };
+        const headerRow = `<tr>${headers.map((header, index) => cellHtml(header, index, true)).join('')}</tr>`;
+        const bodyRows = rows
+            .map((row) => `<tr>${row.map((value, index) => cellHtml(value, index)).join('')}</tr>`)
+            .join('');
+        const legendTitle = `<tr><th colspan="${headers.length}" style="background-color:#1e293b;color:#fff;font-weight:bold;text-align:left;padding:9px 12px">CHÚ THÍCH MÀU</th></tr>`;
+        const legendRow = `<tr>${colorLegend.map(([label, span], index) => {
+            const [fill, color] = columnColors[index];
+            return `<td colspan="${span}" style="background-color:${fill};color:${color};border:1px solid #cbd5e1;padding:8px 9px;font-weight:bold;text-align:center">${escapeHtml(label)}</td>`;
+        }).join('')}</tr>`;
+        const workbook = `\uFEFF<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Báo cáo công</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
+<body><table><thead>${legendTitle}${legendRow}${headerRow}</thead><tbody>${bodyRows}</tbody></table></body></html>`;
+        const blob = new Blob([workbook], { type: 'application/vnd.ms-excel;charset=utf-8' });
         const link = document.createElement('a');
         const objectUrl = URL.createObjectURL(blob);
         link.href = objectUrl;
-        link.download = `bang-tong-hop-cong-${selectedYear}-${String(selectedMonth).padStart(2, '0')}.csv`;
+        link.download = `bang-tong-hop-cong-${selectedYear}-${String(selectedMonth).padStart(2, '0')}.xls`;
         document.body.append(link);
         link.click();
         link.remove();
         window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-        showToast(`Đã xuất ${filteredEmployees.length} nhân viên ra tệp Excel tương thích CSV.`);
+        showToast(`Đã xuất báo cáo ${filteredEmployees.length} nhân viên với màu phân biệt từng nhóm dữ liệu.`);
     };
 
     const getDailyCalendar = (employee) => {

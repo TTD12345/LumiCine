@@ -104,6 +104,6 @@ Trang nhân viên và quản trị đọc/ghi dữ liệu qua PHP/MySQL; trình 
 - Đơn tăng ca được liên kết với bản ghi `cham_cong`, lưu trong `tang_ca`; quản trị viên duyệt hoặc từ chối trực tiếp trên database.
 - Báo cáo đọc dữ liệu phân ca, chấm công và tăng ca đã duyệt theo tháng.
 - Ngày nghỉ/làm bù tùy chỉnh lưu trong `lumicine_holidays` và được dùng chung giữa các tài khoản quản trị. Lịch Nager.Date vẫn là nguồn tham khảo bên ngoài.
-- Xuất báo cáo CSV UTF-8 và in báo cáo.
+- Xuất báo cáo Excel tương thích định dạng `.xls`, có màu phân biệt các nhóm dữ liệu, và in báo cáo.
 
 Phân quyền thao tác database được xác thực ở máy chủ; các thao tác ghi dùng CSRF token. Trước khi sử dụng thật, hãy kiểm tra mapping tài khoản và sao lưu database định kỳ.
