@@ -35,7 +35,7 @@ foreach ($shifts as $shift) {
     <aside class="employee-sidebar" id="employee-sidebar" aria-label="Điều hướng chính">
         <a class="employee-brand" href="index.php?action=dashboard">
             <span class="brand-icon"><i class="bi bi-buildings-fill" aria-hidden="true"></i></span>
-            <span class="brand-title">LumiCine<small>QUẢN LÝ NHÂN SỰ</small></span>
+            <span class="brand-title">LumiCine</span>
         </a>
         <p class="nav-caption">TỔNG QUAN</p>
         <nav class="employee-nav">
@@ -47,7 +47,7 @@ foreach ($shifts as $shift) {
         </nav>
         <div class="employee-sidebar-bottom">
             <?php if (in_array($currentUser['role'], ['accountant', 'hr', 'chairman'], true)): ?>
-                <a class="employee-admin-link" href="admin.php"><i class="bi bi-shield-lock" aria-hidden="true"></i> Trang quản trị HRM</a>
+                <a class="employee-admin-link" href="admin.php"><i class="bi bi-shield-lock" aria-hidden="true"></i> Trang quản trị LumiCine</a>
             <?php endif; ?>
             <form class="employee-logout-form" action="index.php?action=logout" method="post">
                 <input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>">

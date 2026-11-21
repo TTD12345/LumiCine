@@ -43,7 +43,7 @@ $attendanceSummary = !$attendanceToday
 <body>
 <div class="employee-app">
     <aside class="employee-sidebar" id="employee-sidebar" aria-label="Điều hướng chính">
-        <a class="employee-brand" href="?action=dashboard"><span class="brand-icon"><i class="bi bi-buildings-fill"></i></span><span class="brand-title">LumiCine<small>QUẢN LÝ NHÂN SỰ</small></span></a>
+        <a class="employee-brand" href="?action=dashboard"><span class="brand-icon"><i class="bi bi-buildings-fill"></i></span><span class="brand-title">LumiCine</span></a>
         <p class="nav-caption">TỔNG QUAN</p>
         <nav class="employee-nav">
             <a class="employee-nav-link <?= $section === 'dashboard' ? 'active' : '' ?>" href="?action=dashboard"><i class="bi bi-grid-1x2"></i><span>Bảng điều khiển</span></a>
@@ -54,7 +54,7 @@ $attendanceSummary = !$attendanceToday
         </nav>
         <div class="employee-sidebar-bottom">
             <?php if (in_array($currentUser['role'], ['accountant', 'hr', 'chairman'], true)): ?>
-                <a class="employee-admin-link" href="admin.php"><i class="bi bi-shield-lock"></i> Trang quản trị HRM</a>
+                <a class="employee-admin-link" href="admin.php"><i class="bi bi-shield-lock"></i> Trang quản trị LumiCine</a>
             <?php endif; ?>
             <form class="employee-logout-form" action="index.php?action=logout" method="post"><input type="hidden" name="csrf_token" value="<?= $escape($csrfToken) ?>"><button class="employee-logout-button" type="submit"><i class="bi bi-box-arrow-right"></i> Đăng xuất</button></form>
         </div>

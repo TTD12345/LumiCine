@@ -23,7 +23,7 @@ $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'U
     <main class="auth-card">
         <div class="auth-brand">
             <span class="auth-brand-icon"><i class="bi bi-buildings-fill" aria-hidden="true"></i></span>
-            <span><strong>LumiCine</strong><small>QUẢN LÝ NHÂN SỰ</small></span>
+            <span><strong>LumiCine</strong></span>
         </div>
         <div class="auth-heading">
             <span class="auth-kicker">KHÔNG GIAN LÀM VIỆC</span>
