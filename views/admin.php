@@ -46,9 +46,10 @@ $statusFor = static function (array $employee): array {
         <nav class="nav flex-column sidebar-nav">
             <a class="nav-link" href="index.php?action=admin-overview"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Tổng quan</span></a>
             <a class="nav-link" href="index.php?action=admin-employees"><i class="bi bi-people" aria-hidden="true"></i><span>Quản lý nhân viên</span></a>
+            <a class="nav-link" href="index.php?action=admin-schedule"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Phân ca làm việc</span></a>
             <a class="nav-link" href="index.php?action=admin-attendance"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Quản lý chấm công</span></a>
             <a class="nav-link" href="index.php?action=admin-overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Duyệt tăng ca</span></a>
-            <a class="nav-link active" href="index.php?action=admin-summary" aria-current="page"><i class="bi bi-clipboard-data" aria-hidden="true"></i><span>Tổng hợp công</span><span class="active-marker"></span></a>
+            <a class="nav-link active" href="index.php?action=admin-summary" aria-current="page"><i class="bi bi-clipboard-data" aria-hidden="true"></i><span>Tổng hợp công</span></a>
             <a class="nav-link" href="index.php?action=admin-leave"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Quản lý nghỉ phép</span></a>
             <a class="nav-link" href="index.php?action=admin-reports"><i class="bi bi-bar-chart-line" aria-hidden="true"></i><span>Báo cáo thống kê</span></a>
         </nav>
@@ -57,23 +58,12 @@ $statusFor = static function (array $employee): array {
         <nav class="nav flex-column sidebar-nav">
             <a class="nav-link" href="index.php?action=admin-settings"><i class="bi bi-gear" aria-hidden="true"></i><span>Cài đặt</span></a>
             <a class="nav-link" href="index.php"><i class="bi bi-person-workspace" aria-hidden="true"></i><span>Trang nhân viên</span></a>
-            <form class="sidebar-logout-form" action="index.php?action=logout" method="post">
-                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') ?>">
-                <button class="nav-link" type="submit"><i class="bi bi-box-arrow-right" aria-hidden="true"></i><span>Đăng xuất</span></button>
-            </form>
         </nav>
 
         <div class="sidebar-bottom">
-            <div class="sidebar-help">
-                <span class="help-icon"><i class="bi bi-headset" aria-hidden="true"></i></span>
-                <strong>Bạn cần hỗ trợ?</strong>
-                <span>Liên hệ bộ phận quản trị hệ thống.</span>
-                <a href="mailto:hr@example.com">Trung tâm trợ giúp <i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
-            </div>
             <div class="sidebar-profile">
                 <span class="avatar avatar-admin"><?= htmlspecialchars($currentUser['initials'], ENT_QUOTES, 'UTF-8') ?></span>
                 <span class="profile-copy"><strong><?= htmlspecialchars($currentUser['display_name'], ENT_QUOTES, 'UTF-8') ?></strong><small><?= htmlspecialchars($roleLabel, ENT_QUOTES, 'UTF-8') ?></small></span>
-                <button class="profile-more" type="button" aria-label="Tùy chọn tài khoản"><i class="bi bi-three-dots" aria-hidden="true"></i></button>
             </div>
         </div>
     </aside>

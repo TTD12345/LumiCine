@@ -115,6 +115,16 @@ class HomeController
         $mappingEmployees = $section === 'employees'
             ? $workforce->listEmployees()
             : [];
+        $scheduleDate = date('Y-m-d');
+        $scheduleAssignments = $section === 'schedule'
+            ? $workforce->listAssignments($scheduleDate)
+            : [];
+        $scheduleEmployees = $section === 'schedule'
+            ? $workforce->listEmployees()
+            : [];
+        $scheduleShiftTypes = $section === 'schedule'
+            ? $workforce->listShiftTypes()
+            : [];
         $roleLabel = self::ROLE_LABELS[$currentUser['role']];
         $csrfToken = $this->csrfToken();
         require_once PATH_VIEW . 'admin_section.php';

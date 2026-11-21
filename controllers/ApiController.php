@@ -69,7 +69,10 @@ class ApiController
                     if (!is_string($date)) {
                         throw new InvalidArgumentException('Ngày không hợp lệ.');
                     }
-                    $this->respond(['assignments' => $workforce->listAssignments($date, $employeeId)]);
+                    $this->respond([
+                        'assignments' => $workforce->listAssignments($date, $employeeId),
+                        'shiftTypes' => $workforce->listShiftTypes(),
+                    ]);
                 }
                 $this->requireAdmin($user['role']);
                 $payload = $this->readPayload();

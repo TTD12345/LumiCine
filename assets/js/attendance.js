@@ -591,6 +591,8 @@
             const day = {
                 date: date.getDate(),
                 state: 'weekend',
+                checkIn: '',
+                checkOut: '',
             };
             const holiday = holidayDates.find((item) => item.day === day.date);
             const makeupWorkday = makeupWorkdays.find((item) => item.day === day.date);
@@ -610,6 +612,8 @@
                     day.state = attendance.state;
                     day.lateMinutes = attendance.lateMinutes;
                 }
+                day.checkIn = attendance.checkIn;
+                day.checkOut = attendance.checkOut;
             }
             calendarDays.push(day);
             date.setDate(date.getDate() + 1);
@@ -672,10 +676,17 @@
 
         const metrics = document.createElement('div');
         metrics.className = 'detail-metrics';
+        const recordsWithCheckIn = (employee.dailyRecords || [])
+            .filter((record) => record.checkIn)
+            .sort((first, second) => second.date.localeCompare(first.date));
+        const latestCheckIn = recordsWithCheckIn[0]?.checkIn || 'Chưa có';
+        const latestCheckOut = recordsWithCheckIn.find((record) => record.checkOut)?.checkOut || 'Chưa có';
         appendDetailMetric(metrics, 'Ngày công thực tế', `${employee.worked}/${employee.workingDays}`);
         appendDetailMetric(metrics, 'Nghỉ có lương', employee.leaveDataAvailable ? `${employee.paidLeave} ngày` : 'Chưa có dữ liệu');
         appendDetailMetric(metrics, 'Vắng mặt', `${employee.absent} ngày`);
         appendDetailMetric(metrics, 'Đi muộn', `${employee.late} lượt · ${employee.lateMinutes} phút`);
+        appendDetailMetric(metrics, 'Giờ check-in gần nhất', latestCheckIn);
+        appendDetailMetric(metrics, 'Giờ check-out gần nhất', latestCheckOut);
         appendDetailMetric(metrics, 'Ngày lễ nghỉ theo lịch', `${employee.holidayRestDays} ngày`);
         appendDetailMetric(
         metrics,
@@ -747,6 +758,17 @@
                 const dayNumber = document.createElement('span');
                 dayNumber.className = 'calendar-day-number';
                 dayNumber.textContent = String(day.date);
+                if (day.checkIn || day.checkOut) {
+                    const times = document.createElement('span');
+                    times.className = 'calendar-day-times';
+                    times.textContent = `Vào ${day.checkIn || '--:--'} · Ra ${day.checkOut || '--:--'}`;
+                    cell.append(dayNumber, times);
+                } else {
+                    const times = document.createElement('span');
+                    times.className = 'calendar-day-times calendar-day-times-empty';
+                    times.textContent = 'Vào --:-- · Ra --:--';
+                    cell.append(dayNumber, times);
+                }
                 const state = document.createElement('span');
                 state.className = 'calendar-day-state';
                 state.textContent = day.makeupWorkday
@@ -759,7 +781,7 @@
                 if (day.state === 'late' && day.lateMinutes) {
                     state.textContent = `${day.makeupWorkday ? 'Làm bù · ' : ''}Muộn ${day.lateMinutes} phút`;
                 }
-                cell.append(dayNumber, state);
+                cell.append(state);
                 cell.setAttribute('aria-label', `Ngày ${day.date}: ${day.makeupWorkday ? `Ngày làm bù, ${stateLabels[day.state]}` : day.holidayName || stateLabels[day.state]}`);
                 if (day.holidayName) cell.title = day.holidayName;
             }
