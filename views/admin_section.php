@@ -24,7 +24,7 @@ $isSchedule = $section === 'schedule';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= $escape($page['title']) ?> | LumiCine HRM</title>
+    <title><?= $escape($page['title']) ?> | LumiCine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -37,7 +37,7 @@ $isSchedule = $section === 'schedule';
 <div class="app-shell">
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar" aria-label="Điều hướng quản trị">
-        <a class="brand" href="?action=admin-overview"><span class="brand-mark"><i class="bi bi-buildings-fill"></i></span><span><strong>HRM</strong><small>PEOPLE MANAGEMENT</small></span></a>
+        <a class="brand" href="?action=admin-overview"><span class="brand-mark"><i class="bi bi-buildings-fill"></i></span><span><strong>LumiCine</strong></span></a>
         <p class="nav-caption">KHÔNG GIAN LÀM VIỆC</p>
         <nav class="nav flex-column sidebar-nav">
             <a class="nav-link <?= $section === 'overview' ? 'active' : '' ?>" href="?action=admin-overview"><i class="bi bi-grid-1x2"></i><span>Tổng quan</span></a>
@@ -230,7 +230,7 @@ $isSchedule = $section === 'schedule';
                     <section class="data-card"><div class="table-card-header"><div><h2><?= $section === 'attendance' ? 'Dữ liệu chấm công' : 'Danh sách nhân viên' ?></h2><p><?= $section === 'attendance' ? 'Tổng hợp ngày công theo nhân viên.' : 'Thông tin nhân viên trong hệ thống.' ?></p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th><?php if ($section === 'attendance'): ?><th>Ngày công</th><th>Đi muộn</th><?php endif; ?></tr></thead><tbody><?php foreach ($employees as $employee): ?><tr><td><?= $escape($employee['id']) ?></td><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= $escape($employee['position']) ?></td><?php if ($section === 'attendance'): ?><td><?= (int) $employee['worked'] ?> ngày</td><td><?= (int) $employee['late'] ?> lượt</td><?php endif; ?></tr><?php endforeach; ?></tbody></table></div></section>
                 <?php endif; ?>
             <?php elseif ($section === 'settings'): ?>
-                <section class="data-card"><div class="table-card-header"><div><h2>Cài đặt hệ thống</h2><p>Cấu hình chung cho LumiCine HRM.</p></div></div><div class="settings-grid"><label>Giờ bắt đầu ca<input type="time" value="08:00"></label><label>Giờ kết thúc ca<input type="time" value="17:00"></label><label>Ngày công chuẩn/tháng<input type="number" min="1" max="31" value="22"></label><button class="button button-primary" type="button">Lưu cài đặt</button></div></section>
+                <section class="data-card"><div class="table-card-header"><div><h2>Cài đặt hệ thống</h2><p>Cấu hình chung cho LumiCine.</p></div></div><div class="settings-grid"><label>Giờ bắt đầu ca<input type="time" value="08:00"></label><label>Giờ kết thúc ca<input type="time" value="17:00"></label><label>Ngày công chuẩn/tháng<input type="number" min="1" max="31" value="22"></label><button class="button button-primary" type="button">Lưu cài đặt</button></div></section>
                 <section class="data-card" aria-labelledby="payroll-settings-title">
                     <div class="table-card-header">
                         <div>

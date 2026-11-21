@@ -24,7 +24,7 @@ $statusFor = static function (array $employee): array {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f4f7fb">
-    <title>Bảng tổng hợp công nhân viên | HRM</title>
+    <title>Bảng tổng hợp công nhân viên | LumiCine</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
@@ -37,9 +37,9 @@ $statusFor = static function (array $employee): array {
 <div class="app-shell">
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar" aria-label="Điều hướng chính">
-        <a class="brand" href="index.php?action=admin-overview" aria-label="HRM - trang chủ">
+        <a class="brand" href="index.php?action=admin-overview" aria-label="LumiCine - trang chủ">
             <span class="brand-mark"><i class="bi bi-buildings-fill" aria-hidden="true"></i></span>
-            <span><strong>HRM</strong><small>PEOPLE MANAGEMENT</small></span>
+            <span><strong>LumiCine</strong></span>
         </a>
 
         <p class="nav-caption">KHÔNG GIAN LÀM VIỆC</p>
@@ -292,7 +292,7 @@ $statusFor = static function (array $employee): array {
             </section>
 
             <footer class="page-footer">
-                <span>© <?= date('Y') ?> <strong>HRM</strong> · Hệ thống quản lý nhân sự</span>
+                <span>© <?= date('Y') ?> <strong>LumiCine</strong> · Hệ thống quản lý nhân sự</span>
                 <span><i class="bi bi-shield-check" aria-hidden="true"></i> Dữ liệu chấm công từ database</span>
             </footer>
         </div>
