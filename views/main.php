@@ -45,13 +45,6 @@ foreach ($shifts as $shift) {
             <a class="employee-nav-link" href="index.php?action=overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
             <a class="employee-nav-link" href="index.php?action=attendance"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
         </nav>
-        <?php if ($currentUser['role'] !== 'employee'): ?>
-            <p class="nav-caption nav-caption-spaced">QUẢN LÝ</p>
-            <nav class="employee-nav">
-                <a class="employee-nav-link" href="index.php?action=employees"><i class="bi bi-person-vcard" aria-hidden="true"></i><span>Nhân viên</span></a>
-                <a class="employee-nav-link" href="index.php?action=reports"><i class="bi bi-graph-up" aria-hidden="true"></i><span>Báo cáo</span></a>
-            </nav>
-        <?php endif; ?>
         <div class="employee-sidebar-bottom">
             <?php if (in_array($currentUser['role'], ['accountant', 'hr', 'chairman'], true)): ?>
                 <a class="employee-admin-link" href="admin.php"><i class="bi bi-shield-lock" aria-hidden="true"></i> Trang quản trị HRM</a>
