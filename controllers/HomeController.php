@@ -46,7 +46,9 @@ class HomeController
         $year = filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT);
         $month = ($month !== false && $month >= 1 && $month <= 12) ? $month : (int) date('n');
         $year = ($year !== false && $year >= 2020 && $year <= 2100) ? $year : (int) date('Y');
-        $employees = (new WorkforceModel())->attendanceReport($month, $year);
+        $workforce = new WorkforceModel();
+        $payrollStartDay = $workforce->payrollStartDay();
+        $employees = $workforce->attendanceReport($month, $year);
         $roleLabel = self::ROLE_LABELS[$currentUser['role']];
         $csrfToken = $this->csrfToken();
         require_once PATH_VIEW . 'admin.php';
@@ -108,6 +110,7 @@ class HomeController
         }
 
         $workforce = new WorkforceModel();
+        $payrollStartDay = $section === 'settings' ? $workforce->payrollStartDay() : null;
         $employees = $workforce->attendanceReport((int) date('n'), (int) date('Y'));
         $employeeMappings = $section === 'employees'
             ? $workforce->listEmployeeAccountMappings()

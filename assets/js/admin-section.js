@@ -62,4 +62,34 @@
             }
         });
     }
+
+    const payrollSettingsForm = document.getElementById('payroll-settings-form');
+    if (payrollSettingsForm) {
+        const startDayInput = document.getElementById('payroll-start-day');
+        const saveButton = document.getElementById('save-payroll-settings');
+        const feedback = document.getElementById('payroll-settings-feedback');
+
+        payrollSettingsForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!startDayInput.reportValidity()) return;
+
+            saveButton.disabled = true;
+            feedback.textContent = '';
+            feedback.dataset.state = '';
+            try {
+                const result = await window.lumiCineApi('payroll-settings', {
+                    method: 'POST',
+                    body: { payrollStartDay: Number(startDayInput.value) },
+                });
+                startDayInput.value = String(result.payrollStartDay);
+                feedback.dataset.state = 'success';
+                feedback.textContent = `Đã lưu. Bảng tổng hợp công sẽ tính kỳ lương bắt đầu vào ngày ${result.payrollStartDay}.`;
+            } catch (error) {
+                feedback.dataset.state = 'error';
+                feedback.textContent = error instanceof Error ? error.message : 'Không thể lưu ngày lương.';
+            } finally {
+                saveButton.disabled = false;
+            }
+        });
+    }
 })();

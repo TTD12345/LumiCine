@@ -172,6 +172,27 @@ class ApiController
                 }
                 $this->respond(['success' => true]);
             }
+            if ($resource === 'payroll-settings') {
+                $this->requireAdmin($user['role']);
+                if ($method === 'GET') {
+                    $this->respond(['payrollStartDay' => $workforce->payrollStartDay()]);
+                }
+
+                $payload = $this->readPayload();
+                $rawStartDay = $payload['payrollStartDay'] ?? null;
+                if (!is_int($rawStartDay) && !(is_string($rawStartDay) && ctype_digit($rawStartDay))) {
+                    throw new InvalidArgumentException('Ngày bắt đầu kỳ lương không hợp lệ.');
+                }
+                $startDay = filter_var($rawStartDay, FILTER_VALIDATE_INT);
+                if ($startDay === false) {
+                    throw new InvalidArgumentException('Ngày bắt đầu kỳ lương không hợp lệ.');
+                }
+                $workforce->savePayrollStartDay($startDay);
+                $this->respond([
+                    'success' => true,
+                    'payrollStartDay' => $workforce->payrollStartDay(),
+                ]);
+            }
             if ($resource === 'report') {
                 $this->requireAdmin($user['role']);
                 $month = filter_var($_GET['month'] ?? null, FILTER_VALIDATE_INT);
@@ -179,7 +200,10 @@ class ApiController
                 if (!$month || !$year) {
                     throw new InvalidArgumentException('Kỳ báo cáo không hợp lệ.');
                 }
-                $this->respond(['employees' => $workforce->attendanceReport($month, $year)]);
+                $this->respond([
+                    'employees' => $workforce->attendanceReport($month, $year),
+                    'payrollStartDay' => $workforce->payrollStartDay(),
+                ]);
             }
 
             $this->respond(['error' => 'Không tìm thấy chức năng.'], 404);

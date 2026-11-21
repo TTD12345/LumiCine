@@ -335,6 +335,10 @@ h1, h2, p { margin-top: 0; }
 .status-paid { background: #edf5ff; color: #397bb3; }
 .settings-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: end; gap: 12px; padding: 18px 19px; }
 .settings-grid label { display: grid; gap: 6px; color: #6f8296; font-size: 9px; font-weight: 600; }
+.payroll-settings-grid { grid-template-columns: minmax(180px, 250px) minmax(0, 1fr) auto; }
+.payroll-settings-help { margin: 0; color: #8492a2; font-size: 9px; line-height: 1.6; }
+.payroll-settings-feedback { min-height: 16px; margin: 0 19px 14px; color: #256c4a; font-size: 10px; }
+.payroll-settings-feedback[data-state="error"] { color: #b54747; }
 .mapping-select { min-width: 230px; max-width: 100%; height: 34px; border: 1px solid #e1e8ef; border-radius: 7px; background: #fff; padding: 0 8px; color: #435b73; font-size: 9px; }
 .mapping-feedback { min-height: 16px; margin: 10px 19px 0; color: #256c4a; font-size: 10px; }
 .mapping-save { white-space: nowrap; }
@@ -398,6 +402,10 @@ h1, h2, p { margin-top: 0; }
     .summary-card { padding: 12px; }
     .summary-value { font-size: 22px; }
     .data-card { margin-top: 15px; }
+    .payroll-settings-grid { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
+    .payroll-settings-help { grid-column: auto; }
+    .payroll-settings-grid .button { justify-self: start; }
+    .payroll-settings-feedback { margin-right: 14px; margin-left: 14px; }
     .data-card-heading { padding-right: 14px; padding-left: 14px; }
     .data-card-tools { width: 100%; justify-items: stretch; }
     .holiday-source-tools { justify-content: space-between; }
