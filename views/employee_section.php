@@ -17,6 +17,17 @@ $sections = [
 ];
 $page = $sections[$section] ?? $sections['dashboard'];
 $isOvertime = $section === 'overtime';
+$employeeCount = count($employeeRecords);
+$shiftCount = count($employeeShifts);
+$attendanceSummary = !$attendanceToday
+    ? 'Chưa liên kết hồ sơ'
+    : (!$attendanceToday['has_assignment']
+        ? 'Chưa có phân ca'
+        : (($attendanceToday['attendance_status'] ?? '') === 'VANG_MAT'
+            ? 'Vắng mặt'
+            : ($attendanceToday['check_out'] !== ''
+                ? 'Đã hoàn thành'
+                : ($attendanceToday['check_in'] !== '' ? 'Đang làm việc' : 'Chưa bắt đầu'))));
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -72,34 +83,37 @@ $isOvertime = $section === 'overtime';
             <section class="page-heading"><div><span class="page-kicker"><?= $escape($page['kicker']) ?></span><h1><?= $escape($page['title']) ?></h1><p><?= $escape($page['description']) ?></p></div></section>
             <?php if ($isOvertime): ?>
                 <section class="overtime-card" id="overtime" aria-labelledby="overtime-title">
-                    <div class="overtime-heading"><div><h2 id="overtime-title">Đăng ký tăng ca</h2><p>Gửi lý do và thời gian tăng ca để quản trị viên xem xét.</p></div><button class="overtime-button overtime-button-primary" type="button" id="overtime-open-form"><i class="bi bi-plus-lg"></i> Tạo đơn tăng ca</button></div>
-                    <p class="overtime-note">Đơn đăng ký được lưu trên trình duyệt và hiển thị lại ở tất cả trang nhân viên.</p>
+                    <div class="overtime-heading"><div><h2 id="overtime-title">Đăng ký tăng ca</h2><p>Gửi lý do và thời gian tăng ca để quản trị viên xem xét.</p></div><?php if ($canSubmitOvertime): ?><button class="overtime-button overtime-button-primary" type="button" id="overtime-open-form"><i class="bi bi-plus-lg"></i> Tạo đơn tăng ca</button><?php endif; ?></div>
+                    <p class="overtime-note">Đơn đăng ký và trạng thái duyệt được lưu tập trung trong database.</p>
                     <div class="overtime-feedback" id="overtime-feedback" role="status" aria-live="polite"></div>
                     <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Thời gian</th><th>Lý do</th><th>Trạng thái</th></tr></thead><tbody id="employee-overtime-rows"><tr><td colspan="3">Đang tải đơn tăng ca...</td></tr></tbody></table></div>
                 </section>
             <?php elseif ($section === 'dashboard'): ?>
                 <section class="employee-stats">
-                    <article class="stat-card"><div class="stat-top"><span>Tổng ca làm việc</span><i class="bi bi-calendar2-week"></i></div><strong>6</strong><small>ca hôm nay</small></article>
-                    <article class="stat-card"><div class="stat-top"><span>Đơn tăng ca</span><i class="bi bi-clock-history"></i></div><strong id="dashboard-overtime-count">0</strong><small>đơn đã gửi</small></article>
-                    <article class="stat-card"><div class="stat-top"><span>Chấm công</span><i class="bi bi-calendar2-check"></i></div><strong>—</strong><small>trạng thái hôm nay</small></article>
+                    <article class="stat-card"><div class="stat-top"><span>Tổng ca làm việc</span><i class="bi bi-calendar2-week"></i></div><strong><?= $shiftCount ?></strong><small>ca hôm nay</small></article>
+                    <article class="stat-card"><div class="stat-top"><span>Đơn tăng ca</span><i class="bi bi-clock-history"></i></div><strong><?= $overtimeCount ?></strong><small>đơn đã gửi</small></article>
+                    <article class="stat-card"><div class="stat-top"><span>Chấm công</span><i class="bi bi-calendar2-check"></i></div><strong><?= $escape($attendanceSummary) ?></strong><small>trạng thái hôm nay</small></article>
                 </section>
             <?php elseif ($section === 'shift'): ?>
-                <section class="schedule-card"><div class="schedule-heading"><div><h2>Ca làm việc hôm nay</h2><p>Danh sách ca được phân công cho nhân viên.</p></div></div><div class="employee-table-wrap"><table class="employee-table"><thead><tr><th>Nhân viên</th><th>Bộ phận</th><th>Thời gian</th><th>Địa điểm</th><th>Trạng thái</th></tr></thead><tbody><tr><td>Nguyễn Minh Anh</td><td>Hành chính - Nhân sự</td><td>08:00 – 16:00</td><td>Văn phòng tầng 1</td><td><span class="shift-status active">Đang diễn ra</span></td></tr><tr><td>Trần Quốc Bảo</td><td>Kinh doanh</td><td>09:00 – 17:00</td><td>Văn phòng tầng 2</td><td><span class="shift-status active">Đang diễn ra</span></td></tr><tr><td>Lê Hoàng Yến</td><td>Marketing</td><td>12:00 – 20:00</td><td>Phòng họp A</td><td><span class="shift-status upcoming">Sắp bắt đầu</span></td></tr></tbody></table></div></section>
+                <section class="schedule-card"><div class="schedule-heading"><div><h2>Ca làm việc hôm nay</h2><p>Danh sách ca được phân công cho nhân viên.</p></div></div><div class="employee-table-wrap"><table class="employee-table"><thead><tr><th>Nhân viên</th><th>Bộ phận</th><th>Thời gian</th><th>Địa điểm</th><th>Trạng thái</th></tr></thead><tbody><?php foreach ($employeeShifts as $shift): ?><tr><td><?= $escape($shift['name']) ?></td><td><?= $escape($shift['department']) ?></td><td><?= $escape(substr($shift['start'], 0, 5)) ?> – <?= $escape(substr($shift['end'], 0, 5)) ?></td><td><?= $escape($shift['location']) ?></td><td><span class="shift-status <?= $escape($shift['status']) ?>"><?= $escape(['active' => 'Đang diễn ra', 'upcoming' => 'Sắp bắt đầu', 'completed' => 'Hoàn thành'][$shift['status']]) ?></span></td></tr><?php endforeach; ?><?php if (!$employeeShifts): ?><tr><td colspan="5">Chưa có ca làm việc được phân công hôm nay.</td></tr><?php endif; ?></tbody></table></div></section>
             <?php elseif ($section === 'employees'): ?>
-                <section class="schedule-card"><div class="schedule-heading"><div><h2>Danh sách nhân viên</h2><p>Thông tin nhân viên trong tổ chức.</p></div></div><div class="employee-table-wrap"><table class="employee-table"><thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th></tr></thead><tbody><tr><td>NV001</td><td>Nguyễn Minh Anh</td><td>Hành chính - Nhân sự</td><td>Trưởng phòng nhân sự</td></tr><tr><td>NV002</td><td>Trần Quốc Bảo</td><td>Kinh doanh</td><td>Chuyên viên kinh doanh</td></tr><tr><td>NV003</td><td>Lê Hoàng Yến</td><td>Marketing</td><td>Chuyên viên marketing</td></tr></tbody></table></div></section>
+                <section class="schedule-card"><div class="schedule-heading"><div><h2>Danh sách nhân viên</h2><p>Thông tin nhân viên trong tổ chức.</p></div></div><div class="employee-table-wrap"><table class="employee-table"><thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th></tr></thead><tbody><?php foreach ($employeeRecords as $employee): ?><tr><td><?= $escape($employee['code']) ?></td><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= $escape($employee['position']) ?></td></tr><?php endforeach; ?><?php if (!$employeeRecords): ?><tr><td colspan="4">Chưa có nhân viên đang hoạt động.</td></tr><?php endif; ?></tbody></table></div></section>
             <?php elseif ($section === 'reports'): ?>
-                <section class="employee-stats"><article class="stat-card"><div class="stat-top"><span>Tổng nhân viên</span><i class="bi bi-person-vcard"></i></div><strong>6</strong><small>nhân viên</small></article><article class="stat-card"><div class="stat-top"><span>Ca đang diễn ra</span><i class="bi bi-clock"></i></div><strong>2</strong><small>ca</small></article><article class="stat-card"><div class="stat-top"><span>Đơn tăng ca</span><i class="bi bi-hourglass-split"></i></div><strong>—</strong><small>đơn</small></article></section>
+                <section class="employee-stats"><article class="stat-card"><div class="stat-top"><span>Tổng nhân viên</span><i class="bi bi-person-vcard"></i></div><strong><?= $employeeCount ?></strong><small>nhân viên</small></article><article class="stat-card"><div class="stat-top"><span>Ca hôm nay</span><i class="bi bi-clock"></i></div><strong><?= $shiftCount ?></strong><small>ca đã phân công</small></article><article class="stat-card"><div class="stat-top"><span>Đơn tăng ca</span><i class="bi bi-hourglass-split"></i></div><strong><?= $overtimeCount ?></strong><small>đơn</small></article></section>
             <?php else: ?>
                 <section class="schedule-card section-placeholder"><div class="schedule-heading"><div><h2><?= $escape($page['title']) ?></h2><p>Nội dung chức năng đang sẵn sàng trên trang riêng này.</p></div></div></section>
             <?php endif; ?>
         </div>
     </main>
 </div>
-<?php if ($isOvertime): ?>
+<?php if ($isOvertime && $canSubmitOvertime): ?>
 <dialog class="shift-dialog overtime-dialog" id="overtime-dialog" aria-labelledby="overtime-dialog-title"><form id="overtime-form"><header class="dialog-heading"><div><span class="page-kicker">ĐĂNG KÝ LÀM THÊM</span><h2 id="overtime-dialog-title">Đơn đăng ký tăng ca</h2><p>Thông tin nhân viên: <strong id="overtime-employee-name"><?= $currentUserName ?></strong></p></div><button class="dialog-close" type="button" id="overtime-close-form" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header><div class="dialog-grid"><label class="dialog-field">Bắt đầu tăng ca<input name="start" type="datetime-local" required></label><label class="dialog-field">Kết thúc tăng ca<input name="end" type="datetime-local" required></label><label class="dialog-field full">Lý do tăng ca<textarea name="reason" required minlength="5" maxlength="1000" rows="4"></textarea></label></div><footer class="dialog-actions"><button class="secondary-button" type="button" id="overtime-cancel-form">Hủy</button><button class="primary-button" type="submit">Gửi đơn</button></footer></form></dialog>
 <?php endif; ?>
 <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
 <script src="assets/js/employee-section.js" defer></script>
-<?php if ($isOvertime): ?><script src="assets/js/overtime.js" defer></script><?php endif; ?>
+<?php if ($isOvertime): ?>
+    <?php require PATH_VIEW . 'api-config.php'; ?>
+    <script src="assets/js/overtime.js" defer></script>
+<?php endif; ?>
 </body>
 </html>

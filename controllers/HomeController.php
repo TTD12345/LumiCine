@@ -14,6 +14,18 @@ class HomeController
     public function index()
     {
         $currentUser = $this->requireUser();
+        $workforce = new WorkforceModel();
+        $isAdmin = in_array($currentUser['role'], self::ADMIN_ROLES, true);
+        $employeeId = $workforce->findEmployeeIdByCode($currentUser['employee_code'] ?? null);
+        if (!$isAdmin && $employeeId === null) {
+            $this->showEmployeeMappingRequired();
+            return;
+        }
+
+        $initialDate = date('Y-m-d');
+        $shifts = $workforce->listAssignments($initialDate, $isAdmin ? null : $employeeId);
+        $employees = $isAdmin ? $workforce->listEmployees() : [];
+        $canManageShifts = $isAdmin;
         $roleLabel = self::ROLE_LABELS[$currentUser['role']];
         $csrfToken = $this->csrfToken();
         require_once PATH_VIEW . 'main.php';
@@ -30,6 +42,11 @@ class HomeController
             return;
         }
 
+        $month = filter_input(INPUT_GET, 'month', FILTER_VALIDATE_INT);
+        $year = filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT);
+        $month = ($month !== false && $month >= 1 && $month <= 12) ? $month : (int) date('n');
+        $year = ($year !== false && $year >= 2020 && $year <= 2100) ? $year : (int) date('Y');
+        $employees = (new WorkforceModel())->attendanceReport($month, $year);
         $roleLabel = self::ROLE_LABELS[$currentUser['role']];
         $csrfToken = $this->csrfToken();
         require_once PATH_VIEW . 'admin.php';
@@ -38,6 +55,11 @@ class HomeController
     public function attendance()
     {
         $currentUser = $this->requireUser();
+        $employeeId = (new WorkforceModel())->findEmployeeIdByCode($currentUser['employee_code'] ?? null);
+        if ($employeeId === null) {
+            $this->showEmployeeMappingRequired();
+            return;
+        }
         $roleLabel = self::ROLE_LABELS[$currentUser['role']];
         $csrfToken = $this->csrfToken();
         require_once PATH_VIEW . 'attendance.php';
@@ -46,6 +68,30 @@ class HomeController
     public function employeeSection(string $section)
     {
         $currentUser = $this->requireUser();
+        $workforce = new WorkforceModel();
+        $isAdmin = in_array($currentUser['role'], self::ADMIN_ROLES, true);
+        $employeeId = $workforce->findEmployeeIdByCode($currentUser['employee_code'] ?? null);
+        if (!$isAdmin && $employeeId === null) {
+            $this->showEmployeeMappingRequired();
+            return;
+        }
+        if (!$isAdmin && in_array($section, ['employees', 'reports'], true)) {
+            http_response_code(403);
+            $csrfToken = $this->csrfToken();
+            require_once PATH_VIEW . 'forbidden.php';
+            return;
+        }
+        $employeeRecords = $isAdmin ? $workforce->listEmployees() : [];
+        $employeeShifts = $workforce->listAssignments(
+            date('Y-m-d'),
+            $isAdmin ? null : $employeeId
+        );
+        $overtimeRequests = $workforce->overtimeRequests($isAdmin ? null : $employeeId);
+        $overtimeCount = count($overtimeRequests);
+        $canSubmitOvertime = $employeeId !== null;
+        $attendanceToday = $employeeId === null
+            ? null
+            : $workforce->getAttendance($employeeId, date('Y-m-d'));
         $roleLabel = self::ROLE_LABELS[$currentUser['role']];
         $csrfToken = $this->csrfToken();
         require_once PATH_VIEW . 'employee_section.php';
@@ -61,6 +107,14 @@ class HomeController
             return;
         }
 
+        $workforce = new WorkforceModel();
+        $employees = $workforce->attendanceReport((int) date('n'), (int) date('Y'));
+        $employeeMappings = $section === 'employees'
+            ? $workforce->listEmployeeAccountMappings()
+            : [];
+        $mappingEmployees = $section === 'employees'
+            ? $workforce->listEmployees()
+            : [];
         $roleLabel = self::ROLE_LABELS[$currentUser['role']];
         $csrfToken = $this->csrfToken();
         require_once PATH_VIEW . 'admin_section.php';
@@ -95,7 +149,7 @@ class HomeController
                     } catch (PDOException | RuntimeException $exception) {
                         error_log('LumiCine login database error: ' . $exception->getMessage());
                         $user = null;
-                        $errorMessage = 'Không thể truy cập dữ liệu đăng nhập. Kiểm tra cấu hình MySQL và cài đặt database/schema.sql.';
+                        $errorMessage = 'Không thể truy cập dữ liệu đăng nhập. Kiểm tra cấu hình MySQL và chạy database/migrations/2026-11-21-add-workforce-storage.sql.';
                     }
 
                     if ($errorMessage === '') {
@@ -115,6 +169,9 @@ class HomeController
                                 'id' => (int) $user['id'],
                                 'username' => $user['username'],
                                 'display_name' => $user['display_name'],
+                                'employee_code' => $user['employee_code'] === null
+                                    ? null
+                                    : (string) $user['employee_code'],
                                 'role' => $user['role'],
                             ];
                             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
@@ -227,5 +284,12 @@ class HomeController
     {
         header('Location: ' . (in_array($role, self::ADMIN_ROLES, true) ? 'admin.php' : 'index.php'));
         exit;
+    }
+
+    private function showEmployeeMappingRequired(): void
+    {
+        http_response_code(409);
+        $csrfToken = $this->csrfToken();
+        require_once PATH_VIEW . 'employee_unlinked.php';
     }
 }

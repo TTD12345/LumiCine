@@ -1,6 +1,6 @@
 # LumiCine HRM
 
-Trang nhân viên và trang quản trị là hai trang riêng. Người dùng phải đăng nhập; chỉ tài khoản có vai trò Kế toán, HR hoặc Chủ tịch mới được mở trang quản trị. Việc phân quyền được kiểm tra ở phía máy chủ. Các màn hình nghiệp vụ hiện vẫn dùng dữ liệu mẫu/lưu trên trình duyệt, chưa phải hệ thống dữ liệu nhân sự production.
+LumiCine dùng MySQL làm nguồn dữ liệu cho hồ sơ nhân viên, phân ca, chấm công, tăng ca và báo cáo. Người dùng phải đăng nhập; chỉ tài khoản có vai trò Kế toán, HR hoặc Chủ tịch mới được mở trang quản trị. Quyền thao tác được kiểm tra ở phía máy chủ.
 
 ## Cấu trúc thư mục
 
@@ -33,16 +33,39 @@ LumiCine/
 └── package.json
 ```
 
-## Chạy bằng XAMPP
+## Cấu hình database hiện có
 
-1. Chép thư mục `LumiCine` vào `C:\xampp\htdocs\`.
-2. Mở XAMPP Control Panel và khởi động Apache.
-3. Trang nhân viên: `http://localhost/LumiCine/`.
-4. Trang quản trị: `http://localhost/LumiCine/admin.php`.
+Ứng dụng mặc định kết nối MySQL `data_employments` trên `localhost:3306` bằng user `root` không mật khẩu, phù hợp cấu hình Laragon hiện tại. Có thể cấu hình lại bằng các biến môi trường `LUMICINE_DB_NAME`, `LUMICINE_DB_HOST`, `LUMICINE_DB_PORT`, `LUMICINE_DB_USERNAME` và `LUMICINE_DB_PASSWORD`. PHP cần bật extension `PDO_MYSQL`.
 
-Tạo database `data_employments` (hoặc chọn tên khác), rồi import `database/schema.sql` để tạo bảng tài khoản. PHP phải bật extension `PDO_MYSQL` để kết nối MySQL. Nếu dùng tên database khác hoặc thông tin kết nối khác, cấu hình các biến môi trường `LUMICINE_DB_NAME`, `LUMICINE_DB_HOST`, `LUMICINE_DB_PORT`, `LUMICINE_DB_USERNAME` và `LUMICINE_DB_PASSWORD` trước khi chạy PHP. Các giá trị mặc định dùng MySQL cục bộ, user `root`, mật khẩu trống.
+Không import `database/schema.sql` vào database đang có dữ liệu. Trước khi chạy phiên bản này, sao lưu database rồi áp dụng migration bổ sung (không xóa hoặc sửa nội dung các bản ghi hiện có):
 
-Nếu database đã có bảng `nhan_vien`, chạy `database/migrations/2026-11-18-add-nhan-vien-chuc-vu.sql` để bổ sung cột chức vụ `chuc_vu`.
+```powershell
+Get-Content -Raw .\database\migrations\2026-11-21-add-workforce-storage.sql |
+    & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
+```
+
+Migration thêm `lumicine_users.employee_code`, `phan_ca.dia_diem` và bảng lịch nghỉ `lumicine_holidays`. Migration có thể chạy lại an toàn. Nếu MySQL không nằm ở đường dẫn trên, dùng đường dẫn `mysql.exe` tương ứng với cài đặt của bạn.
+
+Liên kết tài khoản với hồ sơ nhân viên tại **Quản lý nhân viên** trong trang quản trị: chọn hồ sơ theo đúng mã nhân viên đã xác minh và lưu liên kết. Mỗi mã nhân viên chỉ được dùng cho một tài khoản; ứng dụng không tự ghép theo tên. Có thể cập nhật trực tiếp bằng SQL nếu cần:
+
+```sql
+UPDATE lumicine_users
+SET employee_code = 'MA_NHAN_VIEN'
+WHERE username = 'TEN_TAI_KHOAN';
+```
+
+Tài khoản nhân viên chưa được liên kết sẽ không thể xem/chấm công cho hồ sơ của người khác; trang sẽ hướng dẫn quản trị viên bổ sung mapping.
+Sau khi cập nhật `employee_code`, đăng xuất và đăng nhập lại để phiên làm việc nhận mapping mới.
+
+Các bảng nghiệp vụ hiện có được dùng trực tiếp:
+
+- Nhân viên và phòng ban: `nhan_vien`, `phong_ban`.
+- Ca làm và phân ca: `ca_lam_viec`, `phan_ca`.
+- Giờ vào/ra và tổng hợp: `cham_cong`, `tong_hop_cong`.
+- Đơn tăng ca: `tang_ca`.
+- Ngày nghỉ/làm bù do quản trị viên bổ sung: `lumicine_holidays`.
+
+Lịch sử chấm công, đơn tăng ca và phân ca hiện có được giữ nguyên. Hệ thống không đọc hoặc ghi vào bảng `lumicine_attendance` trong `schema.sql`; chấm công dùng bảng hiện hữu `cham_cong`. Database hiện chưa có bảng/quy tắc nghỉ phép riêng hoặc cấu hình lương, nên báo cáo hiển thị chưa có dữ liệu cho các phần này thay vì tự tạo số liệu.
 
 ## Tạo tài khoản đăng nhập
 
@@ -71,34 +94,16 @@ php -S 127.0.0.1:8000
 
 Sau đó mở `http://127.0.0.1:8000/` để vào trang nhân viên hoặc `http://127.0.0.1:8000/admin.php` để vào trang quản trị. Cả hai yêu cầu đăng nhập; đường dẫn cũ `?action=admin` vẫn được bảo vệ quyền như trang quản trị. Nếu dùng `npm run dev`, `scripts/dev.ps1` sẽ tự nạp `php_pdo_mysql.dll` từ thư mục extension của PHP nếu driver chưa được bật.
 
-## Tương tác
+## Dữ liệu nghiệp vụ
 
-Trang nhân viên:
+Trang nhân viên và quản trị đọc/ghi dữ liệu qua PHP/MySQL; trình duyệt không còn lưu dữ liệu nghiệp vụ trong `localStorage`.
 
-- Chuyển ngày, tìm kiếm ca và lọc theo trạng thái.
-- Thêm, sửa, xóa ca và đổi trạng thái; dữ liệu mẫu được lưu theo ngày trong trình duyệt.
-- Gửi đơn đăng ký tăng ca với lý do và thời gian bắt đầu/kết thúc; theo dõi trạng thái duyệt.
-- Xuất danh sách ca thành CSV.
+- Quản trị viên phân ca cho nhân viên trong `phan_ca`; ca được lưu theo ngày và liên kết với `ca_lam_viec`. Có thể sửa/hủy ca khi chưa phát sinh chấm công hoặc tăng ca.
+- Nhân viên chỉ xem lịch của mã nhân viên được liên kết với tài khoản.
+- Chấm công chỉ được ghi nhận trong ngày hiện tại khi nhân viên có phân ca. Thời gian lấy từ máy chủ; dữ liệu vào/ra được ghi vào `cham_cong`.
+- Đơn tăng ca được liên kết với bản ghi `cham_cong`, lưu trong `tang_ca`; quản trị viên duyệt hoặc từ chối trực tiếp trên database.
+- Báo cáo đọc dữ liệu phân ca, chấm công và tăng ca đã duyệt theo tháng.
+- Ngày nghỉ/làm bù tùy chỉnh lưu trong `lumicine_holidays` và được dùng chung giữa các tài khoản quản trị. Lịch Nager.Date vẫn là nguồn tham khảo bên ngoài.
+- Xuất báo cáo CSV UTF-8 và in báo cáo.
 
-Trang quản trị:
-
-- Tìm kiếm theo mã nhân viên hoặc họ tên, không phân biệt dấu.
-- Lọc theo phòng ban, chức vụ và trạng thái công.
-- Chuyển tháng/năm; dữ liệu mẫu và ngày công chuẩn được cập nhật theo kỳ.
-- Xem số lượt/phút đi muộn, ngày nghỉ có lương/không lương và lịch chấm công từng ngày.
-- Duyệt hoặc từ chối các đơn đăng ký tăng ca của nhân viên.
-- Theo dõi ngày lễ đi làm và khoản lương minh họa theo mức 300%; cần thay dữ liệu lương/ngày lễ mẫu bằng cấu hình thực tế trước khi dùng tính lương.
-- Lịch ngày lễ gọi API công khai Nager.Date theo năm và quốc gia `VN`; có thể bổ sung hoặc xóa ngày lễ/ngày nghỉ bù theo thông báo chính thức từng năm.
-- Có thể bổ sung ngày nghỉ hưởng lương và ngày làm bù. Ngày bổ sung lưu trong `localStorage` của trình duyệt hiện tại, không tự đồng bộ giữa máy/người dùng. Nếu API lỗi, trang báo lỗi và vẫn dùng các ngày bổ sung đã lưu.
-- Xuất dữ liệu đang lọc thành CSV UTF-8 tương thích Excel; in báo cáo theo bố cục ngang.
-- Chọn số dòng và chuyển trang; giao diện hỗ trợ cuộn ngang trên bảng dữ liệu.
-
-Đơn tăng ca, ca làm việc và chấm công hiện vẫn lưu trong `localStorage` để minh họa; đăng nhập và quyền admin không biến các dữ liệu mẫu này thành dữ liệu nghiệp vụ an toàn hoặc đồng bộ. Cần chuyển dữ liệu nghiệp vụ sang backend/MySQL và kiểm thử triển khai trước khi sử dụng thực tế.
-
-### Luồng tải lịch nghỉ Việt Nam
-
-1. Khi mở trang quản trị hoặc đổi năm, trình duyệt gọi `https://date.nager.at/api/v3/PublicHolidays/{năm}/VN`.
-2. Ngày lễ do API trả về được kết hợp với ngày bổ sung đã lưu trên trình duyệt.
-3. Danh sách đã kết hợp được dùng để đánh dấu lịch nhân viên và tính ngày công chuẩn (ngày thường trừ ngày nghỉ lễ, cộng ngày làm bù); dữ liệu API được giữ trong bộ nhớ của trang cho đến khi tải lại.
-4. Nager.Date hiện trả thiếu ngày Tết, Giỗ Tổ Hùng Vương và lịch nghỉ/làm bù. Mở **Lịch nghỉ Việt Nam**, chọn ngày, nhập tên và chọn loại ngày để bổ sung; có thể xóa ngày đã thêm.
-5. Nếu API lỗi, trang báo trạng thái và vẫn sử dụng ngày bổ sung đã lưu; nút **Tải lại API** cho phép thử lại. API là nguồn tham khảo, không nên dùng riêng để chốt bảng lương.
+Phân quyền thao tác database được xác thực ở máy chủ; các thao tác ghi dùng CSRF token. Trước khi sử dụng thật, hãy kiểm tra mapping tài khoản và sao lưu database định kỳ.

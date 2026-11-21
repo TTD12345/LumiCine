@@ -1,13 +1,14 @@
 (() => {
     'use strict';
 
-    const storagePrefix = 'lumicine-attendance:';
     const dateInput = document.getElementById('attendance-date');
     const rowsElement = document.getElementById('attendance-history');
     const emptyState = document.getElementById('attendance-history-empty');
     const toastRegion = document.getElementById('toast-region');
-    let attendanceRecord = { checkIn: '', checkOut: '' };
+    let attendanceRecord = { check_in: '', check_out: '', has_assignment: false };
     let historyRecords = [];
+    let isLoading = false;
+    let attendanceLoadError = false;
 
     const notify = (message, isError = false) => {
         const toast = document.createElement('div');
@@ -21,44 +22,9 @@
         window.setTimeout(() => toast.remove(), 4000);
     };
 
-    const validateRecord = (record) => {
-        if (!record || typeof record.checkIn !== 'string' || typeof record.checkOut !== 'string' ||
-            (record.checkOut && !record.checkIn) ||
-            (record.lastPunchType !== undefined &&
-                record.lastPunchType !== 'checkIn' && record.lastPunchType !== 'checkOut')) {
-            throw new Error('Dữ liệu chấm công đã lưu không đúng định dạng.');
-        }
-        return record;
-    };
-
-    const readAttendance = (date) => {
-        const saved = localStorage.getItem(`${storagePrefix}${date}`);
-        return saved === null ? { checkIn: '', checkOut: '' } : validateRecord(JSON.parse(saved));
-    };
-
-    const readHistory = () => {
-        const records = [];
-        for (let index = 0; index < localStorage.length; index += 1) {
-            const key = localStorage.key(index);
-            if (!key || !key.startsWith(storagePrefix)) continue;
-            const date = key.slice(storagePrefix.length);
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-                throw new Error('Ngày trong lịch sử chấm công không hợp lệ.');
-            }
-            const record = validateRecord(JSON.parse(localStorage.getItem(key)));
-            if (record.checkIn || record.checkOut) records.push({ date, ...record });
-        }
-        return records.sort((first, second) => second.date.localeCompare(first.date));
-    };
-
     const getCurrentTime = () => {
         const now = new Date();
         return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    };
-
-    const getNextPunchType = (record) => {
-        if (record.lastPunchType) return record.lastPunchType === 'checkIn' ? 'checkOut' : 'checkIn';
-        return record.checkIn && !record.checkOut ? 'checkOut' : 'checkIn';
     };
 
     const formatMinutes = (minutes) => {
@@ -69,21 +35,32 @@
     };
 
     const getWorkedMinutes = (record) => {
-        if (!record.checkIn || !record.checkOut) return 0;
-        const [inHour, inMinute] = record.checkIn.split(':').map(Number);
-        const [outHour, outMinute] = record.checkOut.split(':').map(Number);
+        if (Number.isFinite(Number(record.worked_minutes))) {
+            return Number(record.worked_minutes);
+        }
+        if (!record.check_in || !record.check_out) return 0;
+        const [inHour, inMinute] = record.check_in.split(':').map(Number);
+        const [outHour, outMinute] = record.check_out.split(':').map(Number);
         return Math.max(0, outHour * 60 + outMinute - (inHour * 60 + inMinute));
     };
 
     const renderAttendance = () => {
-        const { checkIn, checkOut } = attendanceRecord;
-        const nextPunchType = getNextPunchType(attendanceRecord);
-        const isWorking = Boolean(checkIn) && nextPunchType === 'checkOut';
-        const isComplete = Boolean(checkOut) && !isWorking;
+        const { check_in: checkIn, check_out: checkOut } = attendanceRecord;
         const status = document.getElementById('attendance-status');
         const punchButton = document.getElementById('attendance-punch');
         const checkInState = document.getElementById('attendance-check-in-state');
         const checkOutState = document.getElementById('attendance-check-out-state');
+        const isWorking = Boolean(checkIn) && !checkOut;
+        const isComplete = Boolean(checkOut);
+        const now = new Date();
+        const currentDate = [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, '0'),
+            String(now.getDate()).padStart(2, '0'),
+        ].join('-');
+        const isCurrentDate = dateInput.value === currentDate;
+        const nextType = isWorking ? 'check_out' : 'check_in';
+        const isAbsent = attendanceRecord.attendance_status === 'VANG_MAT';
 
         document.getElementById('attendance-check-in').textContent = checkIn || 'Chưa ghi nhận';
         document.getElementById('attendance-check-out').textContent = checkOut || 'Chưa ghi nhận';
@@ -91,15 +68,20 @@
         checkOutState.textContent = checkOut ? 'Đã ghi nhận' : 'Chờ chấm công';
         checkInState.classList.toggle('is-recorded', Boolean(checkIn));
         checkOutState.classList.toggle('is-recorded', Boolean(checkOut));
-        status.textContent = isComplete ? 'Đã hoàn thành' : isWorking ? 'Đang làm việc' : 'Chưa bắt đầu';
+        status.textContent = attendanceLoadError
+            ? 'Lỗi tải dữ liệu'
+            : isAbsent ? 'Vắng mặt' : isComplete ? 'Đã hoàn thành' : isWorking ? 'Đang làm việc' : 'Chưa bắt đầu';
         status.classList.toggle('is-working', isWorking);
         status.classList.toggle('is-complete', isComplete);
-        punchButton.disabled = false;
-        punchButton.querySelector('span').textContent = nextPunchType === 'checkOut'
+        punchButton.disabled = isLoading || !attendanceRecord.has_assignment || !isCurrentDate || isComplete || isAbsent;
+        punchButton.querySelector('span').textContent = nextType === 'check_out'
             ? 'Chấm công ra'
             : 'Chấm công vào';
-        punchButton.querySelector('i').className = `bi ${nextPunchType === 'checkOut' ? 'bi-box-arrow-right' : 'bi-box-arrow-in-right'}`;
-        document.getElementById('attendance-status-summary').textContent = status.textContent;
+        punchButton.querySelector('i').className =
+            `bi ${nextType === 'check_out' ? 'bi-box-arrow-right' : 'bi-box-arrow-in-right'}`;
+        document.getElementById('attendance-status-summary').textContent = attendanceLoadError
+            ? 'Không tải được'
+            : !attendanceRecord.has_assignment ? 'Chưa được phân ca' : status.textContent;
     };
 
     const addCell = (row, value, className = '') => {
@@ -120,13 +102,15 @@
                 month: '2-digit',
                 year: 'numeric',
             }).format(date), 'attendance-history-date');
-            addCell(row, record.checkIn || '—', 'attendance-history-time');
-            addCell(row, record.checkOut || '—', 'attendance-history-time');
-            addCell(row, record.checkOut ? formatMinutes(getWorkedMinutes(record)) : record.checkIn ? 'Đang làm việc' : '—');
+            addCell(row, record.check_in || '—', 'attendance-history-time');
+            addCell(row, record.check_out || '—', 'attendance-history-time');
+            addCell(row, record.check_out ? formatMinutes(getWorkedMinutes(record)) : record.check_in ? 'Đang làm việc' : '—');
             const statusCell = row.insertCell();
             const status = document.createElement('span');
-            status.className = `attendance-history-status${record.checkOut ? ' complete' : record.checkIn ? ' working' : ''}`;
-            status.textContent = record.checkOut ? 'Hoàn thành' : record.checkIn ? 'Đang làm' : 'Chưa chấm công';
+            status.className = `attendance-history-status${record.check_out ? ' complete' : record.check_in ? ' working' : ''}`;
+            status.textContent = record.attendance_status === 'VANG_MAT'
+                ? 'Vắng mặt'
+                : record.check_out ? 'Hoàn thành' : record.check_in ? 'Đang làm' : 'Chưa chấm công';
             statusCell.append(status);
             rowsElement.append(row);
         });
@@ -138,24 +122,34 @@
             ? `Hiển thị ${recentRecords.length} trong ${historyRecords.length} ngày đã ghi nhận`
             : 'Chưa có dữ liệu chấm công';
 
-        const daysWithCheckIn = historyRecords.filter((record) => record.checkIn).length;
+        const daysWithCheckIn = historyRecords.filter((record) => record.check_in).length;
         const totalMinutes = historyRecords.reduce((sum, record) => sum + getWorkedMinutes(record), 0);
         document.getElementById('attendance-days-count').textContent = String(daysWithCheckIn);
         document.getElementById('attendance-hours-total').textContent = formatMinutes(totalMinutes);
     };
 
-    const loadAttendance = () => {
+    const loadAttendance = async () => {
+        isLoading = true;
+        renderAttendance();
         try {
-            attendanceRecord = readAttendance(dateInput.value);
-            historyRecords = readHistory();
+            const result = await window.lumiCineApi('attendance', {
+                query: { date: dateInput.value },
+            });
+            attendanceLoadError = false;
+            attendanceRecord = result.record;
+            historyRecords = result.history;
             renderAttendance();
             renderHistory();
         } catch (error) {
-            notify(error instanceof Error ? error.message : 'Không thể đọc dữ liệu chấm công.', true);
-            attendanceRecord = { checkIn: '', checkOut: '' };
+            attendanceLoadError = true;
+            notify(error instanceof Error ? error.message : 'Không thể tải dữ liệu chấm công.', true);
+            attendanceRecord = { check_in: '', check_out: '', has_assignment: false };
             historyRecords = [];
             renderAttendance();
             renderHistory();
+        } finally {
+            isLoading = false;
+            renderAttendance();
         }
     };
 
@@ -172,40 +166,40 @@
             }).format(now);
     };
 
-    const recordTime = () => {
-        const previousRecord = { ...attendanceRecord };
-        const now = getCurrentTime();
-        const punchType = getNextPunchType(attendanceRecord);
-        if (punchType === 'checkIn') {
-            if (!attendanceRecord.checkIn || now < attendanceRecord.checkIn) {
-                attendanceRecord.checkIn = now;
-            }
-        } else {
-            if (!attendanceRecord.checkOut || now > attendanceRecord.checkOut) {
-                attendanceRecord.checkOut = now;
-            }
-        }
-        attendanceRecord.lastPunchType = punchType;
-
+    const recordTime = async () => {
+        if (isLoading) return;
+        isLoading = true;
+        renderAttendance();
         try {
-            localStorage.setItem(`${storagePrefix}${dateInput.value}`, JSON.stringify(attendanceRecord));
-        } catch (error) {
-            attendanceRecord = previousRecord;
+            const result = await window.lumiCineApi('attendance', {
+                method: 'POST',
+                body: { date: dateInput.value },
+            });
+            attendanceRecord = result.record;
             renderAttendance();
-            notify('Không thể lưu dữ liệu chấm công trên trình duyệt. Hãy kiểm tra dung lượng lưu trữ và thử lại.', true);
-            return;
+            notify(result.type === 'check_out'
+                ? `Đã ghi nhận chấm công ra lúc ${attendanceRecord.check_out}.`
+                : `Đã ghi nhận chấm công vào lúc ${attendanceRecord.check_in}.`);
+            try {
+                historyRecords = (await window.lumiCineApi('attendance', {
+                    query: { date: dateInput.value },
+                })).history;
+                renderHistory();
+            } catch (error) {
+                notify('Chấm công đã được ghi nhận, nhưng không thể tải lại lịch sử.', true);
+            }
+        } catch (error) {
+            notify(error instanceof Error ? error.message : 'Không thể ghi nhận chấm công.', true);
+        } finally {
+            isLoading = false;
+            renderAttendance();
         }
-
-        loadAttendance();
-        notify(punchType === 'checkOut'
-            ? `Đã ghi nhận chấm công ra. Giờ ra cuối cùng: ${attendanceRecord.checkOut}.`
-            : `Đã ghi nhận chấm công vào. Giờ vào đầu tiên: ${attendanceRecord.checkIn}.`);
     };
 
     dateInput.addEventListener('change', loadAttendance);
     document.getElementById('attendance-punch').addEventListener('click', recordTime);
     document.getElementById('notifications-button').addEventListener('click', () => {
-        notify('Dữ liệu chấm công của bạn được lưu trên trình duyệt này.');
+        notify('Dữ liệu chấm công được lưu tập trung trong database.');
     });
     document.addEventListener('click', (event) => {
         const menu = document.getElementById('account-menu');

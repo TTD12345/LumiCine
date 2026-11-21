@@ -28,5 +28,6 @@ match ($action) {
     'admin-settings' => (new HomeController())->adminSection('settings'),
     'login' => (new HomeController())->login(),
     'logout' => (new HomeController())->logout(),
+    'api' => (new ApiController())->handle(),
     default => http_response_code(404),
 };

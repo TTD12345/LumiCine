@@ -3,8 +3,6 @@
 
     const config = window.employeeScheduleConfig;
     const initialDate = config.initialDate;
-    const initialShifts = JSON.parse(document.getElementById('shift-data').textContent);
-    const storagePrefix = 'lumicine-shifts:';
     const statusLabels = {
         active: 'Đang diễn ra',
         upcoming: 'Sắp bắt đầu',
@@ -48,37 +46,6 @@
         return `${Math.floor(minutes / 60)} giờ${minutes % 60 ? ` ${minutes % 60} phút` : ''}`;
     };
 
-    const normalizeShift = (shift) => {
-        if (!shift || typeof shift.id !== 'string' || typeof shift.name !== 'string' ||
-            typeof shift.department !== 'string' || typeof shift.role !== 'string' ||
-            typeof shift.location !== 'string' || typeof shift.start !== 'string' ||
-            typeof shift.end !== 'string' || !statusLabels[shift.status]) {
-            throw new Error('Dữ liệu ca làm việc đã lưu không đúng định dạng.');
-        }
-        return shift;
-    };
-
-    const readShifts = (date) => {
-        const saved = localStorage.getItem(`${storagePrefix}${date}`);
-        if (saved === null && date !== initialDate) return [];
-        const source = saved === null ? JSON.stringify(initialShifts) : saved;
-        const parsed = JSON.parse(source);
-        if (!Array.isArray(parsed)) {
-            throw new Error('Danh sách ca làm việc không đúng định dạng.');
-        }
-        return parsed.map(normalizeShift);
-    };
-
-    const persistShifts = (nextShifts) => {
-        try {
-            localStorage.setItem(`${storagePrefix}${dateInput.value}`, JSON.stringify(nextShifts));
-            return true;
-        } catch (error) {
-            notify('Không thể lưu dữ liệu trên trình duyệt. Hãy kiểm tra dung lượng lưu trữ và thử lại.', true);
-            return false;
-        }
-    };
-
     const makeElement = (tag, className, text) => {
         const element = document.createElement(tag);
         if (className) element.className = className;
@@ -93,34 +60,31 @@
 
         const employeeCell = row.insertCell();
         const employee = makeElement('div', 'employee-cell');
-        employee.append(makeElement('span', `employee-avatar ${shift.tone || tones[index % tones.length]}`, getInitials(shift.name)));
+        employee.append(makeElement('span', `employee-avatar ${tones[index % tones.length]}`, getInitials(shift.name)));
         const identity = makeElement('span', 'employee-identity');
-        identity.append(
-            makeElement('strong', '', shift.name),
-            makeElement('small', '', shift.role)
-        );
+        identity.append(makeElement('strong', '', shift.name), makeElement('small', '', shift.role));
         employee.append(identity);
         employeeCell.append(employee);
 
         row.insertCell().textContent = shift.department;
         const timeCell = row.insertCell();
         timeCell.append(
-            makeElement('strong', 'shift-time', `${shift.start} – ${shift.end}`),
+            makeElement('strong', 'shift-time', `${shift.start.slice(0, 5)} – ${shift.end.slice(0, 5)}`),
             makeElement('small', 'shift-duration', getDuration(shift.start, shift.end))
         );
-        row.insertCell().textContent = shift.location;
+        row.insertCell().textContent = shift.location || '—';
         const statusCell = row.insertCell();
         statusCell.append(makeElement('span', `shift-status ${shift.status}`, statusLabels[shift.status]));
 
         const actionCell = row.insertCell();
-        const actionWrap = makeElement('div', 'shift-actions');
-        const menuButton = makeElement('button', 'row-menu');
-        menuButton.type = 'button';
-        menuButton.setAttribute('aria-label', `Tùy chọn ca của ${shift.name}`);
-        menuButton.setAttribute('aria-expanded', 'false');
-        menuButton.append(makeElement('i', 'bi bi-three-dots'));
-        actionWrap.append(menuButton);
-        actionCell.append(actionWrap);
+        if (config.canManage) {
+            const menuButton = makeElement('button', 'row-menu');
+            menuButton.type = 'button';
+            menuButton.setAttribute('aria-label', `Tùy chọn ca của ${shift.name}`);
+            menuButton.setAttribute('aria-expanded', 'false');
+            menuButton.append(makeElement('i', 'bi bi-three-dots'));
+            actionCell.append(menuButton);
+        }
         return row;
     };
 
@@ -195,15 +159,21 @@
         updateView();
     };
 
-    const loadSelectedDate = () => {
+    const loadSelectedDate = async () => {
         try {
-            shifts = readShifts(dateInput.value);
+            const result = await window.lumiCineApi('schedule', {
+                query: { date: dateInput.value },
+            });
+            shifts = result.assignments;
+            currentPage = 1;
+            updateView();
+            return true;
         } catch (error) {
-            notify(error instanceof Error ? error.message : 'Không thể đọc dữ liệu lịch làm việc.', true);
             shifts = [];
+            updateView();
+            notify(error instanceof Error ? error.message : 'Không thể tải lịch làm việc.', true);
+            return false;
         }
-        currentPage = 1;
-        updateView();
     };
 
     const openShiftDialog = (shift = null) => {
@@ -212,18 +182,13 @@
         document.getElementById('dialog-title').textContent = shift ? 'Chỉnh sửa ca làm việc' : 'Tạo ca làm việc';
         document.getElementById('save-shift').textContent = shift ? 'Lưu thay đổi' : 'Tạo ca';
         if (shift) {
-            Object.entries({
-                name: shift.name,
-                department: shift.department,
-                role: shift.role,
-                start: shift.start,
-                end: shift.end,
-                location: shift.location,
-                status: shift.status,
-            }).forEach(([name, value]) => { form.elements[name].value = value; });
+            form.elements.employeeId.value = String(shift.employee_id);
+            form.elements.start.value = shift.start.slice(0, 5);
+            form.elements.end.value = shift.end.slice(0, 5);
+            form.elements.location.value = shift.location;
         }
         dialog.showModal();
-        form.elements.name.focus();
+        form.elements.employeeId.focus();
     };
 
     const downloadReport = () => {
@@ -253,9 +218,7 @@
         notify('Đã tải báo cáo ca làm việc dạng CSV.');
     };
 
-    filters.forEach((button) => {
-        button.addEventListener('click', () => setCurrentFilter(button.dataset.filter));
-    });
+    filters.forEach((button) => button.addEventListener('click', () => setCurrentFilter(button.dataset.filter)));
     search.addEventListener('input', () => {
         currentPage = 1;
         updateView();
@@ -274,91 +237,88 @@
         });
     });
 
-    document.getElementById('add-shift').addEventListener('click', () => openShiftDialog());
+    if (config.canManage) {
+        document.getElementById('add-shift').addEventListener('click', () => openShiftDialog());
+        form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const saveButton = document.getElementById('save-shift');
+            saveButton.disabled = true;
+            try {
+                const wasEditing = Boolean(editingId);
+                await window.lumiCineApi('schedule', {
+                    method: 'POST',
+                    body: {
+                        id: editingId,
+                        employeeId: form.elements.employeeId.value,
+                        date: dateInput.value,
+                        start: form.elements.start.value,
+                        end: form.elements.end.value,
+                        location: form.elements.location.value.trim(),
+                    },
+                });
+                dialog.close();
+                if (await loadSelectedDate()) {
+                    notify(wasEditing ? 'Đã cập nhật ca làm việc.' : 'Đã thêm ca làm việc.');
+                } else {
+                    notify('Ca đã được lưu, nhưng không thể tải lại lịch từ database.', true);
+                }
+            } catch (error) {
+                notify(error instanceof Error ? error.message : 'Không thể lưu ca làm việc.', true);
+            } finally {
+                saveButton.disabled = false;
+            }
+        });
+        shiftList.addEventListener('click', async (event) => {
+            const button = event.target.closest('button');
+            if (!button) return;
+            const row = button.closest('tr');
+            const shift = shifts.find((item) => item.id === row?.dataset.shiftId);
+            if (!shift) return;
+
+            if (button.classList.contains('row-menu')) {
+                const wasOpen = button.getAttribute('aria-expanded') === 'true';
+                closeRowMenus();
+                if (wasOpen) return;
+                button.setAttribute('aria-expanded', 'true');
+                const menu = makeElement('div', 'action-menu');
+                const edit = makeElement('button', '', 'Chỉnh sửa ca');
+                edit.type = 'button';
+                edit.dataset.action = 'edit';
+                const remove = makeElement('button', 'danger', 'Hủy ca làm việc');
+                remove.type = 'button';
+                remove.dataset.action = 'cancel';
+                menu.append(edit, remove);
+                button.after(menu);
+                return;
+            }
+
+            closeRowMenus();
+            if (button.dataset.action === 'edit') {
+                openShiftDialog(shift);
+            } else if (button.dataset.action === 'cancel' &&
+                window.confirm(`Bạn có chắc muốn hủy ca của ${shift.name}?`)) {
+                try {
+                    await window.lumiCineApi('schedule', {
+                        method: 'POST',
+                        body: { operation: 'cancel', id: shift.id },
+                    });
+                    if (await loadSelectedDate()) {
+                        notify('Đã hủy ca làm việc.');
+                    } else {
+                        notify('Ca đã được hủy, nhưng không thể tải lại lịch từ database.', true);
+                    }
+                } catch (error) {
+                    notify(error instanceof Error ? error.message : 'Không thể hủy ca làm việc.', true);
+                }
+            }
+        });
+    }
+
     document.getElementById('close-dialog').addEventListener('click', () => dialog.close());
     document.getElementById('cancel-dialog').addEventListener('click', () => dialog.close());
     dialog.addEventListener('click', (event) => {
         if (event.target === dialog) dialog.close();
     });
-    form.addEventListener('submit', (event) => {
-        event.preventDefault();
-        const fields = new FormData(form);
-        const name = String(fields.get('name') || '').trim();
-        if (!name) return;
-        const wasEditing = Boolean(editingId);
-        const existingShift = shifts.find((shift) => shift.id === editingId);
-        const shift = {
-            id: editingId || `shift-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-            name,
-            department: String(fields.get('department')).trim(),
-            role: String(fields.get('role')).trim(),
-            start: String(fields.get('start')),
-            end: String(fields.get('end')),
-            location: String(fields.get('location')).trim(),
-            status: String(fields.get('status')),
-            tone: existingShift?.tone || tones[shifts.length % tones.length],
-        };
-        const nextShifts = wasEditing
-            ? shifts.map((item) => item.id === editingId ? shift : item)
-            : [...shifts, shift];
-        if (!persistShifts(nextShifts)) return;
-        shifts = nextShifts;
-        dialog.close();
-        currentPage = 1;
-        updateView();
-        notify(wasEditing ? 'Đã cập nhật ca làm việc.' : 'Đã thêm ca làm việc.');
-    });
-
-    shiftList.addEventListener('click', (event) => {
-        const button = event.target.closest('button');
-        if (!button) return;
-        const row = button.closest('tr');
-        const shift = shifts.find((item) => item.id === row?.dataset.shiftId);
-        if (!shift) return;
-
-        if (button.classList.contains('row-menu')) {
-            const wasOpen = button.getAttribute('aria-expanded') === 'true';
-            closeRowMenus();
-            if (wasOpen) return;
-            button.setAttribute('aria-expanded', 'true');
-            const menu = makeElement('div', 'action-menu');
-            const addAction = (label, action, danger = false) => {
-                const actionButton = makeElement('button', danger ? 'danger' : '', label);
-                actionButton.type = 'button';
-                actionButton.dataset.action = action;
-                menu.append(actionButton);
-            };
-            addAction('Chỉnh sửa ca', 'edit');
-            addAction('Đánh dấu đang diễn ra', 'active');
-            addAction('Đánh dấu sắp bắt đầu', 'upcoming');
-            addAction('Đánh dấu hoàn thành', 'completed');
-            addAction('Xóa ca làm việc', 'delete', true);
-            button.after(menu);
-            return;
-        }
-
-        const action = button.dataset.action;
-        if (action === 'edit') {
-            closeRowMenus();
-            openShiftDialog(shift);
-        } else if (action === 'delete') {
-            closeRowMenus();
-            if (!window.confirm(`Bạn có chắc muốn xóa ca của ${shift.name}?`)) return;
-            const nextShifts = shifts.filter((item) => item.id !== shift.id);
-            if (!persistShifts(nextShifts)) return;
-            shifts = nextShifts;
-            updateView();
-            notify('Đã xóa ca làm việc.');
-        } else if (statusLabels[action]) {
-            closeRowMenus();
-            const nextShifts = shifts.map((item) => item.id === shift.id ? { ...item, status: action } : item);
-            if (!persistShifts(nextShifts)) return;
-            shifts = nextShifts;
-            updateView();
-            notify(`Đã chuyển ca sang trạng thái "${statusLabels[action]}".`);
-        }
-    });
-
     document.addEventListener('click', (event) => {
         if (!event.target.closest('.shift-actions')) closeRowMenus();
         if (!event.target.closest('.topbar-account')) {
@@ -376,22 +336,8 @@
         menu.hidden = !menu.hidden;
         document.getElementById('account-menu-button').setAttribute('aria-expanded', String(!menu.hidden));
     });
-
-    const accountMenu = document.getElementById('account-menu');
-    document.getElementById('reset-sample-data').addEventListener('click', () => {
-        accountMenu.hidden = true;
-        if (!window.confirm('Khôi phục danh sách ca mẫu cho ngày hiện tại? Dữ liệu đã lưu của ngày này sẽ bị thay thế.')) return;
-        const defaults = dateInput.value === initialDate
-            ? JSON.parse(JSON.stringify(initialShifts)).map(normalizeShift)
-            : [];
-        if (!persistShifts(defaults)) return;
-        shifts = defaults;
-        search.value = '';
-        setCurrentFilter('all');
-        notify('Đã khôi phục danh sách ca mẫu.');
-    });
-
     document.getElementById('export-report').addEventListener('click', downloadReport);
+
     const sidebar = document.getElementById('employee-sidebar');
     const scrim = document.getElementById('sidebar-scrim');
     const toggleSidebar = () => {

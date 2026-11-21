@@ -16,14 +16,6 @@ $pages = [
 ];
 $page = $pages[$section] ?? $pages['overview'];
 $isOvertime = $section === 'overtime';
-$employees = [
-    ['id' => 'NV001', 'name' => 'Nguyễn Minh Anh', 'department' => 'Hành chính - Nhân sự', 'position' => 'Trưởng phòng nhân sự', 'worked' => 22, 'leave' => 0, 'late' => 0],
-    ['id' => 'NV002', 'name' => 'Trần Quốc Bảo', 'department' => 'Kinh doanh', 'position' => 'Chuyên viên kinh doanh', 'worked' => 20, 'leave' => 1, 'late' => 3],
-    ['id' => 'NV003', 'name' => 'Lê Hoàng Yến', 'department' => 'Marketing', 'position' => 'Chuyên viên marketing', 'worked' => 19, 'leave' => 2, 'late' => 1],
-    ['id' => 'NV004', 'name' => 'Phạm Đức Long', 'department' => 'Kế toán', 'position' => 'Kế toán viên', 'worked' => 18, 'leave' => 0, 'late' => 2],
-    ['id' => 'NV005', 'name' => 'Võ Ngọc Mai', 'department' => 'Hành chính - Nhân sự', 'position' => 'Nhân viên hành chính', 'worked' => 21, 'leave' => 1, 'late' => 1],
-    ['id' => 'NV006', 'name' => 'Đặng Tuấn Kiệt', 'department' => 'Công nghệ thông tin', 'position' => 'Chuyên viên IT', 'worked' => 22, 'leave' => 0, 'late' => 0],
-];
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -88,17 +80,66 @@ $employees = [
                     <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-blue"><i class="bi bi-people-fill"></i></span></div><p class="summary-label">Nhân viên</p><div class="summary-value"><?= count($employees) ?> <span>người</span></div></article>
                     <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-green"><i class="bi bi-calendar2-check-fill"></i></span></div><p class="summary-label">Ngày công</p><div class="summary-value"><?= array_sum(array_column($employees, 'worked')) ?> <span>ngày</span></div></article>
                     <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-orange"><i class="bi bi-clock-history"></i></span></div><p class="summary-label">Đi muộn</p><div class="summary-value"><?= array_sum(array_column($employees, 'late')) ?> <span>lượt</span></div></article>
-                    <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-purple"><i class="bi bi-calendar2-heart-fill"></i></span></div><p class="summary-label">Nghỉ phép</p><div class="summary-value"><?= array_sum(array_column($employees, 'leave')) ?> <span>ngày</span></div></article>
+                    <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-purple"><i class="bi bi-calendar2-heart-fill"></i></span></div><p class="summary-label">Nghỉ phép</p><div class="summary-value">— <span>chưa có bảng dữ liệu</span></div></article>
                 </section>
             <?php elseif (in_array($section, ['employees', 'attendance', 'leave', 'reports'], true)): ?>
                 <?php if ($section === 'leave'): ?>
-                    <section class="data-card"><div class="table-card-header"><div><h2>Danh sách nghỉ phép</h2><p>Thông tin nghỉ phép của nhân viên.</p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Nhân viên</th><th>Bộ phận</th><th>Ngày nghỉ</th><th>Trạng thái</th></tr></thead><tbody><?php foreach ($employees as $employee): ?><?php if ($employee['leave'] > 0): ?><tr><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= (int) $employee['leave'] ?> ngày</td><td><span class="status-badge status-paid">Đã ghi nhận</span></td></tr><?php endif; ?><?php endforeach; ?></tbody></table></div></section>
+                    <section class="data-card"><div class="table-card-header"><div><h2>Danh sách nghỉ phép</h2><p>Database hiện chưa có bảng lưu đơn/ngày nghỉ phép.</p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Nhân viên</th><th>Bộ phận</th><th>Ngày nghỉ</th><th>Trạng thái</th></tr></thead><tbody><tr><td colspan="4">Chưa có dữ liệu nghỉ phép để hiển thị.</td></tr></tbody></table></div></section>
                 <?php elseif ($section === 'reports'): ?>
                     <section class="summary-grid">
                         <article class="summary-card"><p class="summary-label">Tổng nhân viên</p><div class="summary-value"><?= count($employees) ?></div></article>
                         <article class="summary-card"><p class="summary-label">Tổng ngày công</p><div class="summary-value"><?= array_sum(array_column($employees, 'worked')) ?></div></article>
                         <article class="summary-card"><p class="summary-label">Lượt đi muộn</p><div class="summary-value"><?= array_sum(array_column($employees, 'late')) ?></div></article>
-                        <article class="summary-card"><p class="summary-label">Ngày nghỉ phép</p><div class="summary-value"><?= array_sum(array_column($employees, 'leave')) ?></div></article>
+                        <article class="summary-card"><p class="summary-label">Ngày nghỉ phép</p><div class="summary-value">—</div></article>
+                    </section>
+                <?php elseif ($section === 'employees'): ?>
+                    <section class="data-card">
+                        <div class="table-card-header">
+                            <div>
+                                <h2>Liên kết tài khoản nhân viên</h2>
+                                <p>Chọn đúng hồ sơ theo mã nhân viên đã xác minh. Mỗi hồ sơ chỉ liên kết được với một tài khoản.</p>
+                            </div>
+                        </div>
+                        <p class="mapping-feedback" id="mapping-feedback" role="status" aria-live="polite"></p>
+                        <div class="table-wrap">
+                            <table class="employee-table" id="employee-account-mappings">
+                                <thead><tr><th>Tài khoản</th><th>Tên hiển thị</th><th>Hồ sơ nhân viên</th><th>Thao tác</th></tr></thead>
+                                <tbody>
+                                    <?php if ($employeeMappings === []): ?>
+                                        <tr><td colspan="4">Không có tài khoản mang vai trò nhân viên.</td></tr>
+                                    <?php else: ?>
+                                        <?php foreach ($employeeMappings as $account): ?>
+                                            <tr data-mapping-row data-user-id="<?= (int) $account['id'] ?>">
+                                                <td><?= $escape($account['username']) ?></td>
+                                                <td><?= $escape($account['display_name']) ?></td>
+                                                <td>
+                                                    <select class="mapping-select" data-employee-code aria-label="Hồ sơ nhân viên cho tài khoản <?= $escape($account['username']) ?>">
+                                                        <option value="">Chưa liên kết</option>
+                                                        <?php if ($account['employee_code'] !== null && !array_filter($mappingEmployees, static fn ($employee) => $employee['code'] === $account['employee_code'])): ?>
+                                                            <option value="<?= $escape($account['employee_code']) ?>" selected>Mã không còn hoạt động: <?= $escape($account['employee_code']) ?></option>
+                                                        <?php endif; ?>
+                                                        <?php foreach ($mappingEmployees as $employee): ?>
+                                                            <option value="<?= $escape($employee['code']) ?>" <?= $employee['code'] === $account['employee_code'] ? 'selected' : '' ?>>
+                                                                <?= $escape($employee['code']) ?> — <?= $escape($employee['name']) ?><?= $employee['department'] !== '' ? ' (' . $escape($employee['department']) . ')' : '' ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                </td>
+                                                <td><button class="button button-primary mapping-save" type="button" data-save-mapping>Lưu liên kết</button></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section class="data-card">
+                        <div class="table-card-header"><div><h2>Danh sách hồ sơ nhân viên</h2><p>Đối chiếu mã nhân viên trước khi gán cho tài khoản.</p></div></div>
+                        <div class="table-wrap"><table class="employee-table"><thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th></tr></thead><tbody>
+                            <?php foreach ($mappingEmployees as $employee): ?>
+                                <tr><td><?= $escape($employee['code']) ?></td><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= $escape($employee['position']) ?></td></tr>
+                            <?php endforeach; ?>
+                        </tbody></table></div>
                     </section>
                 <?php else: ?>
                     <section class="data-card"><div class="table-card-header"><div><h2><?= $section === 'attendance' ? 'Dữ liệu chấm công' : 'Danh sách nhân viên' ?></h2><p><?= $section === 'attendance' ? 'Tổng hợp ngày công theo nhân viên.' : 'Thông tin nhân viên trong hệ thống.' ?></p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th><?php if ($section === 'attendance'): ?><th>Ngày công</th><th>Đi muộn</th><?php endif; ?></tr></thead><tbody><?php foreach ($employees as $employee): ?><tr><td><?= $escape($employee['id']) ?></td><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= $escape($employee['position']) ?></td><?php if ($section === 'attendance'): ?><td><?= (int) $employee['worked'] ?> ngày</td><td><?= (int) $employee['late'] ?> lượt</td><?php endif; ?></tr><?php endforeach; ?></tbody></table></div></section>
@@ -113,6 +154,11 @@ $employees = [
 </div>
 <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container" aria-live="polite"></div>
 <script src="assets/js/admin-section.js" defer></script>
-<?php if ($isOvertime): ?><script src="assets/js/overtime.js" defer></script><?php endif; ?>
+<?php if ($isOvertime): ?>
+    <?php require PATH_VIEW . 'api-config.php'; ?>
+    <script src="assets/js/overtime.js" defer></script>
+<?php elseif ($section === 'employees'): ?>
+    <?php require PATH_VIEW . 'api-config.php'; ?>
+<?php endif; ?>
 </body>
 </html>
