@@ -52,13 +52,6 @@ $attendanceSummary = !$attendanceToday
             <a class="employee-nav-link <?= $isOvertime ? 'active' : '' ?>" href="?action=overtime"><i class="bi bi-clock-history"></i><span>Đăng ký tăng ca</span></a>
             <a class="employee-nav-link <?= $section === 'attendance' ? 'active' : '' ?>" href="?action=attendance"><i class="bi bi-calendar2-check"></i><span>Chấm công</span></a>
         </nav>
-        <?php if ($currentUser['role'] !== 'employee'): ?>
-            <p class="nav-caption nav-caption-spaced">QUẢN LÝ</p>
-            <nav class="employee-nav">
-                <a class="employee-nav-link <?= $section === 'employees' ? 'active' : '' ?>" href="?action=employees"><i class="bi bi-person-vcard"></i><span>Nhân viên</span></a>
-                <a class="employee-nav-link <?= $section === 'reports' ? 'active' : '' ?>" href="?action=reports"><i class="bi bi-graph-up"></i><span>Báo cáo</span></a>
-            </nav>
-        <?php endif; ?>
         <div class="employee-sidebar-bottom">
             <?php if (in_array($currentUser['role'], ['accountant', 'hr', 'chairman'], true)): ?>
                 <a class="employee-admin-link" href="admin.php"><i class="bi bi-shield-lock"></i> Trang quản trị HRM</a>
