@@ -36,6 +36,18 @@
         return badge;
     };
 
+    const overlapsAdministrativeHours = (start, end) => {
+        const date = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+        const lastDate = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+        while (date <= lastDate) {
+            const workStart = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 8, 0, 0);
+            const workEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 17, 0, 0);
+            if (start < workEnd && end > workStart) return true;
+            date.setDate(date.getDate() + 1);
+        }
+        return false;
+    };
+
     const renderEmployeeRequests = () => {
         if (!employeeRows) return;
         employeeRows.replaceChildren();
@@ -148,28 +160,15 @@
                     showMessage('Vui lòng nhập lý do (ít nhất 5 ký tự) và thời gian kết thúc sau thời gian bắt đầu.', true);
                     return;
                 }
+                const overtimeStart = new Date(start);
+                const overtimeEnd = new Date(end);
+                if (overlapsAdministrativeHours(overtimeStart, overtimeEnd)) {
+                    showMessage('Chỉ được đăng ký tăng ca ngoài giờ hành chính 08:00 - 17:00.', true);
+                    return;
+                }
 
                 isLoading = true;
                 try {
-                    const overtimeStart = new Date(start);
-                    const overtimeEnd = new Date(end);
-                    const scheduleDate = start.slice(0, 10);
-                    const schedule = await window.lumiCineApi('schedule', {
-                        query: { date: scheduleDate },
-                    });
-                    const conflictingShift = (schedule.assignments || []).find((assignment) => {
-                        const shiftStart = new Date(`${scheduleDate}T${assignment.start.slice(0, 5)}:00`);
-                        let shiftEnd = new Date(`${scheduleDate}T${assignment.end.slice(0, 5)}:00`);
-                        if (shiftEnd <= shiftStart) shiftEnd.setDate(shiftEnd.getDate() + 1);
-                        return overtimeStart < shiftEnd && overtimeEnd > shiftStart;
-                    });
-                    if (conflictingShift) {
-                        showMessage(
-                            `Thời gian tăng ca không hợp lệ: trùng ca làm việc ${conflictingShift.start.slice(0, 5)} - ${conflictingShift.end.slice(0, 5)}.`,
-                            true
-                        );
-                        return;
-                    }
                     await window.lumiCineApi('overtime', {
                         method: 'POST',
                         body: { start, end, reason },
