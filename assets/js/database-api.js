@@ -27,7 +27,7 @@
             throw new Error('Phản hồi từ máy chủ không hợp lệ.');
         }
         if (!response.ok) {
-            throw new Error(payload.error || `Yêu cầu thất bại (${response.status}).`);
+            throw new Error(payload.detail || payload.error || `Yêu cầu thất bại (${response.status}).`);
         }
         return payload;
     };

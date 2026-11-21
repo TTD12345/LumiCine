@@ -51,6 +51,14 @@ if ($loadedExtensions -notcontains 'pdo_mysql') {
     $serverArguments += @('-d', "extension=$pdoMysqlExtension")
 }
 
+if ($loadedExtensions -notcontains 'mbstring') {
+    $extensionDirectory = Join-Path (Split-Path $phpPath) 'ext'
+    $mbstringExtension = Join-Path $extensionDirectory 'php_mbstring.dll'
+    if (Test-Path -LiteralPath $mbstringExtension) {
+        $serverArguments += @('-d', "extension=$mbstringExtension")
+    }
+}
+
 $serverArguments += @('-S', '127.0.0.1:8000')
 & $phpPath @serverArguments
 exit $LASTEXITCODE

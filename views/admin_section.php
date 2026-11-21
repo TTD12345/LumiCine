@@ -112,7 +112,7 @@ $isSchedule = $section === 'schedule';
                                     <?php else: ?>
                                         <?php foreach ($scheduleAssignments as $index => $assignment): ?>
                                             <tr data-assignment-id="<?= $escape($assignment['id']) ?>">
-                                                <td><div class="schedule-employee"><span><?= $escape(mb_substr($assignment['name'], 0, 1, 'UTF-8')) ?></span><div><strong><?= $escape($assignment['name']) ?></strong><small><?= $escape($assignment['role']) ?></small></div></div></td>
+                                                <td><div class="schedule-employee"><span><?= $escape(lumicineUtf8Substring($assignment['name'], 0, 1)) ?></span><div><strong><?= $escape($assignment['name']) ?></strong><small><?= $escape($assignment['role']) ?></small></div></div></td>
                                                 <td><?= $escape($assignment['department']) ?></td><td><strong><?= $escape($assignment['shift_name'] ?? ('Ca ' . ($index + 1))) ?></strong></td>
                                                 <td><strong><?= $escape(substr($assignment['start'], 0, 5)) ?> - <?= $escape(substr($assignment['end'], 0, 5)) ?></strong></td>
                                                 <td><?= $escape($assignment['location']) ?></td>
@@ -238,7 +238,7 @@ $isSchedule = $section === 'schedule';
     </main>
 </div>
 <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container" aria-live="polite"></div>
-<script src="assets/js/admin-section.js" defer></script>
+<script src="assets/js/admin-section.js?v=20261121" defer></script>
 <?php if ($isSchedule): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
     <script>

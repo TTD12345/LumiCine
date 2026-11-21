@@ -26,7 +26,7 @@ class WorkforceModel extends BaseModel
              FROM nhan_vien e
              LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
              WHERE e.trang_thai = 1
-             ORDER BY e.ho_ten'
+             ORDER BY e.ma_nhan_vien ASC'
         )->fetchAll();
     }
 
@@ -49,7 +49,7 @@ class WorkforceModel extends BaseModel
 
         if ($employeeCode !== null) {
             $employeeCode = trim($employeeCode);
-            if ($employeeCode === '' || mb_strlen($employeeCode) > 32) {
+            if ($employeeCode === '' || lumicineUtf8Length($employeeCode) > 32) {
                 throw new InvalidArgumentException('Mã nhân viên không hợp lệ.');
             }
 
@@ -169,7 +169,7 @@ class WorkforceModel extends BaseModel
         }
         $this->validateTime($start);
         $this->validateTime($end);
-        if ($location === '' || mb_strlen($location) > 100) {
+        if ($location === '' || lumicineUtf8Length($location) > 100) {
             throw new InvalidArgumentException('Địa điểm làm việc không hợp lệ.');
         }
 
@@ -463,7 +463,7 @@ class WorkforceModel extends BaseModel
     {
         $startDate = $this->parseDateTime($start);
         $endDate = $this->parseDateTime($end);
-        if ($endDate <= $startDate || mb_strlen($reason) < 5 || mb_strlen($reason) > 1000) {
+        if ($endDate <= $startDate || lumicineUtf8Length($reason) < 5 || lumicineUtf8Length($reason) > 1000) {
             throw new InvalidArgumentException('Thời gian hoặc lý do tăng ca không hợp lệ.');
         }
         if ($this->overlapsAdministrativeHours($startDate, $endDate)) {
@@ -605,7 +605,7 @@ class WorkforceModel extends BaseModel
     public function addHoliday(string $date, string $name, string $type): void
     {
         $this->validateDate($date);
-        if (mb_strlen(trim($name)) === 0 || mb_strlen(trim($name)) > 150) {
+        if (lumicineUtf8Length(trim($name)) === 0 || lumicineUtf8Length(trim($name)) > 150) {
             throw new InvalidArgumentException('Tên ngày nghỉ không hợp lệ.');
         }
         if (!in_array($type, ['holiday', 'workday'], true)) {
