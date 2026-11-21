@@ -33,19 +33,57 @@
 
     let selectedMonth = Number(config.month);
     let selectedYear = Number(config.year);
+    let selectedPayrollStartDay = Number(config.payrollStartDay);
     let currentPage = 1;
     let employees = [];
     let filteredEmployees = [];
     let modalInstance = null;
     const holidayDataByYear = new Map();
     const holidayErrorsByYear = new Map();
+    const manualHolidayErrorsByYear = new Map();
     let manualHolidays = [];
-    let manualHolidayError = '';
     let periodUpdateId = 0;
 
     const formatNumber = (value) => new Intl.NumberFormat('vi-VN', {
         maximumFractionDigits: 1,
     }).format(value);
+    const getPayrollPeriod = () => {
+        const startMonth = selectedMonth - 1;
+        const startDay = Math.min(
+            selectedPayrollStartDay,
+            new Date(selectedYear, startMonth + 1, 0).getDate(),
+        );
+        const start = new Date(selectedYear, startMonth, startDay);
+        const nextPeriodMonth = new Date(selectedYear, selectedMonth, 1);
+        const nextPeriodDay = Math.min(
+            selectedPayrollStartDay,
+            new Date(nextPeriodMonth.getFullYear(), nextPeriodMonth.getMonth() + 1, 0).getDate(),
+        );
+        const nextPeriodStart = new Date(
+            nextPeriodMonth.getFullYear(),
+            nextPeriodMonth.getMonth(),
+            nextPeriodDay,
+        );
+        return {
+            start,
+            end: new Date(
+                nextPeriodStart.getFullYear(),
+                nextPeriodStart.getMonth(),
+                nextPeriodStart.getDate() - 1,
+            ),
+        };
+    };
+    const formatDateKey = (date) => [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+    ].join('-');
+    const formatDateLabel = (date) =>
+        `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+    const getPayrollPeriodLabel = () => {
+        const { start, end } = getPayrollPeriod();
+        return `${formatDateLabel(start)} – ${formatDateLabel(end)}`;
+    };
     const isValidHolidayRecord = (record) =>
         record &&
         typeof record.date === 'string' &&
@@ -57,14 +95,20 @@
     const loadManualHolidays = async (year) => {
         try {
             const result = await window.lumiCineApi('holidays', { query: { year } });
-            manualHolidays = result.holidays.map((holiday) => ({
-                ...holiday,
-                source: 'manual',
-            }));
-            manualHolidayError = '';
+            manualHolidays = [
+                ...manualHolidays.filter((holiday) => !holiday.date.startsWith(`${year}-`)),
+                ...result.holidays.map((holiday) => ({
+                    ...holiday,
+                    source: 'manual',
+                })),
+            ];
+            manualHolidayErrorsByYear.delete(year);
         } catch (error) {
-            manualHolidayError = error instanceof Error ? error.message : 'Không đọc được lịch bổ sung.';
-            manualHolidays = [];
+            manualHolidayErrorsByYear.set(
+                year,
+                error instanceof Error ? error.message : 'Không đọc được lịch bổ sung.',
+            );
+            manualHolidays = manualHolidays.filter((holiday) => !holiday.date.startsWith(`${year}-`));
         }
     };
 
@@ -96,8 +140,21 @@
     const getPublicHolidays = (year, month) =>
         getYearHolidays(year).filter((holiday) => holiday.date.slice(5, 7) === String(month).padStart(2, '0'));
 
+    const getPayrollPeriodEntries = (type) => {
+        const { start, end } = getPayrollPeriod();
+        const startDate = formatDateKey(start);
+        const endDate = formatDateKey(end);
+        const entries = [];
+        for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
+            entries.push(...getYearEntries(year));
+        }
+        return entries.filter((entry) =>
+            entry.type === type && entry.date >= startDate && entry.date <= endDate);
+    };
+
     const loadHolidays = async (year) => {
         await loadManualHolidays(year);
+        const manualHolidayError = manualHolidayErrorsByYear.get(year) || '';
         if (holidayDataByYear.has(year)) {
             const previousError = holidayErrorsByYear.get(year);
             if (year === selectedYear) {
@@ -171,6 +228,7 @@
 
     const renderHolidayList = (year) => {
         const holidays = getYearEntries(year);
+        const manualHolidayError = manualHolidayErrorsByYear.get(year) || '';
         holidayList.replaceChildren();
         if (manualHolidayError) {
             const warning = document.createElement('li');
@@ -232,15 +290,13 @@
 
     const buildMonthlyEmployees = () => {
         return baseEmployees.map((employee) => {
-            const holidayDates = getPublicHolidays(selectedYear, selectedMonth);
+            const holidayDates = getPayrollPeriodEntries('holiday');
             const dailyRecords = employee.dailyRecords || [];
             const holidayWorkedDates = holidayDates
                 .filter((holiday) => dailyRecords.some((record) =>
                     record.date === holiday.date && record.checkIn))
                 .map((holiday) => holiday.date);
-            const makeupWorkDates = getYearWorkdays(selectedYear)
-                .filter((workday) => workday.date.slice(5, 7) === String(selectedMonth).padStart(2, '0'))
-                .map((workday) => workday.date);
+            const makeupWorkDates = getPayrollPeriodEntries('workday').map((workday) => workday.date);
             const monthlyEmployee = {
                 ...employee,
                 holidayWorkedDates,
@@ -464,7 +520,7 @@
         document.getElementById('standard-workdays').textContent =
             `${employees[0]?.workingDays || 0} ngày`;
         document.getElementById('period-caption').textContent =
-            `Tổng hợp công nhân viên · ${monthNames[selectedMonth - 1]} năm ${selectedYear}`;
+            `Kỳ chấm công: ${getPayrollPeriodLabel()}`;
     };
 
     const updatePeriod = async ({ announce = false } = {}) => {
@@ -477,19 +533,24 @@
         window.history.replaceState({}, '', url);
 
         try {
-            await loadHolidays(selectedYear);
-            if (requestId !== periodUpdateId) return false;
-
             const result = await window.lumiCineApi('report', {
                 query: { month: selectedMonth, year: selectedYear },
             });
+            if (requestId !== periodUpdateId) return false;
+            if (!Number.isInteger(result.payrollStartDay) || result.payrollStartDay < 1 || result.payrollStartDay > 31) {
+                throw new Error('Ngày bắt đầu kỳ lương từ máy chủ không hợp lệ.');
+            }
+            selectedPayrollStartDay = result.payrollStartDay;
+            const { start, end } = getPayrollPeriod();
+            const holidayYears = [...new Set([start.getFullYear(), end.getFullYear()])];
+            await Promise.all(holidayYears.map(loadHolidays));
             if (requestId !== periodUpdateId) return false;
             baseEmployees = result.employees;
             employees = buildMonthlyEmployees();
             renderStatistics();
             applyFilters();
 
-            if (announce) showToast(`Đang xem dữ liệu database ${monthNames[selectedMonth - 1]} năm ${selectedYear}.`);
+            if (announce) showToast(`Đang xem kỳ chấm công ${getPayrollPeriodLabel()}.`);
             return true;
         } catch (error) {
             if (requestId !== periodUpdateId) return false;
@@ -605,9 +666,10 @@
             const [fill, color] = columnColors[index];
             return `<td colspan="${span}" style="background-color:${fill};color:${color};border:1px solid #cbd5e1;padding:8px 9px;font-weight:bold;text-align:center">${escapeHtml(label)}</td>`;
         }).join('')}</tr>`;
+        const periodRow = `<tr><th colspan="${headers.length}" style="background-color:#f1f5f9;color:#334155;text-align:left;padding:8px 12px">Kỳ chấm công: ${getPayrollPeriodLabel()}</th></tr>`;
         const workbook = `\uFEFF<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
 <head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Báo cáo công</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
-<body><table><thead>${legendTitle}${legendRow}${headerRow}</thead><tbody>${bodyRows}</tbody></table></body></html>`;
+<body><table><thead>${legendTitle}${legendRow}${periodRow}${headerRow}</thead><tbody>${bodyRows}</tbody></table></body></html>`;
         const blob = new Blob([workbook], { type: 'application/vnd.ms-excel;charset=utf-8' });
         const link = document.createElement('a');
         const objectUrl = URL.createObjectURL(blob);
@@ -623,28 +685,29 @@
     const getDailyCalendar = (employee) => {
         const businessDays = [];
         const calendarDays = [];
-        const holidayDates = getPublicHolidays(selectedYear, selectedMonth);
-        const makeupWorkdays = getYearWorkdays(selectedYear)
-            .filter((workday) => workday.date.slice(5, 7) === String(selectedMonth).padStart(2, '0'));
+        const { start, end } = getPayrollPeriod();
+        const calendarEntries = new Map([
+            ...getPayrollPeriodEntries('holiday'),
+            ...getPayrollPeriodEntries('workday'),
+        ].map((entry) => [entry.date, entry]));
         const attendanceByDate = new Map((employee.dailyRecords || []).map((record) => [record.date, record]));
-        const date = new Date(selectedYear, selectedMonth - 1, 1);
+        const date = new Date(start);
 
-        while (date.getMonth() === selectedMonth - 1) {
+        while (date <= end) {
             const weekDay = date.getDay();
-            const dateKey = [
-                selectedYear,
-                String(selectedMonth).padStart(2, '0'),
-                String(date.getDate()).padStart(2, '0'),
-            ].join('-');
+            const dateKey = formatDateKey(date);
             const attendance = attendanceByDate.get(dateKey);
             const day = {
                 date: date.getDate(),
+                dateLabel: `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`,
+                fullDate: formatDateLabel(date),
                 state: 'weekend',
                 checkIn: '',
                 checkOut: '',
             };
-            const holiday = holidayDates.find((item) => item.day === day.date);
-            const makeupWorkday = makeupWorkdays.find((item) => item.day === day.date);
+            const calendarEntry = calendarEntries.get(dateKey);
+            const holiday = calendarEntry?.type === 'holiday' ? calendarEntry : null;
+            const makeupWorkday = calendarEntry?.type === 'workday' ? calendarEntry : null;
             if (holiday) {
                 day.state = attendance?.checkIn ? 'holiday-worked' : 'holiday-off';
                 day.holidayName = holiday.name;
@@ -672,7 +735,7 @@
             if (day.makeupWorkday && day.state === 'unrecorded') day.state = 'makeup-workday';
         });
 
-        const leadingEmptyDays = (new Date(selectedYear, selectedMonth - 1, 1).getDay() + 6) % 7;
+        const leadingEmptyDays = (start.getDay() + 6) % 7;
         const cells = [...Array(leadingEmptyDays).fill(null), ...calendarDays];
         while (cells.length % 7 !== 0) cells.push(null);
         return cells;
@@ -701,8 +764,7 @@
 
     const openEmployeeDetails = (employee) => {
         document.getElementById('employee-modal-title').textContent = `Chi tiết ${employee.name}`;
-        document.getElementById('modal-period').textContent =
-            `${monthNames[selectedMonth - 1]} ${selectedYear}`;
+        document.getElementById('modal-period').textContent = getPayrollPeriodLabel();
         const body = document.getElementById('employee-modal-body');
         body.replaceChildren();
 
@@ -749,7 +811,7 @@
         sectionHeading.className = 'detail-section-title';
         sectionHeading.textContent = 'Lịch chấm công';
         const period = document.createElement('span');
-        period.textContent = `${monthNames[selectedMonth - 1]} ${selectedYear}`;
+        period.textContent = getPayrollPeriodLabel();
         sectionHeading.append(period);
         body.append(sectionHeading);
 
@@ -778,7 +840,7 @@
         const calendar = document.createElement('div');
         calendar.className = 'attendance-calendar';
         calendar.setAttribute('role', 'grid');
-        calendar.setAttribute('aria-label', `Lịch chấm công ${monthNames[selectedMonth - 1]} ${selectedYear}`);
+        calendar.setAttribute('aria-label', `Lịch chấm công ${getPayrollPeriodLabel()}`);
 
         ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].forEach((label) => {
             const weekday = document.createElement('div');
@@ -806,7 +868,7 @@
             if (day) {
                 const dayNumber = document.createElement('span');
                 dayNumber.className = 'calendar-day-number';
-                dayNumber.textContent = String(day.date);
+                dayNumber.textContent = day.dateLabel;
                 if (day.checkIn || day.checkOut) {
                     const times = document.createElement('span');
                     times.className = 'calendar-day-times';
@@ -831,7 +893,7 @@
                     state.textContent = `${day.makeupWorkday ? 'Làm bù · ' : ''}Muộn ${day.lateMinutes} phút`;
                 }
                 cell.append(state);
-                cell.setAttribute('aria-label', `Ngày ${day.date}: ${day.makeupWorkday ? `Ngày làm bù, ${stateLabels[day.state]}` : day.holidayName || stateLabels[day.state]}`);
+                cell.setAttribute('aria-label', `${day.fullDate}: ${day.makeupWorkday ? `Ngày làm bù, ${stateLabels[day.state]}` : day.holidayName || stateLabels[day.state]}`);
                 if (day.holidayName) cell.title = day.holidayName;
             }
             calendar.append(cell);
@@ -947,14 +1009,15 @@
         const nameInput = document.getElementById('holiday-name');
         const typeInput = document.getElementById('holiday-type');
         if (!dateInput.reportValidity() || !nameInput.reportValidity()) return;
-        if (manualHolidayError) {
-            setHolidaySourceStatus(`${manualHolidayError} Không thể lưu ngày bổ sung.`, 'error');
-            return;
-        }
 
         const date = dateInput.value;
         const name = nameInput.value.trim();
         const dateYear = Number(date.slice(0, 4));
+        const manualHolidayError = manualHolidayErrorsByYear.get(dateYear);
+        if (manualHolidayError) {
+            setHolidaySourceStatus(`${manualHolidayError} Không thể lưu ngày bổ sung.`, 'error');
+            return;
+        }
         if (!name) {
             showToast('Vui lòng nhập tên ngày hoặc ghi chú.');
             nameInput.focus();

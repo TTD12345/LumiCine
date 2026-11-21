@@ -629,12 +629,58 @@ class WorkforceModel extends BaseModel
         }
     }
 
+    public function payrollStartDay(): int
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT setting_value FROM lumicine_settings WHERE setting_key = :setting_key'
+        );
+        $statement->execute(['setting_key' => 'payroll_start_day']);
+        $value = $statement->fetchColumn();
+        $day = filter_var($value, FILTER_VALIDATE_INT);
+        if ($value === false || $day === false || $day < 1 || $day > 31) {
+            throw new RuntimeException('Ngày bắt đầu kỳ lương trong cài đặt không hợp lệ.');
+        }
+
+        return $day;
+    }
+
+    public function savePayrollStartDay(int $day): void
+    {
+        if ($day < 1 || $day > 31) {
+            throw new InvalidArgumentException('Ngày bắt đầu kỳ lương phải từ 1 đến 31.');
+        }
+
+        $statement = $this->pdo->prepare(
+            'INSERT INTO lumicine_settings (setting_key, setting_value)
+             VALUES (\'payroll_start_day\', :insert_value)
+             ON DUPLICATE KEY UPDATE setting_value = :update_value'
+        );
+        $statement->execute([
+            'insert_value' => (string) $day,
+            'update_value' => (string) $day,
+        ]);
+    }
+
     public function attendanceReport(int $month, int $year): array
     {
         if ($month < 1 || $month > 12 || $year < 2020 || $year > 2100) {
             throw new InvalidArgumentException('Kỳ báo cáo không hợp lệ.');
         }
 
+        $startDay = $this->payrollStartDay();
+        $periodStart = new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
+        $periodStart = $periodStart->setDate(
+            $year,
+            $month,
+            min($startDay, (int) $periodStart->format('t'))
+        );
+        $nextPeriodStart = $periodStart->modify('first day of next month');
+        $nextPeriodStart = $nextPeriodStart->setDate(
+            (int) $nextPeriodStart->format('Y'),
+            (int) $nextPeriodStart->format('n'),
+            min($startDay, (int) $nextPeriodStart->format('t'))
+        );
+        $periodEnd = $nextPeriodStart->modify('-1 day')->format('Y-m-d');
         $statement = $this->pdo->prepare(
             'SELECT e.id, e.ma_nhan_vien AS employee_code, e.ho_ten AS name,
                     COALESCE(d.ten_phong_ban, \'\') AS department,
@@ -647,8 +693,7 @@ class WorkforceModel extends BaseModel
              LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
              LEFT JOIN phan_ca a ON a.nhan_vien_id = e.id
                   AND a.trang_thai = \'DA_PHAN\'
-                  AND MONTH(a.ngay_lam) = :month
-                  AND YEAR(a.ngay_lam) = :year
+                  AND a.ngay_lam BETWEEN :period_start AND :period_end
              LEFT JOIN cham_cong c ON c.phan_ca_id = a.id
              LEFT JOIN (
                  SELECT t.cham_cong_id, SUM(t.tong_phut_tang_ca) AS overtime_minutes
@@ -658,7 +703,10 @@ class WorkforceModel extends BaseModel
              WHERE e.trang_thai = 1
              ORDER BY e.ho_ten, a.ngay_lam'
         );
-        $statement->execute(['month' => $month, 'year' => $year]);
+        $statement->execute([
+            'period_start' => $periodStart->format('Y-m-d'),
+            'period_end' => $periodEnd,
+        ]);
         $rows = $statement->fetchAll();
         $employees = [];
 

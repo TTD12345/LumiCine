@@ -225,6 +225,22 @@ $isSchedule = $section === 'schedule';
                 <?php endif; ?>
             <?php elseif ($section === 'settings'): ?>
                 <section class="data-card"><div class="table-card-header"><div><h2>Cài đặt hệ thống</h2><p>Cấu hình chung cho LumiCine HRM.</p></div></div><div class="settings-grid"><label>Giờ bắt đầu ca<input type="time" value="08:00"></label><label>Giờ kết thúc ca<input type="time" value="17:00"></label><label>Ngày công chuẩn/tháng<input type="number" min="1" max="31" value="22"></label><button class="button button-primary" type="button">Lưu cài đặt</button></div></section>
+                <section class="data-card" aria-labelledby="payroll-settings-title">
+                    <div class="table-card-header">
+                        <div>
+                            <h2 id="payroll-settings-title">Kỳ lương và tổng hợp công</h2>
+                            <p>Chọn ngày bắt đầu chu kỳ; bảng tổng hợp công sẽ tính từ ngày này đến trước ngày bắt đầu kỳ tiếp theo.</p>
+                        </div>
+                    </div>
+                    <form class="settings-grid payroll-settings-grid" id="payroll-settings-form">
+                        <label for="payroll-start-day">Ngày bắt đầu kỳ lương
+                            <input id="payroll-start-day" name="payrollStartDay" type="number" min="1" max="31" step="1" value="<?= (int) $payrollStartDay ?>" required>
+                        </label>
+                        <p class="payroll-settings-help">Nếu tháng không có ngày đã chọn (ví dụ ngày 31), hệ thống dùng ngày cuối tháng. Thay đổi sẽ áp dụng cho lịch và số liệu của bảng tổng hợp công.</p>
+                        <button class="button button-primary" id="save-payroll-settings" type="submit">Lưu ngày lương</button>
+                    </form>
+                    <p class="payroll-settings-feedback" id="payroll-settings-feedback" role="status" aria-live="polite"></p>
+                </section>
             <?php else: ?>
                 <section class="data-card section-placeholder"><div class="table-card-header"><div><h2><?= $escape($page['title']) ?></h2><p>Chức năng này đã được đặt trên trang riêng.</p></div></div></section>
             <?php endif; ?>
@@ -232,7 +248,7 @@ $isSchedule = $section === 'schedule';
     </main>
 </div>
 <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container" aria-live="polite"></div>
-<script src="assets/js/admin-section.js" defer></script>
+<script src="assets/js/admin-section.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/admin-section.js') ?>" defer></script>
 <?php if ($isSchedule): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
     <script>
@@ -244,6 +260,8 @@ $isSchedule = $section === 'schedule';
     <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/overtime.js" defer></script>
 <?php elseif ($section === 'employees'): ?>
+    <?php require PATH_VIEW . 'api-config.php'; ?>
+<?php elseif ($section === 'settings'): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
 <?php endif; ?>
 </body>

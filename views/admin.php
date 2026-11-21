@@ -351,7 +351,8 @@ $statusFor = static function (array $employee): array {
 <script>
     window.hrmAttendanceConfig = {
         month: <?= $month ?>,
-        year: <?= $year ?>
+        year: <?= $year ?>,
+        payrollStartDay: <?= $payrollStartDay ?>
     };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

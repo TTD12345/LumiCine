@@ -42,9 +42,11 @@ Không import `database/schema.sql` vào database đang có dữ liệu. Trướ
 ```powershell
 Get-Content -Raw .\database\migrations\2026-11-21-add-workforce-storage.sql |
     & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
+Get-Content -Raw .\database\migrations\2026-11-21-add-payroll-settings.sql |
+    & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
 ```
 
-Migration thêm `lumicine_users.employee_code`, `phan_ca.dia_diem` và bảng lịch nghỉ `lumicine_holidays`. Migration có thể chạy lại an toàn. Nếu MySQL không nằm ở đường dẫn trên, dùng đường dẫn `mysql.exe` tương ứng với cài đặt của bạn.
+Các migration thêm `lumicine_users.employee_code`, `phan_ca.dia_diem`, bảng lịch nghỉ `lumicine_holidays` và cấu hình `lumicine_settings` (mặc định ngày bắt đầu kỳ lương là 10). Migration có thể chạy lại an toàn. Nếu MySQL không nằm ở đường dẫn trên, dùng đường dẫn `mysql.exe` tương ứng với cài đặt của bạn.
 
 Liên kết tài khoản với hồ sơ nhân viên tại **Quản lý nhân viên** trong trang quản trị: chọn hồ sơ theo đúng mã nhân viên đã xác minh và lưu liên kết. Mỗi mã nhân viên chỉ được dùng cho một tài khoản; ứng dụng không tự ghép theo tên. Có thể cập nhật trực tiếp bằng SQL nếu cần:
 
@@ -102,7 +104,7 @@ Trang nhân viên và quản trị đọc/ghi dữ liệu qua PHP/MySQL; trình 
 - Nhân viên chỉ xem lịch của mã nhân viên được liên kết với tài khoản.
 - Chấm công chỉ được ghi nhận trong ngày hiện tại khi nhân viên có phân ca. Thời gian lấy từ máy chủ; dữ liệu vào/ra được ghi vào `cham_cong`.
 - Đơn tăng ca được liên kết với bản ghi `cham_cong`, lưu trong `tang_ca`; quản trị viên duyệt hoặc từ chối trực tiếp trên database.
-- Báo cáo đọc dữ liệu phân ca, chấm công và tăng ca đã duyệt theo tháng.
+- Ngày bắt đầu kỳ lương có thể thay đổi trong **Cài đặt**; bảng tổng hợp công và lịch chi tiết áp dụng từ ngày này đến trước ngày bắt đầu kỳ tiếp theo. Nếu tháng thiếu ngày đã chọn, hệ thống dùng ngày cuối tháng.
 - Ngày nghỉ/làm bù tùy chỉnh lưu trong `lumicine_holidays` và được dùng chung giữa các tài khoản quản trị. Lịch Nager.Date vẫn là nguồn tham khảo bên ngoài.
 - Xuất báo cáo Excel tương thích định dạng `.xls`, có màu phân biệt các nhóm dữ liệu, và in báo cáo.
 
