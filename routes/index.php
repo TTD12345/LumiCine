@@ -21,6 +21,7 @@ match ($action) {
     'admin-summary' => (new HomeController())->admin(),
     'admin-overview' => (new HomeController())->adminSection('overview'),
     'admin-employees' => (new HomeController())->adminSection('employees'),
+    'admin-schedule' => (new HomeController())->adminSection('schedule'),
     'admin-attendance' => (new HomeController())->adminSection('attendance'),
     'admin-overtime' => (new HomeController())->adminSection('overtime'),
     'admin-leave' => (new HomeController())->adminSection('leave'),

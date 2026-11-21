@@ -151,6 +151,25 @@
 
                 isLoading = true;
                 try {
+                    const overtimeStart = new Date(start);
+                    const overtimeEnd = new Date(end);
+                    const scheduleDate = start.slice(0, 10);
+                    const schedule = await window.lumiCineApi('schedule', {
+                        query: { date: scheduleDate },
+                    });
+                    const conflictingShift = (schedule.assignments || []).find((assignment) => {
+                        const shiftStart = new Date(`${scheduleDate}T${assignment.start.slice(0, 5)}:00`);
+                        let shiftEnd = new Date(`${scheduleDate}T${assignment.end.slice(0, 5)}:00`);
+                        if (shiftEnd <= shiftStart) shiftEnd.setDate(shiftEnd.getDate() + 1);
+                        return overtimeStart < shiftEnd && overtimeEnd > shiftStart;
+                    });
+                    if (conflictingShift) {
+                        showMessage(
+                            `Thời gian tăng ca không hợp lệ: trùng ca làm việc ${conflictingShift.start.slice(0, 5)} - ${conflictingShift.end.slice(0, 5)}.`,
+                            true
+                        );
+                        return;
+                    }
                     await window.lumiCineApi('overtime', {
                         method: 'POST',
                         body: { start, end, reason },

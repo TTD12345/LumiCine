@@ -121,10 +121,24 @@ class WorkforceModel extends BaseModel
         return $assignments;
     }
 
+    public function listShiftTypes(): array
+    {
+        $statement = $this->pdo->query(
+            'SELECT id, ten_ca AS name, gio_bat_dau AS start, gio_ket_thuc AS end,
+                    COALESCE(so_phut_cho_di_muon, 0) AS late_tolerance
+             FROM ca_lam_viec
+             WHERE trang_thai = 1
+             ORDER BY gio_bat_dau, id'
+        );
+
+        return $statement->fetchAll();
+    }
+
     public function saveAssignment(array $data): array
     {
         $employeeId = filter_var($data['employeeId'] ?? null, FILTER_VALIDATE_INT);
         $date = $data['date'] ?? '';
+        $shiftId = isset($data['shiftId']) ? filter_var($data['shiftId'], FILTER_VALIDATE_INT) : null;
         $start = $data['start'] ?? '';
         $end = $data['end'] ?? '';
         $locationValue = $data['location'] ?? '';
@@ -138,6 +152,22 @@ class WorkforceModel extends BaseModel
             throw new InvalidArgumentException('Nhân viên hoặc ca làm việc không hợp lệ.');
         }
         $this->validateDate($date);
+        if ($shiftId !== null) {
+            if (!$shiftId || $shiftId < 1) {
+                throw new InvalidArgumentException('Loại ca làm việc không hợp lệ.');
+            }
+            $shiftStatement = $this->pdo->prepare(
+                'SELECT gio_bat_dau, gio_ket_thuc FROM ca_lam_viec
+                 WHERE id = :id AND trang_thai = 1 LIMIT 1'
+            );
+            $shiftStatement->execute(['id' => $shiftId]);
+            $shift = $shiftStatement->fetch();
+            if ($shift === false) {
+                throw new InvalidArgumentException('Loại ca làm việc không tồn tại.');
+            }
+            $start = (string) $shift['gio_bat_dau'];
+            $end = (string) $shift['gio_ket_thuc'];
+        }
         $this->validateTime($start);
         $this->validateTime($end);
         if ($location === '' || mb_strlen($location) > 100) {
@@ -441,19 +471,58 @@ class WorkforceModel extends BaseModel
         $this->pdo->beginTransaction();
         try {
             $assignmentStatement = $this->pdo->prepare(
-                'SELECT id FROM phan_ca
-                 WHERE nhan_vien_id = :employee_id AND ngay_lam = :work_date
-                       AND trang_thai = \'DA_PHAN\'
-                 ORDER BY id DESC LIMIT 1 FOR UPDATE'
+                'SELECT a.id, a.ngay_lam AS work_date,
+                        c.gio_bat_dau AS shift_start, c.gio_ket_thuc AS shift_end
+                 FROM phan_ca a
+                 INNER JOIN ca_lam_viec c ON c.id = a.ca_lam_viec_id
+                 WHERE a.nhan_vien_id = :employee_id
+                       AND a.ngay_lam BETWEEN :from_date AND :work_date
+                       AND a.trang_thai = \'DA_PHAN\'
+                 ORDER BY a.ngay_lam, c.gio_bat_dau, a.id
+                 FOR UPDATE'
             );
             $assignmentStatement->execute([
                 'employee_id' => $employeeId,
                 'work_date' => $startDate->format('Y-m-d'),
+                'from_date' => $startDate->modify('-1 day')->format('Y-m-d'),
             ]);
-            $assignmentId = $assignmentStatement->fetchColumn();
-            if ($assignmentId === false) {
+            $assignments = $assignmentStatement->fetchAll();
+            if ($assignments === []) {
                 throw new InvalidArgumentException('Bạn chưa được phân ca trong ngày tăng ca.');
             }
+
+            $matchingAssignmentId = null;
+            foreach ($assignments as $assignment) {
+                if ((string) $assignment['work_date'] === $startDate->format('Y-m-d')) {
+                    $matchingAssignmentId = (int) $assignment['id'];
+                    break;
+                }
+            }
+            if ($matchingAssignmentId === null) {
+                $matchingAssignmentId = (int) $assignments[0]['id'];
+            }
+
+            foreach ($assignments as $assignment) {
+                $shiftStart = $this->parseDateTime(
+                    (string) $assignment['work_date'] . 'T' . substr((string) $assignment['shift_start'], 0, 5)
+                );
+                $shiftEnd = $this->parseDateTime(
+                    (string) $assignment['work_date'] . 'T' . substr((string) $assignment['shift_end'], 0, 5)
+                );
+                if ($shiftEnd <= $shiftStart) {
+                    $shiftEnd = $shiftEnd->modify('+1 day');
+                }
+
+                if ($startDate < $shiftEnd && $endDate > $shiftStart) {
+                    throw new InvalidArgumentException(
+                        'Thời gian tăng ca không hợp lệ vì trùng hoặc nằm trong giờ làm việc '
+                        . $shiftStart->format('H:i') . ' - ' . $shiftEnd->format('H:i') . ' ngày '
+                        . $assignment['work_date'] . '.'
+                    );
+                }
+            }
+
+            $assignmentId = $matchingAssignmentId;
 
             $createAttendance = $this->pdo->prepare(
                 'INSERT INTO cham_cong (nhan_vien_id, phan_ca_id, trang_thai)
@@ -668,6 +737,7 @@ class WorkforceModel extends BaseModel
         return 'SELECT a.id, a.ngay_lam AS work_date, e.id AS employee_id,
                        e.ho_ten AS name, COALESCE(e.chuc_vu, \'\') AS role,
                        COALESCE(d.ten_phong_ban, \'\') AS department,
+                       c.id AS shift_id, c.ten_ca AS shift_name,
                        c.gio_bat_dau AS start, c.gio_ket_thuc AS end,
                        COALESCE(a.dia_diem, \'\') AS location
                 FROM phan_ca a
