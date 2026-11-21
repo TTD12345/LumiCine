@@ -112,7 +112,7 @@ $isSchedule = $section === 'schedule';
                                     <?php else: ?>
                                         <?php foreach ($scheduleAssignments as $index => $assignment): ?>
                                             <tr data-assignment-id="<?= $escape($assignment['id']) ?>">
-                                                <td><div class="schedule-employee"><span><?= $escape(mb_substr($assignment['name'], 0, 1, 'UTF-8')) ?></span><div><strong><?= $escape($assignment['name']) ?></strong><small><?= $escape($assignment['role']) ?></small></div></div></td>
+                                                <td><div class="schedule-employee"><span><?= $escape(lumicineUtf8Substring($assignment['name'], 0, 1)) ?></span><div><strong><?= $escape($assignment['name']) ?></strong><small><?= $escape($assignment['role']) ?></small></div></div></td>
                                                 <td><?= $escape($assignment['department']) ?></td><td><strong><?= $escape($assignment['shift_name'] ?? ('Ca ' . ($index + 1))) ?></strong></td>
                                                 <td><strong><?= $escape(substr($assignment['start'], 0, 5)) ?> - <?= $escape(substr($assignment['end'], 0, 5)) ?></strong></td>
                                                 <td><?= $escape($assignment['location']) ?></td>
@@ -182,15 +182,21 @@ $isSchedule = $section === 'schedule';
                         <p class="mapping-feedback" id="mapping-feedback" role="status" aria-live="polite"></p>
                         <div class="table-wrap">
                             <table class="employee-table" id="employee-account-mappings">
-                                <thead><tr><th>Tài khoản</th><th>Tên hiển thị</th><th>Hồ sơ nhân viên</th><th>Thao tác</th></tr></thead>
+                                <thead><tr><th>Tài khoản</th><th>Tên hiển thị</th><th>Vai trò</th><th>Hồ sơ nhân viên</th><th>Thao tác</th></tr></thead>
                                 <tbody>
                                     <?php if ($employeeMappings === []): ?>
-                                        <tr><td colspan="4">Không có tài khoản mang vai trò nhân viên.</td></tr>
+                                        <tr><td colspan="5">Không có tài khoản đăng nhập.</td></tr>
                                     <?php else: ?>
                                         <?php foreach ($employeeMappings as $account): ?>
                                             <tr data-mapping-row data-user-id="<?= (int) $account['id'] ?>">
                                                 <td><?= $escape($account['username']) ?></td>
                                                 <td><?= $escape($account['display_name']) ?></td>
+                                                <td><?= $escape([
+                                                    'employee' => 'Nhân viên',
+                                                    'accountant' => 'Kế toán',
+                                                    'hr' => 'HR',
+                                                    'chairman' => 'Chủ tịch',
+                                                ][$account['role']] ?? $account['role']) ?></td>
                                                 <td>
                                                     <select class="mapping-select" data-employee-code aria-label="Hồ sơ nhân viên cho tài khoản <?= $escape($account['username']) ?>">
                                                         <option value="">Chưa liên kết</option>
@@ -249,6 +255,7 @@ $isSchedule = $section === 'schedule';
 </div>
 <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container" aria-live="polite"></div>
 <script src="assets/js/admin-section.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/admin-section.js') ?>" defer></script>
+<script src="assets/js/admin-section.js?v=20261121" defer></script>
 <?php if ($isSchedule): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
     <script>

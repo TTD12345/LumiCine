@@ -211,7 +211,10 @@ class ApiController
             $this->respond(['error' => $exception->getMessage()], 422);
         } catch (Throwable $exception) {
             error_log('LumiCine API error: ' . $exception->getMessage());
-            $this->respond(['error' => 'Không thể xử lý yêu cầu. Kiểm tra cấu hình database và migration.'], 500);
+            $this->respond([
+                'error' => 'Không thể xử lý yêu cầu. Kiểm tra cấu hình database và migration.',
+                'detail' => $exception->getMessage(),
+            ], 500);
         }
     }
 

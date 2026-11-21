@@ -48,7 +48,14 @@ Get-Content -Raw .\database\migrations\2026-11-21-add-payroll-settings.sql |
 
 Các migration thêm `lumicine_users.employee_code`, `phan_ca.dia_diem`, bảng lịch nghỉ `lumicine_holidays` và cấu hình `lumicine_settings` (mặc định ngày bắt đầu kỳ lương là 10). Migration có thể chạy lại an toàn. Nếu MySQL không nằm ở đường dẫn trên, dùng đường dẫn `mysql.exe` tương ứng với cài đặt của bạn.
 
-Liên kết tài khoản với hồ sơ nhân viên tại **Quản lý nhân viên** trong trang quản trị: chọn hồ sơ theo đúng mã nhân viên đã xác minh và lưu liên kết. Mỗi mã nhân viên chỉ được dùng cho một tài khoản; ứng dụng không tự ghép theo tên. Có thể cập nhật trực tiếp bằng SQL nếu cần:
+Khi nâng cấp luồng tăng ca, chạy thêm migration riêng để cho phép đơn tăng ca lưu trước khi có phân ca:
+
+```powershell
+Get-Content -Raw .\database\migrations\2026-11-21-add-overtime-employee-link.sql |
+    & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
+```
+
+Liên kết tài khoản với hồ sơ nhân viên tại **Quản lý nhân viên** trong trang quản trị: chọn hồ sơ theo đúng mã nhân viên đã xác minh và lưu liên kết. Mã nhân viên có thể được liên kết cho tài khoản nhân viên hoặc tài khoản quản trị (HR, kế toán, chủ tịch) để tài khoản đó cũng chấm công theo hồ sơ của mình. Mỗi mã nhân viên chỉ được dùng cho một tài khoản; ứng dụng không tự ghép theo tên. Có thể cập nhật trực tiếp bằng SQL nếu cần:
 
 ```sql
 UPDATE lumicine_users
@@ -105,6 +112,9 @@ Trang nhân viên và quản trị đọc/ghi dữ liệu qua PHP/MySQL; trình 
 - Chấm công chỉ được ghi nhận trong ngày hiện tại khi nhân viên có phân ca. Thời gian lấy từ máy chủ; dữ liệu vào/ra được ghi vào `cham_cong`.
 - Đơn tăng ca được liên kết với bản ghi `cham_cong`, lưu trong `tang_ca`; quản trị viên duyệt hoặc từ chối trực tiếp trên database.
 - Ngày bắt đầu kỳ lương có thể thay đổi trong **Cài đặt**; bảng tổng hợp công và lịch chi tiết áp dụng từ ngày này đến trước ngày bắt đầu kỳ tiếp theo. Nếu tháng thiếu ngày đã chọn, hệ thống dùng ngày cuối tháng.
+- Nhân viên gửi đơn tăng ca trước, đơn được lưu trong `tang_ca` với hồ sơ nhân viên và chưa cần phân ca. Khi quản trị viên duyệt, hệ thống tự tạo ca tăng ca, phân ca và bản ghi `cham_cong`; đơn bị từ chối thì không tạo phân ca.
+- Thời gian tăng ca chỉ được đăng ký ngoài giờ hành chính 08:00–17:00. Đơn có bất kỳ phần nào trùng khoảng 08:00–17:00 sẽ bị từ chối ở máy chủ.
+- Báo cáo đọc dữ liệu phân ca, chấm công và tăng ca đã duyệt theo tháng.
 - Ngày nghỉ/làm bù tùy chỉnh lưu trong `lumicine_holidays` và được dùng chung giữa các tài khoản quản trị. Lịch Nager.Date vẫn là nguồn tham khảo bên ngoài.
 - Xuất báo cáo Excel tương thích định dạng `.xls`, có màu phân biệt các nhóm dữ liệu, và in báo cáo.
 
