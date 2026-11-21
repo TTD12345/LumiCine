@@ -182,15 +182,21 @@ $isSchedule = $section === 'schedule';
                         <p class="mapping-feedback" id="mapping-feedback" role="status" aria-live="polite"></p>
                         <div class="table-wrap">
                             <table class="employee-table" id="employee-account-mappings">
-                                <thead><tr><th>Tài khoản</th><th>Tên hiển thị</th><th>Hồ sơ nhân viên</th><th>Thao tác</th></tr></thead>
+                                <thead><tr><th>Tài khoản</th><th>Tên hiển thị</th><th>Vai trò</th><th>Hồ sơ nhân viên</th><th>Thao tác</th></tr></thead>
                                 <tbody>
                                     <?php if ($employeeMappings === []): ?>
-                                        <tr><td colspan="4">Không có tài khoản mang vai trò nhân viên.</td></tr>
+                                        <tr><td colspan="5">Không có tài khoản đăng nhập.</td></tr>
                                     <?php else: ?>
                                         <?php foreach ($employeeMappings as $account): ?>
                                             <tr data-mapping-row data-user-id="<?= (int) $account['id'] ?>">
                                                 <td><?= $escape($account['username']) ?></td>
                                                 <td><?= $escape($account['display_name']) ?></td>
+                                                <td><?= $escape([
+                                                    'employee' => 'Nhân viên',
+                                                    'accountant' => 'Kế toán',
+                                                    'hr' => 'HR',
+                                                    'chairman' => 'Chủ tịch',
+                                                ][$account['role']] ?? $account['role']) ?></td>
                                                 <td>
                                                     <select class="mapping-select" data-employee-code aria-label="Hồ sơ nhân viên cho tài khoản <?= $escape($account['username']) ?>">
                                                         <option value="">Chưa liên kết</option>
