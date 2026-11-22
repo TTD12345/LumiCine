@@ -90,6 +90,8 @@ class HomeController
         );
         $overtimeRequests = $workforce->overtimeRequests($isAdmin ? null : $employeeId);
         $overtimeCount = count($overtimeRequests);
+        $leaveRequests = $workforce->leaveRequests($isAdmin ? null : $employeeId);
+        $leaveCount = count($leaveRequests);
         $canSubmitOvertime = $employeeId !== null;
         $attendanceToday = $employeeId === null
             ? null

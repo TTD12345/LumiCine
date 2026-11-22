@@ -12,11 +12,13 @@ $sections = [
     'dashboard' => ['kicker' => 'TỔNG QUAN', 'title' => 'Bảng điều khiển', 'description' => 'Xem tổng quan lịch làm việc, chấm công và đơn tăng ca.'],
     'shift' => ['kicker' => 'CA LÀM VIỆC', 'title' => 'Ca làm việc', 'description' => 'Danh sách ca làm việc được phân công cho nhân viên.'],
     'overtime' => ['kicker' => 'ĐĂNG KÝ LÀM THÊM', 'title' => 'Đăng ký tăng ca', 'description' => 'Tạo và theo dõi các đơn tăng ca của bạn.'],
+    'leave' => ['kicker' => 'NGHỈ PHÉP', 'title' => 'Đăng ký nghỉ phép', 'description' => 'Tạo đơn xin nghỉ và theo dõi trạng thái duyệt.'],
     'employees' => ['kicker' => 'DANH SÁCH NHÂN VIÊN', 'title' => 'Nhân viên', 'description' => 'Thông tin nhân viên trong tổ chức.'],
     'reports' => ['kicker' => 'BÁO CÁO', 'title' => 'Báo cáo', 'description' => 'Thống kê và báo cáo hoạt động nhân sự.'],
 ];
 $page = $sections[$section] ?? $sections['dashboard'];
 $isOvertime = $section === 'overtime';
+$isLeave = $section === 'leave';
 $employeeCount = count($employeeRecords);
 $shiftCount = count($employeeShifts);
 $attendanceSummary = !$attendanceToday
@@ -38,7 +40,7 @@ $attendanceSummary = !$attendanceToday
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="assets/css/employee.css" rel="stylesheet">
-    <?php if ($isOvertime): ?><link href="assets/css/overtime.css" rel="stylesheet"><?php endif; ?>
+    <?php if ($isOvertime || $isLeave): ?><link href="assets/css/overtime.css" rel="stylesheet"><?php endif; ?>
 </head>
 <body>
 <div class="employee-app">
@@ -50,6 +52,7 @@ $attendanceSummary = !$attendanceToday
             <a class="employee-nav-link <?= $section === 'schedule' ? 'active' : '' ?>" href="?action=schedule"><i class="bi bi-calendar-week"></i><span>Lịch làm việc</span></a>
             <a class="employee-nav-link <?= $section === 'shift' ? 'active' : '' ?>" href="?action=shift"><i class="bi bi-people"></i><span>Ca làm việc</span></a>
             <a class="employee-nav-link <?= $isOvertime ? 'active' : '' ?>" href="?action=overtime"><i class="bi bi-clock-history"></i><span>Đăng ký tăng ca</span></a>
+            <a class="employee-nav-link <?= $isLeave ? 'active' : '' ?>" href="?action=leave"><i class="bi bi-calendar2-minus"></i><span>Đăng ký nghỉ phép</span></a>
             <a class="employee-nav-link <?= $section === 'attendance' ? 'active' : '' ?>" href="?action=attendance"><i class="bi bi-calendar2-check"></i><span>Chấm công</span></a>
         </nav>
         <div class="employee-sidebar-bottom">
@@ -81,10 +84,18 @@ $attendanceSummary = !$attendanceToday
                     <div class="overtime-feedback" id="overtime-feedback" role="status" aria-live="polite"></div>
                     <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Thời gian</th><th>Lý do</th><th>Trạng thái</th></tr></thead><tbody id="employee-overtime-rows"><tr><td colspan="3">Đang tải đơn tăng ca...</td></tr></tbody></table></div>
                 </section>
+            <?php elseif ($isLeave): ?>
+                <section class="overtime-card" id="leave" aria-labelledby="leave-title">
+                    <div class="overtime-heading"><div><h2 id="leave-title">Đăng ký nghỉ phép</h2><p>Gửi thời gian và lý do nghỉ để quản trị viên xem xét.</p></div><?php if ($canSubmitOvertime): ?><button class="overtime-button overtime-button-primary" type="button" id="leave-open-form"><i class="bi bi-plus-lg"></i> Tạo đơn nghỉ phép</button><?php endif; ?></div>
+                    <p class="overtime-note">Chỉ được hủy đơn khi đơn vẫn đang chờ duyệt.</p>
+                    <div class="overtime-feedback" id="leave-feedback" role="status" aria-live="polite"></div>
+                    <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Thời gian nghỉ</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="employee-leave-rows"><tr><td colspan="4">Đang tải đơn nghỉ phép...</td></tr></tbody></table></div>
+                </section>
             <?php elseif ($section === 'dashboard'): ?>
                 <section class="employee-stats">
                     <article class="stat-card"><div class="stat-top"><span>Tổng ca làm việc</span><i class="bi bi-calendar2-week"></i></div><strong><?= $shiftCount ?></strong><small>ca hôm nay</small></article>
                     <article class="stat-card"><div class="stat-top"><span>Đơn tăng ca</span><i class="bi bi-clock-history"></i></div><strong><?= $overtimeCount ?></strong><small>đơn đã gửi</small></article>
+                    <article class="stat-card"><div class="stat-top"><span>Đơn nghỉ phép</span><i class="bi bi-calendar2-minus"></i></div><strong><?= $leaveCount ?></strong><small>đơn đã gửi</small></article>
                     <article class="stat-card"><div class="stat-top"><span>Chấm công</span><i class="bi bi-calendar2-check"></i></div><strong><?= $escape($attendanceSummary) ?></strong><small>trạng thái hôm nay</small></article>
                 </section>
             <?php elseif ($section === 'shift'): ?>
@@ -102,11 +113,28 @@ $attendanceSummary = !$attendanceToday
 <?php if ($isOvertime && $canSubmitOvertime): ?>
 <dialog class="shift-dialog overtime-dialog" id="overtime-dialog" aria-labelledby="overtime-dialog-title"><form id="overtime-form"><header class="dialog-heading"><div><span class="page-kicker">ĐĂNG KÝ LÀM THÊM</span><h2 id="overtime-dialog-title">Đơn đăng ký tăng ca</h2><p>Thông tin nhân viên: <strong id="overtime-employee-name"><?= $currentUserName ?></strong></p><p>Chỉ đăng ký ngoài giờ hành chính 08:00 - 17:00. Ca tăng ca chỉ được tạo sau khi quản trị viên duyệt.</p></div><button class="dialog-close" type="button" id="overtime-close-form" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header><div class="dialog-grid"><label class="dialog-field">Bắt đầu tăng ca<input name="start" type="datetime-local" required></label><label class="dialog-field">Kết thúc tăng ca<input name="end" type="datetime-local" required></label><label class="dialog-field full">Lý do tăng ca<textarea name="reason" required minlength="5" maxlength="1000" rows="4"></textarea></label></div><footer class="dialog-actions"><button class="secondary-button" type="button" id="overtime-cancel-form">Hủy</button><button class="primary-button" type="submit">Gửi đơn</button></footer></form></dialog>
 <?php endif; ?>
+<?php if ($isLeave && $canSubmitOvertime): ?>
+<dialog class="shift-dialog overtime-dialog" id="leave-dialog" aria-labelledby="leave-dialog-title">
+    <form id="leave-form">
+        <header class="dialog-heading"><div><span class="page-kicker">NGHỈ PHÉP</span><h2 id="leave-dialog-title">Đơn đăng ký nghỉ phép</h2><p>Thông tin nhân viên: <strong><?= $currentUserName ?></strong></p></div><button class="dialog-close" type="button" id="leave-close-form" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>
+        <div class="dialog-grid">
+            <label class="dialog-field">Bắt đầu nghỉ<input name="start" type="datetime-local" required></label>
+            <label class="dialog-field">Kết thúc nghỉ<input name="end" type="datetime-local" required></label>
+            <label class="dialog-field full">Lý do nghỉ phép<textarea name="reason" required minlength="5" maxlength="1000" rows="4" placeholder="Ví dụ: Việc gia đình, khám bệnh..."></textarea></label>
+        </div>
+        <footer class="dialog-actions"><button class="secondary-button" type="button" id="leave-cancel-form">Hủy</button><button class="primary-button" type="submit">Gửi đơn</button></footer>
+    </form>
+</dialog>
+<?php endif; ?>
 <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
 <script src="assets/js/employee-section.js" defer></script>
 <?php if ($isOvertime): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/overtime.js" defer></script>
+<?php endif; ?>
+<?php if ($isLeave): ?>
+    <?php require PATH_VIEW . 'api-config.php'; ?>
+    <script src="assets/js/leave.js" defer></script>
 <?php endif; ?>
 </body>
 </html>

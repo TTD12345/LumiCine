@@ -200,6 +200,45 @@ class ApiController
                 );
                 $this->respond(['success' => true], 201);
             }
+            if ($resource === 'leave') {
+                if ($method === 'GET') {
+                    $this->respond(['requests' => $workforce->leaveRequests($employeeId)]);
+                }
+                $payload = $this->readPayload();
+                $operation = $payload['operation'] ?? 'submit';
+                if ($operation === 'review') {
+                    $this->requireAdmin($user['role']);
+                    $id = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
+                    $status = $payload['status'] ?? '';
+                    if (!$id || $id < 1 || !in_array($status, ['approved', 'rejected'], true)) {
+                        throw new InvalidArgumentException('Thông tin xử lý đơn nghỉ phép không hợp lệ.');
+                    }
+                    $workforce->reviewLeave($id, $status, $linkedEmployeeId);
+                    $this->respond(['success' => true]);
+                }
+                if ($operation === 'cancel') {
+                    $id = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
+                    if (!$id || $id < 1) {
+                        throw new InvalidArgumentException('Đơn nghỉ phép không hợp lệ.');
+                    }
+                    if ($linkedEmployeeId === null) {
+                        $this->respond(['error' => 'Tài khoản chưa được liên kết với hồ sơ nhân viên.'], 403);
+                    }
+                    $workforce->cancelLeave($id, $linkedEmployeeId);
+                    $this->respond(['success' => true]);
+                }
+                if ($linkedEmployeeId === null) {
+                    $this->respond(['error' => 'Tài khoản chưa được liên kết với hồ sơ nhân viên.'], 403);
+                }
+                $start = $payload['start'] ?? null;
+                $end = $payload['end'] ?? null;
+                $reason = $payload['reason'] ?? null;
+                if (!is_string($start) || !is_string($end) || !is_string($reason)) {
+                    throw new InvalidArgumentException('Thông tin đơn nghỉ phép không hợp lệ.');
+                }
+                $workforce->submitLeave($linkedEmployeeId, $start, $end, $reason);
+                $this->respond(['success' => true], 201);
+            }
             if ($resource === 'holidays') {
                 $year = filter_var($_GET['year'] ?? null, FILTER_VALIDATE_INT);
                 if ($method === 'GET') {
