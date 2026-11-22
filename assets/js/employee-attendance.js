@@ -46,6 +46,18 @@
 
     const renderAttendance = () => {
         const { check_in: checkIn, check_out: checkOut } = attendanceRecord;
+        const shiftName = document.getElementById('attendance-shift-name');
+        const shiftTime = document.getElementById('attendance-shift-time');
+        const shiftLocation = document.getElementById('attendance-shift-location');
+        if (shiftName) shiftName.textContent = attendanceRecord.shift_name || 'Ca làm việc';
+        if (shiftTime) {
+            shiftTime.textContent = attendanceRecord.shift_start && attendanceRecord.shift_end
+                ? `${attendanceRecord.shift_start} — ${attendanceRecord.shift_end}`
+                : 'Chưa phân ca';
+        }
+        if (shiftLocation) {
+            shiftLocation.textContent = attendanceRecord.location || 'Chưa có địa điểm';
+        }
         const status = document.getElementById('attendance-status');
         const punchButton = document.getElementById('attendance-punch');
         const checkInState = document.getElementById('attendance-check-in-state');

@@ -43,6 +43,7 @@ foreach ($shifts as $shift) {
             <a class="employee-nav-link active" href="index.php?action=schedule" aria-current="page"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
             <a class="employee-nav-link" href="index.php?action=shift"><i class="bi bi-people" aria-hidden="true"></i><span>Ca làm việc</span></a>
             <a class="employee-nav-link" href="index.php?action=overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
+            <a class="employee-nav-link" href="index.php?action=leave"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Đăng ký nghỉ phép</span></a>
             <a class="employee-nav-link" href="index.php?action=attendance"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
         </nav>
         <div class="employee-sidebar-bottom">

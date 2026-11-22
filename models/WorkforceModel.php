@@ -544,7 +544,11 @@ class WorkforceModel extends BaseModel
         $statement = $this->pdo->prepare(
             'SELECT DATE_FORMAT(c.thoi_gian_vao, \'%H:%i\') AS check_in,
                     DATE_FORMAT(c.thoi_gian_ra, \'%H:%i\') AS check_out,
-                    c.trang_thai AS attendance_status
+                    c.trang_thai AS attendance_status,
+                    s.ten_ca AS shift_name,
+                    DATE_FORMAT(s.gio_bat_dau, \'%H:%i\') AS shift_start,
+                    DATE_FORMAT(s.gio_ket_thuc, \'%H:%i\') AS shift_end,
+                    COALESCE(a.dia_diem, \'\') AS location
              FROM phan_ca a
              INNER JOIN ca_lam_viec s ON s.id = a.ca_lam_viec_id
              LEFT JOIN cham_cong c ON c.phan_ca_id = a.id
@@ -563,12 +567,24 @@ class WorkforceModel extends BaseModel
         $record = $statement->fetch();
 
         return $record === false
-            ? ['check_in' => '', 'check_out' => '', 'has_assignment' => false]
+            ? [
+                'check_in' => '',
+                'check_out' => '',
+                'has_assignment' => false,
+                'shift_name' => 'Ca làm việc',
+                'shift_start' => '',
+                'shift_end' => '',
+                'location' => '',
+            ]
             : [
                 'check_in' => $record['check_in'] ?? '',
                 'check_out' => $record['check_out'] ?? '',
                 'has_assignment' => true,
                 'attendance_status' => $record['attendance_status'],
+                'shift_name' => $record['shift_name'] ?? 'Ca làm việc',
+                'shift_start' => $record['shift_start'] ?? '',
+                'shift_end' => $record['shift_end'] ?? '',
+                'location' => $record['location'] ?? '',
             ];
     }
 
