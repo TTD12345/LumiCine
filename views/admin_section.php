@@ -17,6 +17,7 @@ $pages = [
 ];
 $page = $pages[$section] ?? $pages['overview'];
 $isOvertime = $section === 'overtime';
+$isLeave = $section === 'leave';
 $isSchedule = $section === 'schedule';
 ?>
 <!DOCTYPE html>
@@ -30,7 +31,7 @@ $isSchedule = $section === 'schedule';
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="assets/css/hrm.css" rel="stylesheet">
-    <?php if ($isOvertime): ?><link href="assets/css/overtime.css" rel="stylesheet"><?php endif; ?>
+    <?php if ($isOvertime || $isLeave): ?><link href="assets/css/overtime.css" rel="stylesheet"><?php endif; ?>
     <?php if ($isSchedule): ?><link href="assets/css/schedule.css" rel="stylesheet"><?php endif; ?>
 </head>
 <body>
@@ -171,7 +172,11 @@ $isSchedule = $section === 'schedule';
                 </section>
             <?php elseif (in_array($section, ['employees', 'attendance', 'leave', 'reports'], true)): ?>
                 <?php if ($section === 'leave'): ?>
-                    <section class="data-card"><div class="table-card-header"><div><h2>Danh sách nghỉ phép</h2><p>Database hiện chưa có bảng lưu đơn/ngày nghỉ phép.</p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Nhân viên</th><th>Bộ phận</th><th>Ngày nghỉ</th><th>Trạng thái</th></tr></thead><tbody><tr><td colspan="4">Chưa có dữ liệu nghỉ phép để hiển thị.</td></tr></tbody></table></div></section>
+                    <section class="overtime-card" id="leave-requests" aria-labelledby="leave-requests-title">
+                        <div class="overtime-heading"><div><h2 id="leave-requests-title">Đơn đăng ký nghỉ phép</h2><p>Xem lý do, thời gian và xử lý các đơn nghỉ phép.</p></div><div class="overtime-summary"><span>Chờ duyệt</span><strong id="leave-pending-count">0</strong></div></div>
+                        <div class="overtime-feedback" id="leave-feedback" role="status" aria-live="polite"></div>
+                        <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Nhân viên</th><th>Bắt đầu</th><th>Kết thúc</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="admin-leave-rows"><tr><td colspan="6">Đang tải đơn nghỉ phép...</td></tr></tbody></table></div>
+                    </section>
                 <?php elseif ($section === 'reports'): ?>
                     <section class="summary-grid">
                         <article class="summary-card"><p class="summary-label">Tổng nhân viên</p><div class="summary-value"><?= count($employees) ?></div></article>
@@ -356,6 +361,9 @@ $isSchedule = $section === 'schedule';
 <?php elseif ($isOvertime): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/overtime.js" defer></script>
+<?php elseif ($isLeave): ?>
+    <?php require PATH_VIEW . 'api-config.php'; ?>
+    <script src="assets/js/leave.js" defer></script>
 <?php elseif ($section === 'employees'): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/workforce-management.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/workforce-management.js') ?>" defer></script>

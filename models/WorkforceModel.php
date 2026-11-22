@@ -755,6 +755,123 @@ class WorkforceModel extends BaseModel
         }
     }
 
+    public function leaveRequests(?int $employeeId = null): array
+    {
+        $sql = 'SELECT l.id, e.ho_ten AS employee_name,
+                       DATE_FORMAT(l.gio_bat_dau, \'%Y-%m-%dT%H:%i\') AS start,
+                       DATE_FORMAT(l.gio_ket_thuc, \'%Y-%m-%dT%H:%i\') AS end,
+                       l.ly_do AS reason,
+                       CASE l.trang_thai
+                           WHEN \'CHO_DUYET\' THEN \'pending\'
+                           WHEN \'DA_DUYET\' THEN \'approved\'
+                           ELSE \'rejected\'
+                       END AS status
+                FROM lumicine_leave_requests l
+                INNER JOIN nhan_vien e ON e.id = l.nhan_vien_id';
+        $parameters = [];
+        if ($employeeId !== null) {
+            $sql .= ' WHERE l.nhan_vien_id = :employee_id';
+            $parameters['employee_id'] = $employeeId;
+        }
+        $sql .= ' ORDER BY l.created_at DESC, l.id DESC';
+        $statement = $this->pdo->prepare($sql);
+        $statement->execute($parameters);
+        return $statement->fetchAll();
+    }
+
+    public function submitLeave(int $employeeId, string $start, string $end, string $reason): void
+    {
+        $startDate = $this->parseDateTime($start);
+        $endDate = $this->parseDateTime($end);
+        $reason = trim($reason);
+        if ($endDate <= $startDate || lumicineUtf8Length($reason) < 5 || lumicineUtf8Length($reason) > 1000) {
+            throw new InvalidArgumentException('Thời gian hoặc lý do nghỉ phép không hợp lệ.');
+        }
+        $now = new DateTimeImmutable();
+        if ($startDate < $now) {
+            throw new InvalidArgumentException('Không thể đăng ký nghỉ phép trong quá khứ.');
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $employeeCheck = $this->pdo->prepare(
+                'SELECT id FROM nhan_vien WHERE id = :id AND trang_thai = 1'
+            );
+            $employeeCheck->execute(['id' => $employeeId]);
+            if ($employeeCheck->fetchColumn() === false) {
+                throw new InvalidArgumentException('Nhân viên không tồn tại hoặc đã ngừng hoạt động.');
+            }
+
+            $overlap = $this->pdo->prepare(
+                'SELECT id FROM lumicine_leave_requests
+                 WHERE nhan_vien_id = :employee_id
+                   AND trang_thai IN (\'CHO_DUYET\', \'DA_DUYET\')
+                   AND gio_bat_dau <= :end_at
+                   AND gio_ket_thuc >= :start_at
+                 LIMIT 1 FOR UPDATE'
+            );
+            $overlap->execute([
+                'employee_id' => $employeeId,
+                'start_at' => $startDate->format('Y-m-d H:i:s'),
+                'end_at' => $endDate->format('Y-m-d H:i:s'),
+            ]);
+            if ($overlap->fetchColumn() !== false) {
+                throw new InvalidArgumentException('Thời gian nghỉ phép bị trùng với đơn đang chờ duyệt hoặc đã được duyệt.');
+            }
+
+            $insert = $this->pdo->prepare(
+                'INSERT INTO lumicine_leave_requests
+                 (nhan_vien_id, gio_bat_dau, gio_ket_thuc, ly_do, trang_thai)
+                 VALUES (:employee_id, :start_at, :end_at, :reason, \'CHO_DUYET\')'
+            );
+            $insert->execute([
+                'employee_id' => $employeeId,
+                'start_at' => $startDate->format('Y-m-d H:i:s'),
+                'end_at' => $endDate->format('Y-m-d H:i:s'),
+                'reason' => $reason,
+            ]);
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $exception;
+        }
+    }
+
+    public function reviewLeave(int $requestId, string $status, ?int $reviewerId): void
+    {
+        $databaseStatus = $status === 'approved' ? 'DA_DUYET' : 'TU_CHOI';
+        $statement = $this->pdo->prepare(
+            'UPDATE lumicine_leave_requests
+             SET trang_thai = :status, nguoi_duyet_id = :reviewer_id
+             WHERE id = :id AND trang_thai = \'CHO_DUYET\''
+        );
+        $statement->execute([
+            'status' => $databaseStatus,
+            'reviewer_id' => $reviewerId,
+            'id' => $requestId,
+        ]);
+        if ($statement->rowCount() === 0) {
+            throw new InvalidArgumentException('Đơn nghỉ phép không tồn tại hoặc đã được xử lý.');
+        }
+    }
+
+    public function cancelLeave(int $requestId, int $employeeId): void
+    {
+        $statement = $this->pdo->prepare(
+            'DELETE FROM lumicine_leave_requests
+             WHERE id = :id AND nhan_vien_id = :employee_id AND trang_thai = \'CHO_DUYET\''
+        );
+        $statement->execute([
+            'id' => $requestId,
+            'employee_id' => $employeeId,
+        ]);
+        if ($statement->rowCount() === 0) {
+            throw new InvalidArgumentException('Chỉ có thể hủy đơn nghỉ phép đang chờ duyệt.');
+        }
+    }
+
     public function reviewOvertime(int $requestId, string $status, ?int $reviewerId): void
     {
         $databaseStatus = $status === 'approved' ? 'DA_DUYET' : 'TU_CHOI';
@@ -1106,7 +1223,7 @@ class WorkforceModel extends BaseModel
     {
         $parsed = DateTimeImmutable::createFromFormat('!Y-m-d\TH:i', $value);
         if (!$parsed || $parsed->format('Y-m-d\TH:i') !== $value) {
-            throw new InvalidArgumentException('Thời gian tăng ca không hợp lệ.');
+            throw new InvalidArgumentException('Thời gian không hợp lệ.');
         }
 
         return $parsed;

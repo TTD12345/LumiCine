@@ -16,6 +16,7 @@ match ($action) {
     'dashboard' => (new HomeController())->employeeSection('dashboard'),
     'shift' => (new HomeController())->employeeSection('shift'),
     'overtime' => (new HomeController())->employeeSection('overtime'),
+    'leave' => (new HomeController())->employeeSection('leave'),
     'employees' => (new HomeController())->employeeSection('employees'),
     'reports' => (new HomeController())->employeeSection('reports'),
     'admin-summary' => (new HomeController())->admin(),
