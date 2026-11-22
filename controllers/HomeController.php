@@ -16,7 +16,9 @@ class HomeController
         $currentUser = $this->requireUser();
         $workforce = new WorkforceModel();
         $isAdmin = in_array($currentUser['role'], self::ADMIN_ROLES, true);
-        $employeeId = $workforce->findEmployeeIdByCode($currentUser['employee_code'] ?? null);
+        $employeeId = $workforce->findEmployeeIdByUserEmployeeId(
+            isset($currentUser['employee_id']) ? (int) $currentUser['employee_id'] : null
+        ) ?? $workforce->findEmployeeIdByCode($currentUser['employee_code'] ?? null);
         if (!$isAdmin && $employeeId === null) {
             $this->showEmployeeMappingRequired();
             return;
@@ -57,7 +59,10 @@ class HomeController
     public function attendance()
     {
         $currentUser = $this->requireUser();
-        $employeeId = (new WorkforceModel())->findEmployeeIdByCode($currentUser['employee_code'] ?? null);
+        $workforce = new WorkforceModel();
+        $employeeId = $workforce->findEmployeeIdByUserEmployeeId(
+            isset($currentUser['employee_id']) ? (int) $currentUser['employee_id'] : null
+        ) ?? $workforce->findEmployeeIdByCode($currentUser['employee_code'] ?? null);
         if ($employeeId === null) {
             $this->showEmployeeMappingRequired();
             return;
@@ -72,7 +77,9 @@ class HomeController
         $currentUser = $this->requireUser();
         $workforce = new WorkforceModel();
         $isAdmin = in_array($currentUser['role'], self::ADMIN_ROLES, true);
-        $employeeId = $workforce->findEmployeeIdByCode($currentUser['employee_code'] ?? null);
+        $employeeId = $workforce->findEmployeeIdByUserEmployeeId(
+            isset($currentUser['employee_id']) ? (int) $currentUser['employee_id'] : null
+        ) ?? $workforce->findEmployeeIdByCode($currentUser['employee_code'] ?? null);
         if (!$isAdmin && $employeeId === null) {
             $this->showEmployeeMappingRequired();
             return;
@@ -193,6 +200,9 @@ class HomeController
                                 'employee_code' => $user['employee_code'] === null
                                     ? null
                                     : (string) $user['employee_code'],
+                                'employee_id' => $user['employee_id'] === null
+                                    ? null
+                                    : (int) $user['employee_id'],
                                 'role' => $user['role'],
                             ];
                             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));

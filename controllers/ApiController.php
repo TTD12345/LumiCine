@@ -30,7 +30,9 @@ class ApiController
 
         try {
             $workforce = new WorkforceModel();
-            $linkedEmployeeId = $workforce->findEmployeeIdByCode(
+            $linkedEmployeeId = $workforce->findEmployeeIdByUserEmployeeId(
+                isset($user['employee_id']) ? (int) $user['employee_id'] : null
+            ) ?? $workforce->findEmployeeIdByCode(
                 isset($user['employee_code']) && is_string($user['employee_code'])
                     ? $user['employee_code']
                     : null
