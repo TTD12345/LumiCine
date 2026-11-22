@@ -10,14 +10,12 @@ $pages = [
     'employees' => ['title' => 'Quản lý nhân viên', 'kicker' => 'NHÂN SỰ', 'description' => 'Quản lý thông tin và hồ sơ nhân viên.'],
     'schedule' => ['title' => 'Phân ca làm việc', 'kicker' => 'LỊCH LÀM VIỆC', 'description' => 'Tạo và quản lý ca làm việc cho nhân viên theo từng ngày.'],
     'attendance' => ['title' => 'Quản lý chấm công', 'kicker' => 'CHẤM CÔNG', 'description' => 'Theo dõi và quản lý dữ liệu chấm công nhân viên.'],
-    'overtime' => ['title' => 'Duyệt tăng ca', 'kicker' => 'TĂNG CA', 'description' => 'Xem và xử lý các đơn đăng ký tăng ca.'],
-    'leave' => ['title' => 'Quản lý nghỉ phép', 'kicker' => 'NGHỈ PHÉP', 'description' => 'Theo dõi và xử lý đơn nghỉ phép.'],
+    'overtime' => ['title' => 'Duyệt tăng ca và nghỉ phép', 'kicker' => 'TĂNG CA & NGHỈ PHÉP', 'description' => 'Xem và xử lý đơn đăng ký tăng ca, nghỉ phép.'],
     'reports' => ['title' => 'Báo cáo thống kê', 'kicker' => 'BÁO CÁO', 'description' => 'Xem thống kê và xuất báo cáo nhân sự.'],
     'settings' => ['title' => 'Cài đặt', 'kicker' => 'HỆ THỐNG', 'description' => 'Cấu hình thông tin và tham số hệ thống.'],
 ];
 $page = $pages[$section] ?? $pages['overview'];
 $isOvertime = $section === 'overtime';
-$isLeave = $section === 'leave';
 $isSchedule = $section === 'schedule';
 ?>
 <!DOCTYPE html>
@@ -31,7 +29,7 @@ $isSchedule = $section === 'schedule';
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="assets/css/hrm.css" rel="stylesheet">
-    <?php if ($isOvertime || $isLeave): ?><link href="assets/css/overtime.css" rel="stylesheet"><?php endif; ?>
+    <?php if ($isOvertime): ?><link href="assets/css/overtime.css" rel="stylesheet"><?php endif; ?>
     <?php if ($isSchedule): ?><link href="assets/css/schedule.css" rel="stylesheet"><?php endif; ?>
 </head>
 <body>
@@ -45,9 +43,8 @@ $isSchedule = $section === 'schedule';
             <a class="nav-link <?= $section === 'employees' ? 'active' : '' ?>" href="?action=admin-employees"><i class="bi bi-people"></i><span>Quản lý nhân viên</span></a>
             <a class="nav-link <?= $section === 'schedule' ? 'active' : '' ?>" href="?action=admin-schedule"><i class="bi bi-calendar-week"></i><span>Phân ca làm việc</span></a>
             <a class="nav-link <?= $section === 'attendance' ? 'active' : '' ?>" href="?action=admin-attendance"><i class="bi bi-calendar2-check"></i><span>Quản lý chấm công</span></a>
-            <a class="nav-link <?= $section === 'overtime' ? 'active' : '' ?>" href="?action=admin-overtime"><i class="bi bi-clock-history"></i><span>Duyệt tăng ca</span></a>
+            <a class="nav-link <?= $section === 'overtime' ? 'active' : '' ?>" href="?action=admin-overtime"><i class="bi bi-clock-history"></i><span>Duyệt tăng ca và nghỉ phép</span></a>
             <a class="nav-link" href="?action=admin-summary"><i class="bi bi-clipboard-data"></i><span>Tổng hợp công</span></a>
-            <a class="nav-link <?= $section === 'leave' ? 'active' : '' ?>" href="?action=admin-leave"><i class="bi bi-calendar2-minus"></i><span>Quản lý nghỉ phép</span></a>
             <a class="nav-link <?= $section === 'reports' ? 'active' : '' ?>" href="?action=admin-reports"><i class="bi bi-bar-chart-line"></i><span>Báo cáo thống kê</span></a>
         </nav>
         <p class="nav-caption nav-caption-settings">HỆ THỐNG</p>
@@ -163,6 +160,11 @@ $isSchedule = $section === 'schedule';
                     <div class="overtime-feedback" id="overtime-feedback" role="status" aria-live="polite"></div>
                     <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Nhân viên</th><th>Bắt đầu</th><th>Kết thúc</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="admin-overtime-rows"><tr><td colspan="6">Đang tải đơn tăng ca...</td></tr></tbody></table></div>
                 </section>
+                <section class="overtime-card" id="leave-requests" aria-labelledby="leave-requests-title">
+                    <div class="overtime-heading"><div><h2 id="leave-requests-title">Đơn đăng ký nghỉ phép</h2><p>Xem lý do, thời gian và xử lý các đơn nghỉ phép.</p></div><div class="overtime-summary"><span>Chờ duyệt</span><strong id="leave-pending-count">0</strong></div></div>
+                    <div class="overtime-feedback" id="leave-feedback" role="status" aria-live="polite"></div>
+                    <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Nhân viên</th><th>Bắt đầu</th><th>Kết thúc</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="admin-leave-rows"><tr><td colspan="6">Đang tải đơn nghỉ phép...</td></tr></tbody></table></div>
+                </section>
             <?php elseif ($section === 'overview'): ?>
                 <section class="summary-grid">
                     <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-blue"><i class="bi bi-people-fill"></i></span></div><p class="summary-label">Nhân viên</p><div class="summary-value"><?= count($employees) ?> <span>người</span></div></article>
@@ -170,14 +172,8 @@ $isSchedule = $section === 'schedule';
                     <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-orange"><i class="bi bi-clock-history"></i></span></div><p class="summary-label">Đi muộn</p><div class="summary-value"><?= array_sum(array_column($employees, 'late')) ?> <span>lượt</span></div></article>
                     <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-purple"><i class="bi bi-calendar2-heart-fill"></i></span></div><p class="summary-label">Nghỉ phép</p><div class="summary-value">— <span>chưa có bảng dữ liệu</span></div></article>
                 </section>
-            <?php elseif (in_array($section, ['employees', 'attendance', 'leave', 'reports'], true)): ?>
-                <?php if ($section === 'leave'): ?>
-                    <section class="overtime-card" id="leave-requests" aria-labelledby="leave-requests-title">
-                        <div class="overtime-heading"><div><h2 id="leave-requests-title">Đơn đăng ký nghỉ phép</h2><p>Xem lý do, thời gian và xử lý các đơn nghỉ phép.</p></div><div class="overtime-summary"><span>Chờ duyệt</span><strong id="leave-pending-count">0</strong></div></div>
-                        <div class="overtime-feedback" id="leave-feedback" role="status" aria-live="polite"></div>
-                        <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Nhân viên</th><th>Bắt đầu</th><th>Kết thúc</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="admin-leave-rows"><tr><td colspan="6">Đang tải đơn nghỉ phép...</td></tr></tbody></table></div>
-                    </section>
-                <?php elseif ($section === 'reports'): ?>
+            <?php elseif (in_array($section, ['employees', 'attendance', 'reports'], true)): ?>
+                <?php if ($section === 'reports'): ?>
                     <section class="summary-grid">
                         <article class="summary-card"><p class="summary-label">Tổng nhân viên</p><div class="summary-value"><?= count($employees) ?></div></article>
                         <article class="summary-card"><p class="summary-label">Tổng ngày công</p><div class="summary-value"><?= array_sum(array_column($employees, 'worked')) ?></div></article>
@@ -361,8 +357,6 @@ $isSchedule = $section === 'schedule';
 <?php elseif ($isOvertime): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/overtime.js" defer></script>
-<?php elseif ($isLeave): ?>
-    <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/leave.js" defer></script>
 <?php elseif ($section === 'employees'): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>

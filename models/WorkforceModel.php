@@ -2,6 +2,54 @@
 
 class WorkforceModel extends BaseModel
 {
+    public function __construct()
+    {
+        parent::__construct();
+        $this->ensureLeaveRequestsTable();
+        $this->ensureUserEmployeeIdColumn();
+    }
+
+    private function ensureUserEmployeeIdColumn(): void
+    {
+        $column = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME = \'lumicine_users\'
+               AND COLUMN_NAME = \'employee_id\''
+        );
+        $column->execute();
+        if ((int) $column->fetchColumn() === 0) {
+            $this->pdo->exec(
+                'ALTER TABLE lumicine_users ADD COLUMN employee_id INT NULL AFTER employee_code'
+            );
+        }
+        $this->pdo->exec(
+            'UPDATE lumicine_users u
+             INNER JOIN nhan_vien e
+                 ON BINARY u.employee_code = BINARY e.ma_nhan_vien
+             SET u.employee_id = e.id
+             WHERE u.employee_id IS NULL'
+        );
+    }
+
+    private function ensureLeaveRequestsTable(): void
+    {
+        $this->pdo->exec(
+            'CREATE TABLE IF NOT EXISTS lumicine_leave_requests (
+                id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                nhan_vien_id INT NOT NULL,
+                gio_bat_dau DATETIME NOT NULL,
+                gio_ket_thuc DATETIME NOT NULL,
+                ly_do VARCHAR(1000) NULL,
+                trang_thai ENUM(\'CHO_DUYET\',\'DA_DUYET\',\'TU_CHOI\') NOT NULL DEFAULT \'CHO_DUYET\',
+                nguoi_duyet_id INT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (id),
+                KEY idx_leave_employee_period (nhan_vien_id, gio_bat_dau, gio_ket_thuc)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
     public function findEmployeeIdByCode(?string $employeeCode): ?int
     {
         if ($employeeCode === null || $employeeCode === '') {
@@ -15,6 +63,20 @@ class WorkforceModel extends BaseModel
         $employeeId = $statement->fetchColumn();
 
         return $employeeId === false ? null : (int) $employeeId;
+    }
+
+    public function findEmployeeIdByUserEmployeeId(?int $employeeId): ?int
+    {
+        if ($employeeId === null || $employeeId < 1) {
+            return null;
+        }
+        $statement = $this->pdo->prepare(
+            'SELECT id FROM nhan_vien WHERE id = :id AND trang_thai = 1 LIMIT 1'
+        );
+        $statement->execute(['id' => $employeeId]);
+        $id = $statement->fetchColumn();
+
+        return $id === false ? null : (int) $id;
     }
 
     public function listEmployees(): array
@@ -153,10 +215,16 @@ class WorkforceModel extends BaseModel
                         throw new InvalidArgumentException('Mã nhân viên mới đã được liên kết với tài khoản khác.');
                     }
                     $updateMapping = $this->pdo->prepare(
-                        'UPDATE lumicine_users SET employee_code = :new_code
+                        'UPDATE lumicine_users
+                         SET employee_code = :new_code,
+                             employee_id = :employee_id
                          WHERE BINARY employee_code = BINARY :old_code'
                     );
-                    $updateMapping->execute(['new_code' => $code, 'old_code' => $currentCode]);
+                    $updateMapping->execute([
+                        'new_code' => $code,
+                        'employee_id' => $id,
+                        'old_code' => $currentCode,
+                    ]);
                 }
             }
 
@@ -274,11 +342,11 @@ class WorkforceModel extends BaseModel
     public function listEmployeeAccountMappings(): array
     {
         return $this->pdo->query(
-            'SELECT u.id, u.username, u.display_name, u.employee_code,
-                    e.ho_ten AS employee_name
+            'SELECT u.id, u.username, u.display_name, u.employee_code, u.employee_id, u.role,
+                    COALESCE(direct.ho_ten, legacy.ho_ten) AS employee_name
              FROM lumicine_users u
-             LEFT JOIN nhan_vien e ON BINARY e.ma_nhan_vien = BINARY u.employee_code
-             WHERE u.role = \'employee\'
+             LEFT JOIN nhan_vien direct ON direct.id = u.employee_id
+             LEFT JOIN nhan_vien legacy ON BINARY legacy.ma_nhan_vien = BINARY u.employee_code
              ORDER BY u.username'
         )->fetchAll();
     }
@@ -296,14 +364,17 @@ class WorkforceModel extends BaseModel
             }
 
             $employee = $this->pdo->prepare(
-                'SELECT 1 FROM nhan_vien
+                'SELECT id FROM nhan_vien
                  WHERE ma_nhan_vien = :employee_code AND trang_thai = 1
                  LIMIT 1'
             );
             $employee->execute(['employee_code' => $employeeCode]);
-            if ($employee->fetchColumn() === false) {
+            $employeeId = $employee->fetchColumn();
+            if ($employeeId === false) {
                 throw new InvalidArgumentException('Không tìm thấy nhân viên đang hoạt động với mã này.');
             }
+        } else {
+            $employeeId = null;
         }
 
         $account = $this->pdo->prepare(
@@ -315,11 +386,14 @@ class WorkforceModel extends BaseModel
         }
 
         $statement = $this->pdo->prepare(
-            'UPDATE lumicine_users SET employee_code = :employee_code WHERE id = :user_id'
+            'UPDATE lumicine_users
+             SET employee_code = :employee_code, employee_id = :employee_id
+             WHERE id = :user_id'
         );
         try {
             $statement->execute([
                 'employee_code' => $employeeCode,
+                'employee_id' => $employeeId !== null ? (int) $employeeId : null,
                 'user_id' => $userId,
             ]);
         } catch (PDOException $exception) {
