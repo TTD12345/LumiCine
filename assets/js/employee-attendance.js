@@ -5,7 +5,13 @@
     const rowsElement = document.getElementById('attendance-history');
     const emptyState = document.getElementById('attendance-history-empty');
     const toastRegion = document.getElementById('toast-region');
-    let attendanceRecord = { check_in: '', check_out: '', has_assignment: false };
+    let attendanceRecord = {
+        check_in: '',
+        check_out: '',
+        late_minutes: 0,
+        early_minutes: 0,
+        has_assignment: false,
+    };
     let historyRecords = [];
     let isLoading = false;
     let attendanceLoadError = false;
@@ -76,8 +82,14 @@
 
         document.getElementById('attendance-check-in').textContent = checkIn || 'Chưa ghi nhận';
         document.getElementById('attendance-check-out').textContent = checkOut || 'Chưa ghi nhận';
-        checkInState.textContent = checkIn ? 'Đã ghi nhận' : 'Chờ chấm công';
-        checkOutState.textContent = checkOut ? 'Đã ghi nhận' : 'Chờ chấm công';
+        const lateMinutes = Number(attendanceRecord.late_minutes) || 0;
+        const earlyMinutes = Number(attendanceRecord.early_minutes) || 0;
+        checkInState.textContent = checkIn
+            ? `Đã ghi nhận${lateMinutes > 0 ? ` · Muộn ${lateMinutes} phút` : ''}`
+            : 'Chờ chấm công';
+        checkOutState.textContent = checkOut
+            ? `Đã ghi nhận${earlyMinutes > 0 ? ` · Về sớm ${earlyMinutes} phút` : ''}`
+            : 'Chờ chấm công';
         checkInState.classList.toggle('is-recorded', Boolean(checkIn));
         checkOutState.classList.toggle('is-recorded', Boolean(checkOut));
         status.textContent = attendanceLoadError
@@ -117,6 +129,8 @@
             addCell(row, record.check_in || '—', 'attendance-history-time');
             addCell(row, record.check_out || '—', 'attendance-history-time');
             addCell(row, record.check_out ? formatMinutes(getWorkedMinutes(record)) : record.check_in ? 'Đang làm việc' : '—');
+            addCell(row, Number(record.late_minutes) > 0 ? `${Number(record.late_minutes)} phút` : '—');
+            addCell(row, Number(record.early_minutes) > 0 ? `${Number(record.early_minutes)} phút` : '—');
             const statusCell = row.insertCell();
             const status = document.createElement('span');
             status.className = `attendance-history-status${record.check_out ? ' complete' : record.check_in ? ' working' : ''}`;
@@ -155,7 +169,13 @@
         } catch (error) {
             attendanceLoadError = true;
             notify(error instanceof Error ? error.message : 'Không thể tải dữ liệu chấm công.', true);
-            attendanceRecord = { check_in: '', check_out: '', has_assignment: false };
+            attendanceRecord = {
+                check_in: '',
+                check_out: '',
+                late_minutes: 0,
+                early_minutes: 0,
+                has_assignment: false,
+            };
             historyRecords = [];
             renderAttendance();
             renderHistory();

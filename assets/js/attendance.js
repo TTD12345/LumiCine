@@ -30,6 +30,13 @@
         leave: 'Nghỉ phép',
         absent: 'Vắng mặt',
     };
+    const leaveTypeLabels = {
+        PHEP_NAM: 'Phép năm',
+        NGHI_OM: 'Nghỉ ốm',
+        KHONG_LUONG: 'Nghỉ không lương',
+        VIEC_RIENG: 'Việc riêng',
+        KHAC: 'Khác',
+    };
 
     let selectedMonth = Number(config.month);
     let selectedYear = Number(config.year);
@@ -280,13 +287,22 @@
         .toLocaleLowerCase('vi');
 
     const getStatus = (employee, workingDays) => {
-        if (employee.absent >= 2) return 'absent';
-        if (employee.leave >= 2 && employee.worked < workingDays - 1) return 'leave';
-        if (workingDays > 0 && employee.absent === 0 && employee.leave === 0 && employee.worked >= workingDays) {
+        if (employee.absent > 0) return 'absent';
+        if (workingDays > 0 && employee.leave === workingDays) return 'leave';
+        if (
+            workingDays > 0
+            && employee.worked + employee.leave === workingDays
+            && employee.incomplete === 0
+        ) {
             return 'complete';
         }
         return 'incomplete';
     };
+
+    const formatLeaveTypes = (leaveByType) => Object.entries(leaveByType || {})
+        .filter(([, days]) => Number(days) > 0)
+        .map(([type, days]) => `${leaveTypeLabels[type] || type}: ${days}`)
+        .join(' · ');
 
     const buildMonthlyEmployees = () => {
         return baseEmployees.map((employee) => {
@@ -349,11 +365,12 @@
         addCell(row, employee.position, 'position-cell');
         addCell(row, String(employee.workingDays), 'text-center');
         addCell(row, String(employee.worked), 'text-center actual-days');
-        addCell(row, employee.leaveDataAvailable ? String(employee.paidLeave) : '—', 'text-center');
-        addCell(row, employee.leaveDataAvailable ? String(employee.unpaidLeave) : '—', 'text-center');
+        addCell(row, String(employee.leave), 'text-center');
+        addCell(row, formatLeaveTypes(employee.leaveByType) || '—');
         addCell(row, String(employee.absent), 'text-center');
         addCell(row, String(employee.late), 'text-center');
         addCell(row, String(employee.lateMinutes), 'text-center');
+        addCell(row, String(employee.earlyMinutes), 'text-center');
         addCell(row, String(employee.holidayWorkDays), 'text-center');
         addCell(row, formatNumber(employee.overtime), 'text-center');
 
@@ -384,14 +401,14 @@
         const total = records.reduce((result, employee) => ({
             expected: result.expected + employee.workingDays,
             worked: result.worked + employee.worked,
-            paidLeave: result.paidLeave + employee.paidLeave,
-            unpaidLeave: result.unpaidLeave + employee.unpaidLeave,
+            leave: result.leave + employee.leave,
             absent: result.absent + employee.absent,
             late: result.late + employee.late,
             lateMinutes: result.lateMinutes + employee.lateMinutes,
+            earlyMinutes: result.earlyMinutes + employee.earlyMinutes,
             holidayWorkDays: result.holidayWorkDays + employee.holidayWorkDays,
             overtime: result.overtime + employee.overtime,
-        }), { expected: 0, worked: 0, paidLeave: 0, unpaidLeave: 0, absent: 0, late: 0, lateMinutes: 0, holidayWorkDays: 0, overtime: 0 });
+        }), { expected: 0, worked: 0, leave: 0, absent: 0, late: 0, lateMinutes: 0, earlyMinutes: 0, holidayWorkDays: 0, overtime: 0 });
 
         totalsElement.replaceChildren();
         const row = document.createElement('tr');
@@ -403,11 +420,12 @@
         [
             total.expected,
             total.worked,
-            '—',
+            total.leave,
             '—',
             total.absent,
             total.late,
             total.lateMinutes,
+            total.earlyMinutes,
             total.holidayWorkDays,
             formatNumber(total.overtime),
         ].forEach((value) => {
@@ -500,9 +518,9 @@
             worked: result.worked + employee.worked,
             late: result.late + employee.late,
             leave: result.leave + employee.leave,
-            paidLeave: result.paidLeave + employee.paidLeave,
-            unpaidLeave: result.unpaidLeave + employee.unpaidLeave,
-        }), { worked: 0, late: 0, leave: 0, paidLeave: 0, unpaidLeave: 0 });
+            absent: result.absent + employee.absent,
+            earlyMinutes: result.earlyMinutes + employee.earlyMinutes,
+        }), { worked: 0, late: 0, leave: 0, absent: 0, earlyMinutes: 0 });
 
         const setStat = (id, value, unit) => {
             const element = document.getElementById(id);
@@ -514,9 +532,9 @@
         setStat('stat-employees', employees.length, 'người');
         setStat('stat-workdays', totals.worked, 'ngày');
         setStat('stat-late', totals.late, 'lượt');
-        setStat('stat-leave', '—', '');
-        document.getElementById('stat-paid-leave').textContent = '—';
-        document.getElementById('stat-unpaid-leave').textContent = '—';
+        setStat('stat-leave', totals.leave, 'ngày');
+        document.getElementById('stat-absent').textContent = formatNumber(totals.absent);
+        document.getElementById('stat-early-minutes').textContent = formatNumber(totals.earlyMinutes);
         document.getElementById('standard-workdays').textContent =
             `${employees[0]?.workingDays || 0} ngày`;
         document.getElementById('period-caption').textContent =
@@ -589,9 +607,9 @@
     const exportReport = () => {
         const headers = [
             'Mã nhân viên', 'Họ và tên', 'Phòng ban', 'Chức vụ',
-            'Ngày công quy định', 'Ngày công thực tế', 'Nghỉ có lương',
-            'Nghỉ không lương', 'Nghỉ không phép', 'Số lần đi muộn',
-            'Tổng phút đi muộn', 'Ngày lễ nghỉ theo lịch', 'Ngày lễ đi làm',
+            'Ngày công quy định', 'Ngày công thực tế', 'Nghỉ phép (ngày)',
+            'Loại nghỉ', 'Nghỉ không phép', 'Số lần đi muộn',
+            'Tổng phút đi muộn', 'Tổng phút về sớm', 'Ngày lễ nghỉ theo lịch', 'Ngày lễ đi làm',
             'Tổng giờ tăng ca', 'Trạng thái',
         ];
         const rows = filteredEmployees.map((employee) => [
@@ -601,11 +619,12 @@
             employee.position,
             employee.workingDays,
             employee.worked,
-            employee.leaveDataAvailable ? employee.paidLeave : '',
-            employee.leaveDataAvailable ? employee.unpaidLeave : '',
+            employee.leave,
+            formatLeaveTypes(employee.leaveByType),
             employee.absent,
             employee.late,
             employee.lateMinutes,
+            employee.earlyMinutes,
             employee.holidayRestDays,
             employee.holidayWorkDays,
             employee.overtime,
@@ -624,12 +643,12 @@
             ['Thông tin nhân sự', 4],
             ['Ngày công', 2],
             ['Nghỉ phép / vắng', 3],
-            ['Đi muộn', 2],
+            ['Đi muộn / về sớm', 3],
             ['Ngày lễ', 2],
             ['Tăng ca', 1],
             ['Trạng thái', 1],
         ];
-        const columnGroups = [0, 0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 4, 4, 5, 6];
+        const columnGroups = [0, 0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5, 6];
         const escapeHtml = (value) => String(value)
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
@@ -648,7 +667,7 @@
                 isHeader ? '' : typeof value === 'number' && Number.isFinite(value)
                     ? 'mso-number-format:0.##'
                     : 'mso-number-format:"\\@"',
-                columnIndex === 4 || columnIndex === 6 || columnIndex === 9 || columnIndex === 11 || columnIndex === 13
+                columnIndex === 4 || columnIndex === 6 || columnIndex === 9 || columnIndex === 12 || columnIndex === 14
                     ? 'border-left:2px solid #94a3b8'
                     : '',
             ].filter(Boolean).join(';');
@@ -720,12 +739,20 @@
             if (attendance) {
                 if (attendance.state === 'absent') {
                     day.state = 'absent';
+                } else if (attendance.state === 'leave') {
+                    day.state = 'leave';
+                } else if (attendance.state === 'partial-leave') {
+                    day.state = 'partial-leave';
+                } else if (attendance.state === 'incomplete') {
+                    day.state = 'incomplete';
                 } else if (attendance.checkIn) {
                     day.state = attendance.state;
                     day.lateMinutes = attendance.lateMinutes;
+                    day.earlyMinutes = attendance.earlyMinutes;
                 }
                 day.checkIn = attendance.checkIn;
                 day.checkOut = attendance.checkOut;
+                day.leaveTypes = attendance.leaveTypes || [];
             }
             calendarDays.push(day);
             date.setDate(date.getDate() + 1);
@@ -793,9 +820,11 @@
         const latestCheckIn = recordsWithCheckIn[0]?.checkIn || 'Chưa có';
         const latestCheckOut = recordsWithCheckIn.find((record) => record.checkOut)?.checkOut || 'Chưa có';
         appendDetailMetric(metrics, 'Ngày công thực tế', `${employee.worked}/${employee.workingDays}`);
-        appendDetailMetric(metrics, 'Nghỉ có lương', employee.leaveDataAvailable ? `${employee.paidLeave} ngày` : 'Chưa có dữ liệu');
+        appendDetailMetric(metrics, 'Nghỉ phép', `${employee.leave} ngày`, formatLeaveTypes(employee.leaveByType) || 'Chưa có đơn nghỉ trọn ca đã duyệt');
         appendDetailMetric(metrics, 'Vắng mặt', `${employee.absent} ngày`);
         appendDetailMetric(metrics, 'Đi muộn', `${employee.late} lượt · ${employee.lateMinutes} phút`);
+        appendDetailMetric(metrics, 'Về sớm', `${employee.earlyMinutes} phút`);
+        appendDetailMetric(metrics, 'Nghỉ việc', employee.terminationDate || 'Chưa ghi nhận');
         appendDetailMetric(metrics, 'Giờ check-in gần nhất', latestCheckIn);
         appendDetailMetric(metrics, 'Giờ check-out gần nhất', latestCheckOut);
         appendDetailMetric(metrics, 'Ngày lễ nghỉ theo lịch', `${employee.holidayRestDays} ngày`);
@@ -820,8 +849,11 @@
         [
             ['on-time', 'Đúng giờ'],
             ['late', 'Đi muộn'],
-            ['paid-leave', 'Nghỉ có lương'],
+            ['early', 'Về sớm'],
+            ['leave', 'Nghỉ phép'],
+            ['partial-leave', 'Nghỉ phép một phần'],
             ['absent', 'Nghỉ không phép'],
+            ['incomplete', 'Chưa check-out'],
             ['holiday-off', 'Nghỉ lễ'],
             ['holiday-worked', 'Đi làm ngày lễ'],
             ['makeup-workday', 'Ngày làm bù'],
@@ -852,9 +884,12 @@
 
         const stateLabels = {
             'on-time': 'Đúng giờ',
-            late: `Muộn ${employee.lateMinutesPerOccurrence} phút`,
-            'paid-leave': 'Nghỉ có lương',
+            late: 'Đi muộn',
+            early: 'Về sớm',
+            leave: 'Nghỉ phép',
+            'partial-leave': 'Nghỉ phép một phần',
             absent: 'Nghỉ không phép',
+            incomplete: 'Chưa check-out',
             unrecorded: 'Chưa ghi nhận',
             weekend: 'Cuối tuần',
             'holiday-off': 'Nghỉ lễ',
@@ -889,8 +924,11 @@
                     : day.holidayName
                         ? `${day.state === 'holiday-worked' ? 'Đi làm · ' : 'Nghỉ lễ · '}${day.holidayName}`
                         : stateLabels[day.state];
-                if (day.state === 'late' && day.lateMinutes) {
-                    state.textContent = `${day.makeupWorkday ? 'Làm bù · ' : ''}Muộn ${day.lateMinutes} phút`;
+                const attendanceNotes = [];
+                if (day.lateMinutes) attendanceNotes.push(`Muộn ${day.lateMinutes} phút`);
+                if (day.earlyMinutes) attendanceNotes.push(`Về sớm ${day.earlyMinutes} phút`);
+                if (attendanceNotes.length > 0) {
+                    state.textContent = `${day.makeupWorkday ? 'Làm bù · ' : ''}${attendanceNotes.join(' · ')}`;
                 }
                 cell.append(state);
                 cell.setAttribute('aria-label', `${day.fullDate}: ${day.makeupWorkday ? `Ngày làm bù, ${stateLabels[day.state]}` : day.holidayName || stateLabels[day.state]}`);

@@ -163,14 +163,14 @@ $isSchedule = $section === 'schedule';
                 <section class="overtime-card" id="leave-requests" aria-labelledby="leave-requests-title">
                     <div class="overtime-heading"><div><h2 id="leave-requests-title">Đơn đăng ký nghỉ phép</h2><p>Xem lý do, thời gian và xử lý các đơn nghỉ phép.</p></div><div class="overtime-summary"><span>Chờ duyệt</span><strong id="leave-pending-count">0</strong></div></div>
                     <div class="overtime-feedback" id="leave-feedback" role="status" aria-live="polite"></div>
-                    <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Nhân viên</th><th>Bắt đầu</th><th>Kết thúc</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="admin-leave-rows"><tr><td colspan="6">Đang tải đơn nghỉ phép...</td></tr></tbody></table></div>
+                    <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Nhân viên</th><th>Bắt đầu</th><th>Kết thúc</th><th>Loại nghỉ</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="admin-leave-rows"><tr><td colspan="7">Đang tải đơn nghỉ phép...</td></tr></tbody></table></div>
                 </section>
             <?php elseif ($section === 'overview'): ?>
                 <section class="summary-grid">
                     <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-blue"><i class="bi bi-people-fill"></i></span></div><p class="summary-label">Nhân viên</p><div class="summary-value"><?= count($employees) ?> <span>người</span></div></article>
                     <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-green"><i class="bi bi-calendar2-check-fill"></i></span></div><p class="summary-label">Ngày công</p><div class="summary-value"><?= array_sum(array_column($employees, 'worked')) ?> <span>ngày</span></div></article>
                     <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-orange"><i class="bi bi-clock-history"></i></span></div><p class="summary-label">Đi muộn</p><div class="summary-value"><?= array_sum(array_column($employees, 'late')) ?> <span>lượt</span></div></article>
-                    <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-purple"><i class="bi bi-calendar2-heart-fill"></i></span></div><p class="summary-label">Nghỉ phép</p><div class="summary-value">— <span>chưa có bảng dữ liệu</span></div></article>
+                    <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-purple"><i class="bi bi-calendar2-heart-fill"></i></span></div><p class="summary-label">Nghỉ phép</p><div class="summary-value"><?= array_sum(array_column($employees, 'leave')) ?> <span>ngày</span></div><div class="summary-foot">Vắng không phép: <?= array_sum(array_column($employees, 'absent')) ?> ngày</div></article>
                 </section>
             <?php elseif (in_array($section, ['employees', 'attendance', 'reports'], true)): ?>
                 <?php if ($section === 'reports'): ?>
@@ -178,7 +178,7 @@ $isSchedule = $section === 'schedule';
                         <article class="summary-card"><p class="summary-label">Tổng nhân viên</p><div class="summary-value"><?= count($employees) ?></div></article>
                         <article class="summary-card"><p class="summary-label">Tổng ngày công</p><div class="summary-value"><?= array_sum(array_column($employees, 'worked')) ?></div></article>
                         <article class="summary-card"><p class="summary-label">Lượt đi muộn</p><div class="summary-value"><?= array_sum(array_column($employees, 'late')) ?></div></article>
-                        <article class="summary-card"><p class="summary-label">Ngày nghỉ phép</p><div class="summary-value">—</div></article>
+                        <article class="summary-card"><p class="summary-label">Ngày nghỉ phép</p><div class="summary-value"><?= array_sum(array_column($employees, 'leave')) ?></div></article>
                     </section>
                 <?php elseif ($section === 'employees'): ?>
                     <section class="data-card" aria-labelledby="workforce-employees-title">
@@ -189,18 +189,19 @@ $isSchedule = $section === 'schedule';
                         <p class="mapping-feedback" id="employee-management-feedback" role="status" aria-live="polite"></p>
                         <div class="table-wrap">
                             <table class="employee-table" id="workforce-employee-table">
-                                <thead><tr><th>Mã nhân viên</th><th>Họ và tên</th><th>Phòng ban</th><th>Chức vụ</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                                <thead><tr><th>Mã nhân viên</th><th>Họ và tên</th><th>Phòng ban</th><th>Chức vụ</th><th>Ngày nghỉ việc</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
                                 <tbody>
                                     <?php if ($managedEmployees === []): ?>
-                                        <tr data-empty-row><td colspan="6">Chưa có hồ sơ nhân viên.</td></tr>
+                                        <tr data-empty-row>                                        <td colspan="7">Chưa có hồ sơ nhân viên.</td></tr>
                                     <?php else: ?>
                                         <?php foreach ($managedEmployees as $employee): ?>
                                             <?php $active = (int) $employee['active'] === 1; ?>
-                                            <tr data-employee-row data-id="<?= (int) $employee['id'] ?>" data-code="<?= $escape($employee['code']) ?>" data-name="<?= $escape($employee['name']) ?>" data-position="<?= $escape($employee['position']) ?>" data-department-id="<?= $employee['department_id'] === null ? '' : (int) $employee['department_id'] ?>" data-active="<?= $active ? '1' : '0' ?>">
+                                            <tr data-employee-row data-id="<?= (int) $employee['id'] ?>" data-code="<?= $escape($employee['code']) ?>" data-name="<?= $escape($employee['name']) ?>" data-position="<?= $escape($employee['position']) ?>" data-department-id="<?= $employee['department_id'] === null ? '' : (int) $employee['department_id'] ?>" data-termination-date="<?= $escape($employee['termination_date'] ?? '') ?>" data-active="<?= $active ? '1' : '0' ?>">
                                                 <td><?= $escape($employee['code']) ?></td>
                                                 <td><?= $escape($employee['name']) ?></td>
                                                 <td><?= $escape($employee['department'] !== '' ? $employee['department'] : 'Chưa phân công') ?></td>
                                                 <td><?= $escape($employee['position'] !== '' ? $employee['position'] : '—') ?></td>
+                                                <td><?= $escape($employee['termination_date'] ?? '—') ?></td>
                                                 <td><span class="status-badge <?= $active ? 'status-complete' : 'status-incomplete' ?>"><?= $active ? 'Đang làm việc' : 'Ngừng hoạt động' ?></span></td>
                                                 <td class="workforce-row-actions">
                                                     <button class="button button-outline" type="button" data-edit-employee>Sửa</button>
@@ -293,7 +294,7 @@ $isSchedule = $section === 'schedule';
                         </tbody></table></div>
                     </section>
                 <?php else: ?>
-                    <section class="data-card"><div class="table-card-header"><div><h2><?= $section === 'attendance' ? 'Dữ liệu chấm công' : 'Danh sách nhân viên' ?></h2><p><?= $section === 'attendance' ? 'Tổng hợp ngày công theo nhân viên.' : 'Thông tin nhân viên trong hệ thống.' ?></p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th><?php if ($section === 'attendance'): ?><th>Ngày công</th><th>Đi muộn</th><?php endif; ?></tr></thead><tbody><?php foreach ($employees as $employee): ?><tr><td><?= $escape($employee['id']) ?></td><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= $escape($employee['position']) ?></td><?php if ($section === 'attendance'): ?><td><?= (int) $employee['worked'] ?> ngày</td><td><?= (int) $employee['late'] ?> lượt</td><?php endif; ?></tr><?php endforeach; ?></tbody></table></div></section>
+                    <section class="data-card"><div class="table-card-header"><div><h2><?= $section === 'attendance' ? 'Dữ liệu chấm công' : 'Danh sách nhân viên' ?></h2><p><?= $section === 'attendance' ? 'Tổng hợp ngày công theo nhân viên.' : 'Thông tin nhân viên trong hệ thống.' ?></p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th><?php if ($section === 'attendance'): ?><th>Ngày công</th><th>Nghỉ phép</th><th>Vắng không phép</th><th>Đi muộn</th><th>Phút về sớm</th><?php endif; ?></tr></thead><tbody><?php foreach ($employees as $employee): ?><tr><td><?= $escape($employee['id']) ?></td><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= $escape($employee['position']) ?></td><?php if ($section === 'attendance'): ?><td><?= (int) $employee['worked'] ?> ngày</td><td><?= (int) $employee['leave'] ?> ngày</td><td><?= (int) $employee['absent'] ?> ngày</td><td><?= (int) $employee['late'] ?> lượt / <?= (int) $employee['lateMinutes'] ?> phút</td><td><?= (int) $employee['earlyMinutes'] ?></td><?php endif; ?></tr><?php endforeach; ?></tbody></table></div></section>
                 <?php endif; ?>
             <?php elseif ($section === 'settings'): ?>
                 <section class="data-card"><div class="table-card-header"><div><h2>Cài đặt hệ thống</h2><p>Cấu hình chung cho LumiCine.</p></div></div><div class="settings-grid"><label>Giờ bắt đầu ca<input type="time" value="08:00"></label><label>Giờ kết thúc ca<input type="time" value="17:00"></label><label>Ngày công chuẩn/tháng<input type="number" min="1" max="31" value="22"></label><button class="button button-primary" type="button">Lưu cài đặt</button></div></section>
@@ -329,6 +330,7 @@ $isSchedule = $section === 'schedule';
                 <label class="dialog-field">Họ và tên<input id="employee-name" type="text" maxlength="100" required></label>
                 <label class="dialog-field">Phòng ban<select id="employee-department"><option value="">Chưa phân công</option><?php foreach ($departments as $department): ?><option value="<?= (int) $department['id'] ?>"><?= $escape($department['name']) ?></option><?php endforeach; ?></select></label>
                 <label class="dialog-field">Chức vụ<input id="employee-position" type="text" maxlength="100"></label>
+                <label class="dialog-field">Ngày nghỉ việc<input id="employee-termination-date" type="date"></label>
             </div>
             <p class="workforce-dialog-feedback" id="employee-dialog-feedback" role="status" aria-live="polite"></p>
             <footer class="dialog-actions"><button class="button button-light" type="button" data-close-employee-dialog>Hủy</button><button class="button button-primary" type="submit" id="save-workforce-employee">Lưu hồ sơ</button></footer>

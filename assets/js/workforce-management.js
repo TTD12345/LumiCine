@@ -30,7 +30,7 @@
         body.replaceChildren();
         if (employees.length === 0) {
             const row = document.createElement('tr');
-            appendCell(row, 'Chưa có hồ sơ nhân viên.').colSpan = 6;
+            appendCell(row, 'Chưa có hồ sơ nhân viên.').colSpan = 7;
             body.append(row);
             return;
         }
@@ -44,11 +44,13 @@
             row.dataset.name = employee.name;
             row.dataset.position = employee.position;
             row.dataset.departmentId = employee.department_id === null ? '' : String(employee.department_id);
+            row.dataset.terminationDate = employee.termination_date || '';
             row.dataset.active = active ? '1' : '0';
             appendCell(row, employee.code);
             appendCell(row, employee.name);
             appendCell(row, employee.department || 'Chưa phân công');
             appendCell(row, employee.position || '—');
+            appendCell(row, employee.termination_date || '—');
 
             const statusCell = document.createElement('td');
             const status = document.createElement('span');
@@ -137,6 +139,7 @@
         document.getElementById('employee-code').value = row ? row.dataset.code : '';
         document.getElementById('employee-name').value = row ? row.dataset.name : '';
         document.getElementById('employee-position').value = row ? row.dataset.position : '';
+        document.getElementById('employee-termination-date').value = row ? row.dataset.terminationDate : '';
         departmentSelect.value = row ? row.dataset.departmentId : '';
         employeeDialog.showModal();
     };
@@ -234,6 +237,7 @@
                     name: document.getElementById('employee-name').value,
                     position: document.getElementById('employee-position').value,
                     departmentId: departmentSelect.value || null,
+                    terminationDate: document.getElementById('employee-termination-date').value || null,
                 },
             });
             employeeDialog.close();

@@ -204,7 +204,10 @@ class ApiController
             }
             if ($resource === 'leave') {
                 if ($method === 'GET') {
-                    $this->respond(['requests' => $workforce->leaveRequests($employeeId)]);
+                    $this->respond([
+                        'requests' => $workforce->leaveRequests($employeeId),
+                        'types' => $workforce->leaveTypes(),
+                    ]);
                 }
                 $payload = $this->readPayload();
                 $operation = $payload['operation'] ?? 'submit';
@@ -235,10 +238,16 @@ class ApiController
                 $start = $payload['start'] ?? null;
                 $end = $payload['end'] ?? null;
                 $reason = $payload['reason'] ?? null;
-                if (!is_string($start) || !is_string($end) || !is_string($reason)) {
+                $leaveType = $payload['leaveType'] ?? null;
+                if (
+                    !is_string($start)
+                    || !is_string($end)
+                    || !is_string($reason)
+                    || !is_string($leaveType)
+                ) {
                     throw new InvalidArgumentException('Thông tin đơn nghỉ phép không hợp lệ.');
                 }
-                $workforce->submitLeave($linkedEmployeeId, $start, $end, $reason);
+                $workforce->submitLeave($linkedEmployeeId, $start, $end, $reason, $leaveType);
                 $this->respond(['success' => true], 201);
             }
             if ($resource === 'holidays') {

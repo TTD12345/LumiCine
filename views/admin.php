@@ -5,14 +5,35 @@ if (!defined('APP_BOOTSTRAPPED')) {
 }
 
 $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+$leaveTypeLabels = [
+    'PHEP_NAM' => 'Phép năm',
+    'NGHI_OM' => 'Nghỉ ốm',
+    'KHONG_LUONG' => 'Nghỉ không lương',
+    'VIEC_RIENG' => 'Việc riêng',
+    'KHAC' => 'Khác',
+];
+$formatLeaveTypes = static function (array $leaveByType) use ($leaveTypeLabels): string {
+    $parts = [];
+    foreach ($leaveByType as $type => $days) {
+        if ($days > 0) {
+            $parts[] = ($leaveTypeLabels[$type] ?? $type) . ': ' . $days;
+        }
+    }
+
+    return implode(' · ', $parts);
+};
 $statusFor = static function (array $employee): array {
-    if ($employee['absent'] >= 2) {
+    if ($employee['absent'] > 0) {
         return ['Vắng mặt', 'absent'];
     }
-    if ($employee['leave'] >= 2 && $employee['worked'] < $employee['workingDays'] - 1) {
+    if ($employee['workingDays'] > 0 && $employee['leave'] === $employee['workingDays']) {
         return ['Nghỉ phép', 'leave'];
     }
-    if ($employee['workingDays'] > 0 && $employee['worked'] >= $employee['workingDays'] && $employee['absent'] === 0) {
+    if (
+        $employee['workingDays'] > 0
+        && $employee['worked'] + $employee['leave'] === $employee['workingDays']
+        && $employee['incomplete'] === 0
+    ) {
         return ['Đủ công', 'complete'];
     }
     return ['Thiếu công', 'incomplete'];
@@ -157,7 +178,7 @@ $statusFor = static function (array $employee): array {
                     <div class="summary-heading"><span class="summary-icon icon-purple"><i class="bi bi-calendar2-heart-fill" aria-hidden="true"></i></span><span class="summary-trend trend-purple"><i class="bi bi-info-circle" aria-hidden="true"></i> Đã ghi nhận</span></div>
                     <p class="summary-label">Số ngày nghỉ phép</p>
                     <div class="summary-value" id="stat-leave">0 <span>ngày</span></div>
-                    <div class="summary-foot">Có lương: <strong id="stat-paid-leave">0</strong> · Không lương: <strong id="stat-unpaid-leave">0</strong></div>
+                    <div class="summary-foot">Vắng không phép: <strong id="stat-absent">0</strong> ngày · Về sớm: <strong id="stat-early-minutes">0</strong> phút</div>
                 </article>
             </section>
 
@@ -225,11 +246,12 @@ $statusFor = static function (array $employee): array {
                                 <th scope="col">Chức vụ</th>
                                 <th scope="col" class="text-center">Ngày công<br>quy định</th>
                                 <th scope="col" class="text-center">Ngày công<br>thực tế</th>
-                                <th scope="col" class="text-center">Nghỉ có<br>lương</th>
-                                <th scope="col" class="text-center">Nghỉ không<br>lương</th>
+                                <th scope="col" class="text-center">Nghỉ phép<br>(ngày)</th>
+                                <th scope="col">Loại nghỉ</th>
                                 <th scope="col" class="text-center">Nghỉ không<br>phép</th>
                                 <th scope="col" class="text-center">Số lần<br>đi muộn</th>
                                 <th scope="col" class="text-center">Tổng phút<br>đi muộn</th>
+                                <th scope="col" class="text-center">Tổng phút<br>về sớm</th>
                                 <th scope="col" class="text-center">Ngày lễ<br>đi làm</th>
                                 <th scope="col" class="text-center">Tổng giờ<br>tăng ca</th>
                                 <th scope="col">Trạng thái</th>
@@ -240,6 +262,7 @@ $statusFor = static function (array $employee): array {
                             <?php foreach ($employees as $index => $employee): ?>
                                 <?php [$statusLabel, $statusClass] = $statusFor($employee); ?>
                                 <?php $initial = preg_match('/^./u', $employee['name'], $initialMatch) === 1 ? $initialMatch[0] : 'N'; ?>
+                                <?php $leaveTypeSummary = $formatLeaveTypes($employee['leaveByType']); ?>
                                 <tr>
                                     <td class="row-index"><?= $index + 1 ?></td>
                                     <td><span class="employee-code"><?= $escape($employee['id']) ?></span></td>
@@ -253,11 +276,12 @@ $statusFor = static function (array $employee): array {
                                     <td class="position-cell"><?= $escape($employee['position']) ?></td>
                                     <td class="text-center"><?= (int) $employee['workingDays'] ?></td>
                                     <td class="text-center"><strong class="actual-days"><?= $employee['worked'] ?></strong></td>
-                                    <td class="text-center">—</td>
-                                    <td class="text-center">—</td>
+                                    <td class="text-center"><?= (int) $employee['leave'] ?></td>
+                                    <td><?= $escape($leaveTypeSummary !== '' ? $leaveTypeSummary : '—') ?></td>
                                     <td class="text-center"><?= $employee['absent'] ?></td>
                                     <td class="text-center"><?= $employee['late'] ?></td>
-                                    <td class="text-center"><?= $employee['late'] * $employee['lateMinutesPerOccurrence'] ?></td>
+                                    <td class="text-center"><?= (int) $employee['lateMinutes'] ?></td>
+                                    <td class="text-center"><?= (int) $employee['earlyMinutes'] ?></td>
                                     <td class="text-center"><?= (int) $employee['holidayWorkDays'] ?></td>
                                     <td class="text-center"><?= number_format($employee['overtime'], 1) ?></td>
                                     <td><span class="status-badge status-<?= $statusClass ?>"><?= $escape($statusLabel) ?></span></td>

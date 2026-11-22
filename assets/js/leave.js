@@ -9,6 +9,7 @@
         approved: 'Đã duyệt',
         rejected: 'Từ chối',
     };
+    let leaveTypes = {};
     let requests = [];
     let isLoading = false;
 
@@ -43,12 +44,13 @@
         if (requests.length === 0) {
             const row = employeeRows.insertRow();
             makeCell(row, 'Bạn chưa có đơn nghỉ phép nào.');
-            row.cells[0].colSpan = 4;
+            row.cells[0].colSpan = 5;
             return;
         }
         requests.forEach((request) => {
             const row = employeeRows.insertRow();
             makeCell(row, `${formatDateTime(request.start)} – ${formatDateTime(request.end)}`);
+            makeCell(row, leaveTypes[request.leave_type] || request.leave_type);
             makeCell(row, request.reason, 'overtime-reason');
             row.insertCell().append(createStatus(request.status));
             const actionCell = row.insertCell();
@@ -73,7 +75,7 @@
         if (requests.length === 0) {
             const row = adminRows.insertRow();
             makeCell(row, 'Chưa có đơn đăng ký nghỉ phép.');
-            row.cells[0].colSpan = 6;
+            row.cells[0].colSpan = 7;
             return;
         }
         requests.forEach((request) => {
@@ -81,6 +83,7 @@
             makeCell(row, request.employee_name);
             makeCell(row, formatDateTime(request.start));
             makeCell(row, formatDateTime(request.end));
+            makeCell(row, leaveTypes[request.leave_type] || request.leave_type);
             makeCell(row, request.reason, 'overtime-reason');
             row.insertCell().append(createStatus(request.status));
             const actionCell = row.insertCell();
@@ -109,6 +112,7 @@
         try {
             const result = await window.lumiCineApi('leave');
             requests = result.requests;
+            leaveTypes = result.types || {};
             renderEmployeeRequests();
             renderAdminRequests();
             return true;
@@ -144,8 +148,9 @@
                 event.preventDefault();
                 const start = form.elements.start.value;
                 const end = form.elements.end.value;
+                const leaveType = form.elements.leaveType.value;
                 const reason = form.elements.reason.value.trim();
-                if (!reason || reason.length < 5 || !start || !end ||
+                if (!reason || reason.length < 5 || !start || !end || !leaveType ||
                     Date.parse(end) < Date.parse(start)) {
                     showMessage('Vui lòng nhập lý do (ít nhất 5 ký tự) và thời gian kết thúc không trước thời gian bắt đầu.', true);
                     return;
@@ -157,7 +162,7 @@
                 try {
                     await window.lumiCineApi('leave', {
                         method: 'POST',
-                        body: { start, end, reason },
+                        body: { start, end, leaveType, reason },
                     });
                     form.reset();
                     dialog.close();

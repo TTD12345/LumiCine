@@ -89,7 +89,7 @@ $attendanceSummary = !$attendanceToday
                     <div class="overtime-heading"><div><h2 id="leave-title">Đăng ký nghỉ phép</h2><p>Gửi thời gian và lý do nghỉ để quản trị viên xem xét.</p></div><?php if ($canSubmitOvertime): ?><button class="overtime-button overtime-button-primary" type="button" id="leave-open-form"><i class="bi bi-plus-lg"></i> Tạo đơn nghỉ phép</button><?php endif; ?></div>
                     <p class="overtime-note">Chỉ được hủy đơn khi đơn vẫn đang chờ duyệt.</p>
                     <div class="overtime-feedback" id="leave-feedback" role="status" aria-live="polite"></div>
-                    <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Thời gian nghỉ</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="employee-leave-rows"><tr><td colspan="4">Đang tải đơn nghỉ phép...</td></tr></tbody></table></div>
+                    <div class="overtime-table-wrap"><table class="overtime-table"><thead><tr><th>Thời gian nghỉ</th><th>Loại nghỉ</th><th>Lý do</th><th>Trạng thái</th><th>Thao tác</th></tr></thead><tbody id="employee-leave-rows"><tr><td colspan="5">Đang tải đơn nghỉ phép...</td></tr></tbody></table></div>
                 </section>
             <?php elseif ($section === 'dashboard'): ?>
                 <section class="employee-stats">
@@ -120,6 +120,15 @@ $attendanceSummary = !$attendanceToday
         <div class="dialog-grid">
             <label class="dialog-field">Bắt đầu nghỉ<input name="start" type="datetime-local" required></label>
             <label class="dialog-field">Kết thúc nghỉ<input name="end" type="datetime-local" required></label>
+            <label class="dialog-field">Loại nghỉ
+                <select name="leaveType" required>
+                    <option value="PHEP_NAM">Phép năm</option>
+                    <option value="NGHI_OM">Nghỉ ốm</option>
+                    <option value="KHONG_LUONG">Nghỉ không lương</option>
+                    <option value="VIEC_RIENG">Việc riêng</option>
+                    <option value="KHAC">Khác</option>
+                </select>
+            </label>
             <label class="dialog-field full">Lý do nghỉ phép<textarea name="reason" required minlength="5" maxlength="1000" rows="4" placeholder="Ví dụ: Việc gia đình, khám bệnh..."></textarea></label>
         </div>
         <footer class="dialog-actions"><button class="secondary-button" type="button" id="leave-cancel-form">Hủy</button><button class="primary-button" type="submit">Gửi đơn</button></footer>

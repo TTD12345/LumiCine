@@ -97,7 +97,7 @@ $currentUserInitials = $escape($currentUser['initials']);
                     <div>
                         <span class="attendance-kicker"><span class="attendance-live-dot"></span> CHẤM CÔNG CỦA TÔI</span>
                         <h2 id="attendance-title">Xin chào, <span id="attendance-name"><?= $currentUserName ?></span></h2>
-                        <p>Ghi nhận giờ làm việc cho ca hành chính của bạn.</p>
+                        <p>Ghi nhận giờ vào, giờ ra và số phút muộn/về sớm theo ca được phân.</p>
                     </div>
                 </div>
                 <div class="attendance-card-body">
@@ -157,7 +157,7 @@ $currentUserInitials = $escape($currentUser['initials']);
                 </div>
                 <div class="employee-table-wrap">
                     <table class="employee-table attendance-history-table">
-                        <thead><tr><th>Ngày</th><th>Giờ vào</th><th>Giờ ra</th><th>Tổng thời gian</th><th>Trạng thái</th></tr></thead>
+                        <thead><tr><th>Ngày</th><th>Giờ vào</th><th>Giờ ra</th><th>Tổng thời gian</th><th>Đi muộn</th><th>Về sớm</th><th>Trạng thái</th></tr></thead>
                         <tbody id="attendance-history"></tbody>
                     </table>
                     <div class="empty-state" id="attendance-history-empty" hidden><i class="bi bi-calendar2-x" aria-hidden="true"></i><strong>Chưa có lịch sử chấm công</strong><span>Các ngày đã chấm công sẽ được hiển thị tại đây.</span></div>
