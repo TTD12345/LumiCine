@@ -35,6 +35,7 @@ $currentUserInitials = $escape($currentUser['initials']);
             <a class="employee-nav-link" href="index.php?action=schedule"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
             <a class="employee-nav-link" href="index.php?action=shift"><i class="bi bi-people" aria-hidden="true"></i><span>Ca làm việc</span></a>
             <a class="employee-nav-link" href="index.php?action=overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
+            <a class="employee-nav-link" href="index.php?action=leave"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Đăng ký nghỉ phép</span></a>
             <a class="employee-nav-link active" href="index.php?action=attendance" aria-current="page"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
         </nav>
         <div class="employee-sidebar-bottom">
@@ -107,9 +108,9 @@ $currentUserInitials = $escape($currentUser['initials']);
                             <span class="attendance-status" id="attendance-status">Chưa bắt đầu</span>
                         </div>
                         <div class="attendance-shift-info">
-                            <span><i class="bi bi-clock" aria-hidden="true"></i> Ca hành chính</span>
-                            <strong>08:00 <span>—</span> 17:00</strong>
-                            <span><i class="bi bi-geo-alt" aria-hidden="true"></i> Văn phòng LumiCine</span>
+                            <span><i class="bi bi-clock" aria-hidden="true"></i> <span id="attendance-shift-name">Ca làm việc</span></span>
+                            <strong id="attendance-shift-time">Chưa phân ca</strong>
+                            <span><i class="bi bi-geo-alt" aria-hidden="true"></i> <span id="attendance-shift-location">Chưa có địa điểm</span></span>
                         </div>
                         <div class="attendance-events">
                             <div class="attendance-event">
