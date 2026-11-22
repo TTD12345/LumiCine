@@ -303,6 +303,14 @@ h1, h2, p { margin-top: 0; }
 .calendar-day-on-time .calendar-day-state, .calendar-marker-on-time, .calendar-legend-on-time { color: #4a9367; }
 .calendar-day-late { border-color: #f2e4cf; background: #fff9f0; }
 .calendar-day-late .calendar-day-state, .calendar-marker-late, .calendar-legend-late { color: #b67a31; }
+.calendar-day-early { border-color: #f2e4cf; background: #fff9f0; }
+.calendar-day-early .calendar-day-state, .calendar-marker-early, .calendar-legend-early { color: #b67a31; }
+.calendar-day-leave { border-color: #dce9f5; background: #f2f7fc; }
+.calendar-day-leave .calendar-day-state, .calendar-marker-leave, .calendar-legend-leave { color: #4c83b6; }
+.calendar-day-partial-leave { border-color: #eee2d5; background: #fff8f1; }
+.calendar-day-partial-leave .calendar-day-state, .calendar-marker-partial-leave, .calendar-legend-partial-leave { color: #a97945; }
+.calendar-day-incomplete { border-color: #f2e4cf; background: #fff9f0; }
+.calendar-day-incomplete .calendar-day-state, .calendar-marker-incomplete, .calendar-legend-incomplete { color: #b67a31; }
 .calendar-day-paid-leave { border-color: #dce9f5; background: #f2f7fc; }
 .calendar-day-paid-leave .calendar-day-state, .calendar-marker-paid-leave, .calendar-legend-paid-leave { color: #4c83b6; }
 .calendar-day-unpaid-leave { border-color: #eee2d5; background: #fff8f1; }
