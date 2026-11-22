@@ -118,6 +118,12 @@ class HomeController
         $mappingEmployees = $section === 'employees'
             ? $workforce->listEmployees()
             : [];
+        $managedEmployees = $section === 'employees'
+            ? $workforce->listManagedEmployees()
+            : [];
+        $departments = $section === 'employees'
+            ? $workforce->listDepartments()
+            : [];
         $scheduleDate = date('Y-m-d');
         $scheduleAssignments = $section === 'schedule'
             ? $workforce->listAssignments($scheduleDate)

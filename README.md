@@ -108,6 +108,7 @@ Sau đó mở `http://127.0.0.1:8000/` để vào trang nhân viên hoặc `http
 Trang nhân viên và quản trị đọc/ghi dữ liệu qua PHP/MySQL; trình duyệt không còn lưu dữ liệu nghiệp vụ trong `localStorage`.
 
 - Quản trị viên phân ca cho nhân viên trong `phan_ca`; ca được lưu theo ngày và liên kết với `ca_lam_viec`. Có thể sửa/hủy ca khi chưa phát sinh chấm công hoặc tăng ca.
+- Tại **Quản lý nhân viên**, quản trị viên có thể thêm/sửa hồ sơ nhân viên, phân phòng ban, ngừng hoạt động hoặc kích hoạt lại hồ sơ, đồng thời thêm/sửa/xóa phòng ban. Ngừng hoạt động là khóa mềm để giữ lịch sử phân ca và chấm công; phòng ban đang được gán cho nhân viên không thể xóa. Khi đổi mã nhân viên đã liên kết với tài khoản, mapping được cập nhật cùng giao dịch.
 - Nhân viên chỉ xem lịch của mã nhân viên được liên kết với tài khoản.
 - Chấm công chỉ được ghi nhận trong ngày hiện tại khi nhân viên có phân ca. Thời gian lấy từ máy chủ; dữ liệu vào/ra được ghi vào `cham_cong`.
 - Đơn tăng ca được liên kết với bản ghi `cham_cong`, lưu trong `tang_ca`; quản trị viên duyệt hoặc từ chối trực tiếp trên database.

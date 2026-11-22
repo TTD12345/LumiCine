@@ -30,6 +30,247 @@ class WorkforceModel extends BaseModel
         )->fetchAll();
     }
 
+    public function listManagedEmployees(): array
+    {
+        return $this->pdo->query(
+            'SELECT e.id, e.ma_nhan_vien AS code, e.ho_ten AS name,
+                    COALESCE(e.chuc_vu, \'\') AS position,
+                    e.ma_phong_ban AS department_id,
+                    COALESCE(d.ten_phong_ban, \'\') AS department,
+                    e.trang_thai AS active
+             FROM nhan_vien e
+             LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
+             ORDER BY e.trang_thai DESC, e.ma_nhan_vien ASC'
+        )->fetchAll();
+    }
+
+    public function listDepartments(): array
+    {
+        return $this->pdo->query(
+            'SELECT d.id, d.ten_phong_ban AS name, COUNT(e.id) AS employee_count
+             FROM phong_ban d
+             LEFT JOIN nhan_vien e ON e.ma_phong_ban = d.id
+             GROUP BY d.id, d.ten_phong_ban
+             ORDER BY d.ten_phong_ban ASC'
+        )->fetchAll();
+    }
+
+    public function saveEmployee(array $data): int
+    {
+        $id = isset($data['id']) ? filter_var($data['id'], FILTER_VALIDATE_INT) : null;
+        $code = $data['code'] ?? null;
+        $name = $data['name'] ?? null;
+        $position = $data['position'] ?? '';
+        $departmentId = $data['departmentId'] ?? null;
+
+        if (
+            ($id !== null && (!$id || $id < 1))
+            || !is_string($code)
+            || !is_string($name)
+            || !is_string($position)
+            || ($departmentId !== null && $departmentId !== '' && !is_string($departmentId) && !is_int($departmentId))
+        ) {
+            throw new InvalidArgumentException('Thông tin nhân viên không hợp lệ.');
+        }
+
+        $code = trim($code);
+        $name = trim($name);
+        $position = trim($position);
+        if (
+            $code === ''
+            || lumicineUtf8Length($code) > 32
+            || $name === ''
+            || lumicineUtf8Length($name) > 100
+            || lumicineUtf8Length($position) > 100
+        ) {
+            throw new InvalidArgumentException('Mã nhân viên, họ tên hoặc chức vụ không hợp lệ.');
+        }
+
+        $department = null;
+        if ($departmentId !== null && $departmentId !== '') {
+            $department = filter_var($departmentId, FILTER_VALIDATE_INT);
+            if (!$department || $department < 1) {
+                throw new InvalidArgumentException('Phòng ban không hợp lệ.');
+            }
+            $departmentCheck = $this->pdo->prepare('SELECT id FROM phong_ban WHERE id = :id LIMIT 1');
+            $departmentCheck->execute(['id' => $department]);
+            if ($departmentCheck->fetchColumn() === false) {
+                throw new InvalidArgumentException('Phòng ban không tồn tại.');
+            }
+        }
+
+        $duplicateSql = 'SELECT id FROM nhan_vien WHERE ma_nhan_vien = :code';
+        $duplicateParameters = ['code' => $code];
+        if ($id !== null) {
+            $duplicateSql .= ' AND id <> :id';
+            $duplicateParameters['id'] = $id;
+        }
+        $duplicate = $this->pdo->prepare($duplicateSql . ' LIMIT 1');
+        $duplicate->execute($duplicateParameters);
+        if ($duplicate->fetchColumn() !== false) {
+            throw new InvalidArgumentException('Mã nhân viên đã được sử dụng.');
+        }
+
+        if ($id === null) {
+            $statement = $this->pdo->prepare(
+                'INSERT INTO nhan_vien (ma_nhan_vien, ho_ten, chuc_vu, ma_phong_ban, trang_thai)
+                 VALUES (:code, :name, :position, :department_id, 1)'
+            );
+            $statement->execute([
+                'code' => $code,
+                'name' => $name,
+                'position' => $position !== '' ? $position : null,
+                'department_id' => $department,
+            ]);
+
+            return (int) $this->pdo->lastInsertId();
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $current = $this->pdo->prepare(
+                'SELECT ma_nhan_vien FROM nhan_vien WHERE id = :id LIMIT 1 FOR UPDATE'
+            );
+            $current->execute(['id' => $id]);
+            $currentCode = $current->fetchColumn();
+            if ($currentCode === false) {
+                throw new InvalidArgumentException('Không tìm thấy hồ sơ nhân viên.');
+            }
+
+            if ((string) $currentCode !== $code) {
+                $mappedAccount = $this->pdo->prepare(
+                    'SELECT id FROM lumicine_users
+                     WHERE BINARY employee_code = BINARY :old_code LIMIT 1'
+                );
+                $mappedAccount->execute(['old_code' => $currentCode]);
+                if ($mappedAccount->fetchColumn() !== false) {
+                    $codeInUse = $this->pdo->prepare(
+                        'SELECT id FROM lumicine_users
+                         WHERE employee_code = :new_code LIMIT 1'
+                    );
+                    $codeInUse->execute(['new_code' => $code]);
+                    if ($codeInUse->fetchColumn() !== false) {
+                        throw new InvalidArgumentException('Mã nhân viên mới đã được liên kết với tài khoản khác.');
+                    }
+                    $updateMapping = $this->pdo->prepare(
+                        'UPDATE lumicine_users SET employee_code = :new_code
+                         WHERE BINARY employee_code = BINARY :old_code'
+                    );
+                    $updateMapping->execute(['new_code' => $code, 'old_code' => $currentCode]);
+                }
+            }
+
+            $statement = $this->pdo->prepare(
+                'UPDATE nhan_vien
+                 SET ma_nhan_vien = :code, ho_ten = :name, chuc_vu = :position,
+                     ma_phong_ban = :department_id
+                 WHERE id = :id'
+            );
+            $statement->execute([
+                'code' => $code,
+                'name' => $name,
+                'position' => $position !== '' ? $position : null,
+                'department_id' => $department,
+                'id' => $id,
+            ]);
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $exception;
+        }
+
+        return $id;
+    }
+
+    public function setEmployeeActive(int $employeeId, bool $active): void
+    {
+        if ($employeeId < 1) {
+            throw new InvalidArgumentException('Nhân viên không hợp lệ.');
+        }
+        $statement = $this->pdo->prepare(
+            'UPDATE nhan_vien SET trang_thai = :active WHERE id = :id'
+        );
+        $statement->execute(['active' => $active ? 1 : 0, 'id' => $employeeId]);
+        if ($statement->rowCount() === 0) {
+            $exists = $this->pdo->prepare('SELECT id FROM nhan_vien WHERE id = :id LIMIT 1');
+            $exists->execute(['id' => $employeeId]);
+            if ($exists->fetchColumn() === false) {
+                throw new InvalidArgumentException('Không tìm thấy hồ sơ nhân viên.');
+            }
+        }
+    }
+
+    public function saveDepartment(array $data): int
+    {
+        $id = isset($data['id']) ? filter_var($data['id'], FILTER_VALIDATE_INT) : null;
+        $name = $data['name'] ?? null;
+        if (($id !== null && (!$id || $id < 1)) || !is_string($name)) {
+            throw new InvalidArgumentException('Thông tin phòng ban không hợp lệ.');
+        }
+        $name = trim($name);
+        if ($name === '' || lumicineUtf8Length($name) > 100) {
+            throw new InvalidArgumentException('Tên phòng ban phải có tối đa 100 ký tự.');
+        }
+
+        $duplicateSql = 'SELECT id FROM phong_ban WHERE ten_phong_ban = :name';
+        $duplicateParameters = ['name' => $name];
+        if ($id !== null) {
+            $duplicateSql .= ' AND id <> :id';
+            $duplicateParameters['id'] = $id;
+        }
+        $duplicate = $this->pdo->prepare($duplicateSql . ' LIMIT 1');
+        $duplicate->execute($duplicateParameters);
+        if ($duplicate->fetchColumn() !== false) {
+            throw new InvalidArgumentException('Tên phòng ban đã được sử dụng.');
+        }
+
+        if ($id === null) {
+            $statement = $this->pdo->prepare(
+                'INSERT INTO phong_ban (ten_phong_ban) VALUES (:name)'
+            );
+            $statement->execute(['name' => $name]);
+
+            return (int) $this->pdo->lastInsertId();
+        }
+
+        $statement = $this->pdo->prepare(
+            'UPDATE phong_ban SET ten_phong_ban = :name WHERE id = :id'
+        );
+        $statement->execute(['name' => $name, 'id' => $id]);
+        if ($statement->rowCount() === 0) {
+            $exists = $this->pdo->prepare('SELECT id FROM phong_ban WHERE id = :id LIMIT 1');
+            $exists->execute(['id' => $id]);
+            if ($exists->fetchColumn() === false) {
+                throw new InvalidArgumentException('Không tìm thấy phòng ban.');
+            }
+        }
+
+        return $id;
+    }
+
+    public function deleteDepartment(int $departmentId): void
+    {
+        if ($departmentId < 1) {
+            throw new InvalidArgumentException('Phòng ban không hợp lệ.');
+        }
+
+        $usage = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM nhan_vien WHERE ma_phong_ban = :id'
+        );
+        $usage->execute(['id' => $departmentId]);
+        if ((int) $usage->fetchColumn() > 0) {
+            throw new InvalidArgumentException('Không thể xóa phòng ban đang được gán cho nhân viên.');
+        }
+
+        $statement = $this->pdo->prepare('DELETE FROM phong_ban WHERE id = :id');
+        $statement->execute(['id' => $departmentId]);
+        if ($statement->rowCount() === 0) {
+            throw new InvalidArgumentException('Không tìm thấy phòng ban.');
+        }
+    }
+
     public function listEmployeeAccountMappings(): array
     {
         return $this->pdo->query(
@@ -120,17 +361,36 @@ class WorkforceModel extends BaseModel
         return $assignments;
     }
 
-    public function listShiftTypes(): array
+    public function listShiftTypes(bool $includeInactive = false): array
     {
-        $statement = $this->pdo->query(
-            'SELECT id, ten_ca AS name, gio_bat_dau AS start, gio_ket_thuc AS end,
-                    COALESCE(so_phut_cho_di_muon, 0) AS late_tolerance
-             FROM ca_lam_viec
-             WHERE trang_thai = 1
-             ORDER BY gio_bat_dau, id'
-        );
+        $sql = 'SELECT id, ten_ca AS name, gio_bat_dau AS start, gio_ket_thuc AS end,
+                       COALESCE(so_phut_cho_di_muon, 0) AS late_tolerance,
+                       trang_thai AS active
+                FROM ca_lam_viec';
+        if (!$includeInactive) {
+            $sql .= ' WHERE trang_thai = 1';
+        }
+        $sql .= ' ORDER BY gio_bat_dau, id';
+        $statement = $this->pdo->query($sql);
 
         return $statement->fetchAll();
+    }
+
+    public function setShiftTypeActive(int $shiftId, bool $active): void
+    {
+        $check = $this->pdo->prepare('SELECT id FROM ca_lam_viec WHERE id = :id');
+        $check->execute(['id' => $shiftId]);
+        if ($check->fetchColumn() === false) {
+            throw new InvalidArgumentException('Loại ca làm việc không tồn tại.');
+        }
+
+        $statement = $this->pdo->prepare(
+            'UPDATE ca_lam_viec SET trang_thai = :active WHERE id = :id'
+        );
+        $statement->execute([
+            'id' => $shiftId,
+            'active' => $active ? 1 : 0,
+        ]);
     }
 
     public function saveAssignment(array $data): array

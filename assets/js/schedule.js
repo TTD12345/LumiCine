@@ -6,6 +6,8 @@
     const rows = document.getElementById('schedule-rows');
     const dialog = document.getElementById('schedule-dialog');
     const form = document.getElementById('schedule-form');
+    const shiftTypesDialog = document.getElementById('shift-types-dialog');
+    const shiftTypesList = document.getElementById('shift-types-list');
     let assignments = window.scheduleInitialData || [];
     let currentStatus = 'all';
     let editingId = null;
@@ -83,7 +85,62 @@
         dialog.showModal();
     };
 
+    const renderShiftTypes = (shiftTypes) => {
+        shiftTypesList.innerHTML = shiftTypes.length ? shiftTypes.map((shift) => `
+            <div class="shift-type-row ${Number(shift.active) === 1 ? '' : 'inactive'}">
+                <div>
+                    <strong>${escapeHtml(shift.name)}</strong>
+                    <small>${escapeHtml(shift.start.slice(0, 5))} - ${escapeHtml(shift.end.slice(0, 5))}</small>
+                </div>
+                <button type="button"
+                    class="shift-type-toggle ${Number(shift.active) === 1 ? 'active' : ''}"
+                    data-shift-id="${escapeHtml(shift.id)}"
+                    data-active="${Number(shift.active) === 1 ? '1' : '0'}">
+                    ${Number(shift.active) === 1 ? 'Ngừng hoạt động' : 'Kích hoạt'}
+                </button>
+            </div>`).join('') :
+            '<div class="schedule-empty-row">Chưa có loại ca làm việc.</div>';
+    };
+
+    const openShiftTypesDialog = async () => {
+        try {
+            const result = await window.lumiCineApi('schedule', {
+                query: { date: dateInput.value, includeInactive: '1' },
+            });
+            renderShiftTypes(result.shiftTypes);
+            shiftTypesDialog.showModal();
+        } catch (error) {
+            notify(error instanceof Error ? error.message : 'Không thể tải danh sách loại ca.');
+        }
+    };
+
     document.getElementById('schedule-create').addEventListener('click', () => openDialog());
+    document.getElementById('schedule-manage-shifts').addEventListener('click', openShiftTypesDialog);
+    document.getElementById('shift-types-close').addEventListener('click', () => shiftTypesDialog.close());
+    document.getElementById('shift-types-cancel').addEventListener('click', () => shiftTypesDialog.close());
+    shiftTypesDialog.addEventListener('click', (event) => { if (event.target === shiftTypesDialog) shiftTypesDialog.close(); });
+    shiftTypesList.addEventListener('click', async (event) => {
+        const button = event.target.closest('button[data-shift-id]');
+        if (!button) return;
+        button.disabled = true;
+        try {
+            const result = await window.lumiCineApi('schedule', {
+                method: 'POST',
+                body: {
+                    operation: 'shift-status',
+                    id: Number(button.dataset.shiftId),
+                    active: button.dataset.active !== '1',
+                },
+            });
+            renderShiftTypes(result.shiftTypes);
+            await loadDate();
+            notify(button.dataset.active === '1' ? 'Đã ngừng hoạt động loại ca.' : 'Đã kích hoạt lại loại ca.');
+        } catch (error) {
+            notify(error instanceof Error ? error.message : 'Không thể cập nhật trạng thái loại ca.');
+        } finally {
+            button.disabled = false;
+        }
+    });
     document.getElementById('schedule-dialog-close').addEventListener('click', () => dialog.close());
     document.getElementById('schedule-dialog-cancel').addEventListener('click', () => dialog.close());
     dialog.addEventListener('click', (event) => { if (event.target === dialog) dialog.close(); });
