@@ -1,4 +1,12 @@
 .overtime-card { margin-top: 18px; overflow: hidden; border: 1px solid #eeedf3; border-radius: 12px; background: #fff; }
+.overtime-page .main-content {
+    width: calc(100vw - var(--sidebar-width));
+    min-width: 0;
+}
+.overtime-page .page-container { width: 100%; max-width: none; }
+.overtime-page .page-intro { min-height: 72px; }
+.overtime-page #overtime-requests,
+.overtime-page #leave-requests { width: 100%; }
 .overtime-heading { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 17px 19px 12px; }
 .overtime-heading h2 { margin: 0 0 4px; color: #303044; font-family: Manrope, sans-serif; font-size: 15px; font-weight: 800; }
 .overtime-heading p, .overtime-note { margin: 0; color: #89899b; font-size: 10px; line-height: 1.6; }
@@ -14,6 +22,24 @@
 .overtime-feedback.error { color: #b94a45; }
 .overtime-table-wrap { overflow-x: auto; border-top: 1px solid #f0eff4; }
 .overtime-table { width: 100%; min-width: 650px; border-collapse: collapse; text-align: left; }
+.overtime-table th:nth-child(1),
+.overtime-table td:nth-child(1) { width: 16%; }
+.overtime-table th:nth-child(2),
+.overtime-table td:nth-child(2),
+.overtime-table th:nth-child(3),
+.overtime-table td:nth-child(3) { width: 12%; white-space: nowrap; }
+.overtime-table th:nth-child(5),
+.overtime-table td:nth-child(5) { width: 105px; text-align: center; }
+.overtime-table th:last-child,
+.overtime-table td:last-child { width: 150px; text-align: center; }
+.overtime-table td:last-child { padding-right: 19px; }
+#leave-requests .overtime-table { min-width: 760px; }
+#leave-requests .overtime-table th:nth-child(5),
+#leave-requests .overtime-table td:nth-child(5) { width: auto; text-align: left; }
+#leave-requests .overtime-table th:nth-child(6),
+#leave-requests .overtime-table td:nth-child(6) { width: 105px; text-align: center; }
+#leave-requests .overtime-table th:nth-child(7),
+#leave-requests .overtime-table td:nth-child(7) { width: 150px; text-align: center; }
 .overtime-table th { height: 37px; background: #fafafd; padding: 0 12px; color: #9998a8; font-size: 8px; font-weight: 700; letter-spacing: .35px; text-transform: uppercase; white-space: nowrap; }
 .overtime-table td { min-height: 48px; border-top: 1px solid #f2f1f5; padding: 10px 12px; color: #68687c; font-size: 10px; vertical-align: middle; }
 .overtime-table th:first-child, .overtime-table td:first-child { padding-left: 19px; }
@@ -32,4 +58,10 @@
 @media (max-width: 520px) {
     .overtime-heading { align-items: flex-start; flex-direction: column; }
     .overtime-heading > .overtime-summary { align-self: flex-end; }
+}
+
+@media (max-width: 760px) {
+    .overtime-page .main-content {
+        width: 100%;
+    }
 }

@@ -28,11 +28,11 @@ $isSchedule = $section === 'schedule';
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link href="assets/css/hrm.css" rel="stylesheet">
-    <?php if ($isOvertime): ?><link href="assets/css/overtime.css" rel="stylesheet"><?php endif; ?>
+    <link href="assets/css/hrm.css?v=<?= (int) filemtime(__DIR__ . '/../assets/css/hrm.css') ?>" rel="stylesheet">
+    <?php if ($isOvertime): ?><link href="assets/css/overtime.css?v=<?= (int) filemtime(__DIR__ . '/../assets/css/overtime.css') ?>" rel="stylesheet"><?php endif; ?>
     <?php if ($isSchedule): ?><link href="assets/css/schedule.css" rel="stylesheet"><?php endif; ?>
 </head>
-<body>
+<body<?= $isOvertime ? ' class="overtime-page"' : '' ?>>
 <div class="app-shell">
     <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
     <aside class="sidebar" id="sidebar" aria-label="Điều hướng quản trị">
@@ -43,7 +43,7 @@ $isSchedule = $section === 'schedule';
             <a class="nav-link <?= $section === 'employees' ? 'active' : '' ?>" href="?action=admin-employees"><i class="bi bi-people"></i><span>Quản lý nhân viên</span></a>
             <a class="nav-link <?= $section === 'schedule' ? 'active' : '' ?>" href="?action=admin-schedule"><i class="bi bi-calendar-week"></i><span>Phân ca làm việc</span></a>
             <a class="nav-link <?= $section === 'attendance' ? 'active' : '' ?>" href="?action=admin-attendance"><i class="bi bi-calendar2-check"></i><span>Quản lý chấm công</span></a>
-            <a class="nav-link <?= $section === 'overtime' ? 'active' : '' ?>" href="?action=admin-overtime"><i class="bi bi-clock-history"></i><span>Duyệt tăng ca và nghỉ phép</span></a>
+            <a class="nav-link <?= $section === 'overtime' ? 'active' : '' ?>" href="?action=admin-overtime"><i class="bi bi-clock-history"></i><span>Duyệt tăng ca & nghỉ phép</span></a>
             <a class="nav-link" href="?action=admin-summary"><i class="bi bi-clipboard-data"></i><span>Tổng hợp công</span></a>
             <a class="nav-link <?= $section === 'reports' ? 'active' : '' ?>" href="?action=admin-reports"><i class="bi bi-bar-chart-line"></i><span>Báo cáo thống kê</span></a>
         </nav>
