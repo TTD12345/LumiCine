@@ -342,6 +342,26 @@ h1, h2, p { margin-top: 0; }
 .mapping-select { min-width: 230px; max-width: 100%; height: 34px; border: 1px solid #e1e8ef; border-radius: 7px; background: #fff; padding: 0 8px; color: #435b73; font-size: 9px; }
 .mapping-feedback { min-height: 16px; margin: 10px 19px 0; color: #256c4a; font-size: 10px; }
 .mapping-save { white-space: nowrap; }
+.workforce-card-header { align-items: flex-start; }
+.workforce-card-header .button { flex: 0 0 auto; }
+.workforce-row-actions { display: flex; gap: 6px; white-space: nowrap; }
+.workforce-row-actions .button { min-height: 30px; padding: 0 9px; font-size: 9px; }
+#employee-management-feedback[data-state="error"], #department-management-feedback[data-state="error"] { color: #b54747; }
+#employee-management-feedback[data-state="success"], #department-management-feedback[data-state="success"] { color: #256c4a; }
+.workforce-dialog { width: min(590px, calc(100% - 28px)); }
+.workforce-form .dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; border-bottom: 1px solid #edf1f5; padding-bottom: 13px; }
+.workforce-form .dialog-heading h2 { margin: 0 0 5px; color: #29435e; font-family: Manrope, sans-serif; font-size: 16px; font-weight: 800; }
+.workforce-form .dialog-heading p { max-width: 440px; margin: 0; color: #8492a2; font-size: 9px; line-height: 1.6; }
+.workforce-form .page-kicker { margin-bottom: 7px; }
+.workforce-form .dialog-close { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid #e6ecf2; border-radius: 7px; background: #fff; color: #74869a; }
+.workforce-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; padding: 17px 0; }
+.workforce-form .dialog-field { display: grid; gap: 6px; color: #6f8296; font-size: 9px; font-weight: 600; }
+.workforce-form .dialog-field input, .workforce-form .dialog-field select { width: 100%; min-width: 0; height: 37px; border: 1px solid #e1e8ef; border-radius: 7px; background: #fff; padding: 0 9px; color: #435b73; font-size: 10px; }
+.workforce-department-field { padding: 17px 0; }
+.workforce-dialog-feedback { min-height: 16px; margin: 0; color: #8492a2; font-size: 9px; }
+.workforce-dialog-feedback[data-state="error"] { color: #b54747; }
+.workforce-form .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #edf1f5; padding-top: 13px; }
+.workforce-form .dialog-actions .button { min-height: 34px; font-size: 9px; }
 .settings-grid input { height: 38px; border: 1px solid #e1e8ef; border-radius: 7px; background: #fff; padding: 0 9px; color: #435b73; }
 .holiday-dialog { width: min(590px, calc(100% - 28px)); max-height: min(85vh, 760px); overflow: auto; border: 1px solid #e2eaf1; border-radius: 13px; padding: 0; color: var(--ink); box-shadow: 0 20px 65px #1835532b; }
 .holiday-dialog::backdrop { background: #10243b77; backdrop-filter: blur(2px); }

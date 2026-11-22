@@ -91,6 +91,7 @@ $isSchedule = $section === 'schedule';
                                 <button class="button button-light" type="button" id="schedule-prev"><i class="bi bi-chevron-left"></i></button>
                                 <label class="schedule-date"><i class="bi bi-calendar3"></i><input id="schedule-date" type="date" value="<?= $escape($scheduleDate) ?>" aria-label="Chọn ngày phân ca"></label>
                                 <button class="button button-light" type="button" id="schedule-next"><i class="bi bi-chevron-right"></i></button>
+                                <button class="button button-outline" type="button" id="schedule-manage-shifts"><i class="bi bi-sliders"></i> Quản lý loại ca</button>
                                 <button class="button button-primary" type="button" id="schedule-create"><i class="bi bi-plus-lg"></i> Tạo ca mới</button>
                             </div>
                         </header>
@@ -148,6 +149,13 @@ $isSchedule = $section === 'schedule';
                         <footer><button type="button" class="button button-light" id="schedule-dialog-cancel">Hủy</button><button type="submit" class="button button-primary" id="schedule-save">Lưu ca làm việc</button></footer>
                     </form>
                 </dialog>
+                <dialog class="schedule-dialog" id="shift-types-dialog">
+                    <form id="shift-types-form" method="dialog">
+                        <header><div><span>QUẢN LÝ LOẠI CA</span><h2>Ngừng hoạt động / kích hoạt ca</h2></div><button type="button" id="shift-types-close" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>
+                        <div class="shift-types-list" id="shift-types-list"></div>
+                        <footer><button type="button" class="button button-light" id="shift-types-cancel">Đóng</button></footer>
+                    </form>
+                </dialog>
             <?php elseif ($isOvertime): ?>
                 <section class="overtime-card" id="overtime-requests" aria-labelledby="overtime-requests-title">
                     <div class="overtime-heading"><div><h2 id="overtime-requests-title">Đơn đăng ký tăng ca</h2><p>Xem lý do, thời gian và xử lý các đơn nhân viên gửi.</p></div><div class="overtime-summary"><span>Chờ duyệt</span><strong id="overtime-pending-count">0</strong></div></div>
@@ -172,6 +180,63 @@ $isSchedule = $section === 'schedule';
                         <article class="summary-card"><p class="summary-label">Ngày nghỉ phép</p><div class="summary-value">—</div></article>
                     </section>
                 <?php elseif ($section === 'employees'): ?>
+                    <section class="data-card" aria-labelledby="workforce-employees-title">
+                        <div class="table-card-header workforce-card-header">
+                            <div><h2 id="workforce-employees-title">Danh sách nhân viên</h2><p>Thêm, cập nhật hồ sơ hoặc tạm ngừng nhân viên. Hồ sơ ngừng hoạt động vẫn được giữ để bảo toàn lịch sử.</p></div>
+                            <button class="button button-primary" type="button" id="add-workforce-employee"><i class="bi bi-person-plus"></i> Thêm nhân viên</button>
+                        </div>
+                        <p class="mapping-feedback" id="employee-management-feedback" role="status" aria-live="polite"></p>
+                        <div class="table-wrap">
+                            <table class="employee-table" id="workforce-employee-table">
+                                <thead><tr><th>Mã nhân viên</th><th>Họ và tên</th><th>Phòng ban</th><th>Chức vụ</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                                <tbody>
+                                    <?php if ($managedEmployees === []): ?>
+                                        <tr data-empty-row><td colspan="6">Chưa có hồ sơ nhân viên.</td></tr>
+                                    <?php else: ?>
+                                        <?php foreach ($managedEmployees as $employee): ?>
+                                            <?php $active = (int) $employee['active'] === 1; ?>
+                                            <tr data-employee-row data-id="<?= (int) $employee['id'] ?>" data-code="<?= $escape($employee['code']) ?>" data-name="<?= $escape($employee['name']) ?>" data-position="<?= $escape($employee['position']) ?>" data-department-id="<?= $employee['department_id'] === null ? '' : (int) $employee['department_id'] ?>" data-active="<?= $active ? '1' : '0' ?>">
+                                                <td><?= $escape($employee['code']) ?></td>
+                                                <td><?= $escape($employee['name']) ?></td>
+                                                <td><?= $escape($employee['department'] !== '' ? $employee['department'] : 'Chưa phân công') ?></td>
+                                                <td><?= $escape($employee['position'] !== '' ? $employee['position'] : '—') ?></td>
+                                                <td><span class="status-badge <?= $active ? 'status-complete' : 'status-incomplete' ?>"><?= $active ? 'Đang làm việc' : 'Ngừng hoạt động' ?></span></td>
+                                                <td class="workforce-row-actions">
+                                                    <button class="button button-outline" type="button" data-edit-employee>Sửa</button>
+                                                    <button class="button button-light" type="button" data-toggle-employee><?= $active ? 'Ngừng hoạt động' : 'Kích hoạt lại' ?></button>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section class="data-card" aria-labelledby="workforce-departments-title">
+                        <div class="table-card-header workforce-card-header">
+                            <div><h2 id="workforce-departments-title">Danh sách phòng ban</h2><p>Quản lý các phòng ban và nhân viên đang được gán.</p></div>
+                            <button class="button button-primary" type="button" id="add-workforce-department"><i class="bi bi-diagram-3"></i> Thêm phòng ban</button>
+                        </div>
+                        <p class="mapping-feedback" id="department-management-feedback" role="status" aria-live="polite"></p>
+                        <div class="table-wrap">
+                            <table class="employee-table" id="workforce-department-table">
+                                <thead><tr><th>Tên phòng ban</th><th>Số hồ sơ nhân viên</th><th>Thao tác</th></tr></thead>
+                                <tbody>
+                                    <?php if ($departments === []): ?>
+                                        <tr data-empty-row><td colspan="3">Chưa có phòng ban.</td></tr>
+                                    <?php else: ?>
+                                        <?php foreach ($departments as $department): ?>
+                                            <tr data-department-row data-id="<?= (int) $department['id'] ?>" data-name="<?= $escape($department['name']) ?>" data-count="<?= (int) $department['employee_count'] ?>">
+                                                <td><?= $escape($department['name']) ?></td>
+                                                <td><?= (int) $department['employee_count'] ?></td>
+                                                <td class="workforce-row-actions"><button class="button button-outline" type="button" data-edit-department>Sửa</button><button class="button button-light" type="button" data-delete-department>Xóa</button></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
                     <section class="data-card">
                         <div class="table-card-header">
                             <div>
@@ -253,6 +318,31 @@ $isSchedule = $section === 'schedule';
         </div>
     </main>
 </div>
+<?php if ($section === 'employees'): ?>
+    <dialog class="holiday-dialog workforce-dialog" id="employee-dialog">
+        <form class="holiday-dialog-content workforce-form" id="employee-form">
+            <header class="dialog-heading"><div><span class="page-kicker"><span></span> HỒ SƠ NHÂN VIÊN</span><h2 id="employee-dialog-title">Thêm nhân viên</h2><p>Điền thông tin hồ sơ. Mã nhân viên được dùng để liên kết tài khoản đăng nhập.</p></div><button class="dialog-close" type="button" data-close-employee-dialog aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>
+            <input id="employee-record-id" type="hidden">
+            <div class="workforce-form-grid">
+                <label class="dialog-field">Mã nhân viên<input id="employee-code" type="text" maxlength="32" autocomplete="off" required></label>
+                <label class="dialog-field">Họ và tên<input id="employee-name" type="text" maxlength="100" required></label>
+                <label class="dialog-field">Phòng ban<select id="employee-department"><option value="">Chưa phân công</option><?php foreach ($departments as $department): ?><option value="<?= (int) $department['id'] ?>"><?= $escape($department['name']) ?></option><?php endforeach; ?></select></label>
+                <label class="dialog-field">Chức vụ<input id="employee-position" type="text" maxlength="100"></label>
+            </div>
+            <p class="workforce-dialog-feedback" id="employee-dialog-feedback" role="status" aria-live="polite"></p>
+            <footer class="dialog-actions"><button class="button button-light" type="button" data-close-employee-dialog>Hủy</button><button class="button button-primary" type="submit" id="save-workforce-employee">Lưu hồ sơ</button></footer>
+        </form>
+    </dialog>
+    <dialog class="holiday-dialog workforce-dialog" id="department-dialog">
+        <form class="holiday-dialog-content workforce-form" id="department-form">
+            <header class="dialog-heading"><div><span class="page-kicker"><span></span> CƠ CẤU NHÂN SỰ</span><h2 id="department-dialog-title">Thêm phòng ban</h2><p>Đặt tên rõ ràng để dễ phân công nhân viên.</p></div><button class="dialog-close" type="button" data-close-department-dialog aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>
+            <input id="department-record-id" type="hidden">
+            <label class="dialog-field workforce-department-field">Tên phòng ban<input id="department-name" type="text" maxlength="100" required></label>
+            <p class="workforce-dialog-feedback" id="department-dialog-feedback" role="status" aria-live="polite"></p>
+            <footer class="dialog-actions"><button class="button button-light" type="button" data-close-department-dialog>Hủy</button><button class="button button-primary" type="submit" id="save-workforce-department">Lưu phòng ban</button></footer>
+        </form>
+    </dialog>
+<?php endif; ?>
 <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container" aria-live="polite"></div>
 <script src="assets/js/admin-section.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/admin-section.js') ?>" defer></script>
 <script src="assets/js/admin-section.js?v=20261121" defer></script>
@@ -268,6 +358,7 @@ $isSchedule = $section === 'schedule';
     <script src="assets/js/overtime.js" defer></script>
 <?php elseif ($section === 'employees'): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
+    <script src="assets/js/workforce-management.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/workforce-management.js') ?>" defer></script>
 <?php elseif ($section === 'settings'): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
 <?php endif; ?>

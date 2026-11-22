@@ -45,7 +45,53 @@ class ApiController
 
             if ($resource === 'employees') {
                 $this->requireAdmin($user['role']);
-                $this->respond(['employees' => $workforce->listEmployees()]);
+                if ($method === 'GET') {
+                    $includeInactive = ($_GET['includeInactive'] ?? '') === '1';
+                    $this->respond([
+                        'employees' => $includeInactive
+                            ? $workforce->listManagedEmployees()
+                            : $workforce->listEmployees(),
+                    ]);
+                }
+
+                $payload = $this->readPayload();
+                $operation = $payload['operation'] ?? 'save';
+                if ($operation === 'status') {
+                    $id = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
+                    $active = $payload['active'] ?? null;
+                    if (!$id || $id < 1 || !is_bool($active)) {
+                        throw new InvalidArgumentException('Thông tin trạng thái nhân viên không hợp lệ.');
+                    }
+                    $workforce->setEmployeeActive($id, $active);
+                    $this->respond(['success' => true]);
+                }
+                if ($operation !== 'save') {
+                    throw new InvalidArgumentException('Thao tác nhân viên không hợp lệ.');
+                }
+
+                $this->respond(['id' => $workforce->saveEmployee($payload)], 201);
+            }
+            if ($resource === 'departments') {
+                $this->requireAdmin($user['role']);
+                if ($method === 'GET') {
+                    $this->respond(['departments' => $workforce->listDepartments()]);
+                }
+
+                $payload = $this->readPayload();
+                $operation = $payload['operation'] ?? 'save';
+                if ($operation === 'delete') {
+                    $id = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
+                    if (!$id || $id < 1) {
+                        throw new InvalidArgumentException('Phòng ban không hợp lệ.');
+                    }
+                    $workforce->deleteDepartment($id);
+                    $this->respond(['success' => true]);
+                }
+                if ($operation !== 'save') {
+                    throw new InvalidArgumentException('Thao tác phòng ban không hợp lệ.');
+                }
+
+                $this->respond(['id' => $workforce->saveDepartment($payload)], 201);
             }
             if ($resource === 'user-mappings') {
                 $this->requireAdmin($user['role']);
@@ -66,17 +112,30 @@ class ApiController
             if ($resource === 'schedule') {
                 $date = $_GET['date'] ?? '';
                 if ($method === 'GET') {
+                    $includeInactive = ($_GET['includeInactive'] ?? '') === '1';
                     if (!is_string($date)) {
                         throw new InvalidArgumentException('Ngày không hợp lệ.');
                     }
                     $this->respond([
                         'assignments' => $workforce->listAssignments($date, $employeeId),
-                        'shiftTypes' => $workforce->listShiftTypes(),
+                        'shiftTypes' => $workforce->listShiftTypes($includeInactive),
                     ]);
                 }
                 $this->requireAdmin($user['role']);
                 $payload = $this->readPayload();
                 $operation = $payload['operation'] ?? 'save';
+                if ($operation === 'shift-status') {
+                    $id = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
+                    $active = $payload['active'] ?? null;
+                    if (!$id || $id < 1 || !is_bool($active)) {
+                        throw new InvalidArgumentException('Thông tin trạng thái ca làm việc không hợp lệ.');
+                    }
+                    $workforce->setShiftTypeActive($id, $active);
+                    $this->respond([
+                        'success' => true,
+                        'shiftTypes' => $workforce->listShiftTypes(true),
+                    ]);
+                }
                 if ($operation === 'cancel') {
                     $id = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
                     if (!$id || $id < 1) {
