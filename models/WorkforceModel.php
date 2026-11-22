@@ -88,7 +88,7 @@ class WorkforceModel extends BaseModel
              FROM nhan_vien e
              LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
              WHERE e.trang_thai = 1
-             ORDER BY e.ma_nhan_vien ASC'
+             ORDER BY e.ho_ten'
         )->fetchAll();
     }
 
@@ -359,7 +359,7 @@ class WorkforceModel extends BaseModel
 
         if ($employeeCode !== null) {
             $employeeCode = trim($employeeCode);
-            if ($employeeCode === '' || lumicineUtf8Length($employeeCode) > 32) {
+            if ($employeeCode === '' || mb_strlen($employeeCode) > 32) {
                 throw new InvalidArgumentException('Mã nhân viên không hợp lệ.');
             }
 
@@ -378,7 +378,7 @@ class WorkforceModel extends BaseModel
         }
 
         $account = $this->pdo->prepare(
-            'SELECT id FROM lumicine_users WHERE id = :user_id LIMIT 1'
+            'SELECT id FROM lumicine_users WHERE id = :user_id AND role = \'employee\' LIMIT 1'
         );
         $account->execute(['user_id' => $userId]);
         if ($account->fetchColumn() === false) {
@@ -504,7 +504,7 @@ class WorkforceModel extends BaseModel
         }
         $this->validateTime($start);
         $this->validateTime($end);
-        if ($location === '' || lumicineUtf8Length($location) > 100) {
+        if ($location === '' || mb_strlen($location) > 100) {
             throw new InvalidArgumentException('Địa điểm làm việc không hợp lệ.');
         }
 
@@ -795,12 +795,12 @@ class WorkforceModel extends BaseModel
                            ELSE \'rejected\'
                        END AS status
                 FROM tang_ca o
-                LEFT JOIN cham_cong c ON c.id = o.cham_cong_id
-                LEFT JOIN phan_ca a ON a.id = c.phan_ca_id
-                INNER JOIN nhan_vien e ON e.id = COALESCE(o.nhan_vien_id, a.nhan_vien_id)';
+                INNER JOIN cham_cong c ON c.id = o.cham_cong_id
+                INNER JOIN phan_ca a ON a.id = c.phan_ca_id
+                INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id';
         $parameters = [];
         if ($employeeId !== null) {
-            $sql .= ' WHERE COALESCE(o.nhan_vien_id, a.nhan_vien_id) = :employee_id';
+            $sql .= ' WHERE a.nhan_vien_id = :employee_id';
             $parameters['employee_id'] = $employeeId;
         }
         $sql .= ' ORDER BY o.created_at DESC, o.id DESC';
@@ -814,23 +814,92 @@ class WorkforceModel extends BaseModel
     {
         $startDate = $this->parseDateTime($start);
         $endDate = $this->parseDateTime($end);
-        if ($endDate <= $startDate || lumicineUtf8Length($reason) < 5 || lumicineUtf8Length($reason) > 1000) {
+        if ($endDate <= $startDate || mb_strlen($reason) < 5 || mb_strlen($reason) > 1000) {
             throw new InvalidArgumentException('Thời gian hoặc lý do tăng ca không hợp lệ.');
-        }
-        if ($this->overlapsAdministrativeHours($startDate, $endDate)) {
-            throw new InvalidArgumentException('Chỉ được đăng ký tăng ca ngoài giờ hành chính 08:00 - 17:00.');
         }
 
         $this->pdo->beginTransaction();
         try {
+            $assignmentStatement = $this->pdo->prepare(
+                'SELECT a.id, a.ngay_lam AS work_date,
+                        c.gio_bat_dau AS shift_start, c.gio_ket_thuc AS shift_end
+                 FROM phan_ca a
+                 INNER JOIN ca_lam_viec c ON c.id = a.ca_lam_viec_id
+                 WHERE a.nhan_vien_id = :employee_id
+                       AND a.ngay_lam BETWEEN :from_date AND :work_date
+                       AND a.trang_thai = \'DA_PHAN\'
+                 ORDER BY a.ngay_lam, c.gio_bat_dau, a.id
+                 FOR UPDATE'
+            );
+            $assignmentStatement->execute([
+                'employee_id' => $employeeId,
+                'work_date' => $startDate->format('Y-m-d'),
+                'from_date' => $startDate->modify('-1 day')->format('Y-m-d'),
+            ]);
+            $assignments = $assignmentStatement->fetchAll();
+            if ($assignments === []) {
+                throw new InvalidArgumentException('Bạn chưa được phân ca trong ngày tăng ca.');
+            }
+
+            $matchingAssignmentId = null;
+            foreach ($assignments as $assignment) {
+                if ((string) $assignment['work_date'] === $startDate->format('Y-m-d')) {
+                    $matchingAssignmentId = (int) $assignment['id'];
+                    break;
+                }
+            }
+            if ($matchingAssignmentId === null) {
+                $matchingAssignmentId = (int) $assignments[0]['id'];
+            }
+
+            foreach ($assignments as $assignment) {
+                $shiftStart = $this->parseDateTime(
+                    (string) $assignment['work_date'] . 'T' . substr((string) $assignment['shift_start'], 0, 5)
+                );
+                $shiftEnd = $this->parseDateTime(
+                    (string) $assignment['work_date'] . 'T' . substr((string) $assignment['shift_end'], 0, 5)
+                );
+                if ($shiftEnd <= $shiftStart) {
+                    $shiftEnd = $shiftEnd->modify('+1 day');
+                }
+
+                if ($startDate < $shiftEnd && $endDate > $shiftStart) {
+                    throw new InvalidArgumentException(
+                        'Thời gian tăng ca không hợp lệ vì trùng hoặc nằm trong giờ làm việc '
+                        . $shiftStart->format('H:i') . ' - ' . $shiftEnd->format('H:i') . ' ngày '
+                        . $assignment['work_date'] . '.'
+                    );
+                }
+            }
+
+            $assignmentId = $matchingAssignmentId;
+
+            $createAttendance = $this->pdo->prepare(
+                'INSERT INTO cham_cong (nhan_vien_id, phan_ca_id, trang_thai)
+                 VALUES (:employee_id, :assignment_id, \'CHUA_CHECK_IN\')
+                 ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)'
+            );
+            $createAttendance->execute([
+                'employee_id' => $employeeId,
+                'assignment_id' => $assignmentId,
+            ]);
+            $attendanceStatement = $this->pdo->prepare(
+                'SELECT id FROM cham_cong WHERE phan_ca_id = :assignment_id'
+            );
+            $attendanceStatement->execute(['assignment_id' => $assignmentId]);
+            $attendanceId = $attendanceStatement->fetchColumn();
+            if ($attendanceId === false) {
+                throw new RuntimeException('Không thể liên kết đơn tăng ca với lịch chấm công.');
+            }
+
             $insert = $this->pdo->prepare(
-                'INSERT INTO tang_ca (nhan_vien_id, cham_cong_id, gio_bat_dau, gio_ket_thuc, tong_phut_tang_ca, ly_do, trang_thai)
-                 VALUES (:employee_id, NULL, :start_at, :end_at, TIMESTAMPDIFF(MINUTE, :start_at_calc, :end_at_calc), :reason, \'CHO_DUYET\')'
+                'INSERT INTO tang_ca (cham_cong_id, gio_bat_dau, gio_ket_thuc, tong_phut_tang_ca, ly_do, trang_thai)
+                 VALUES (:attendance_id, :start_at, :end_at, TIMESTAMPDIFF(MINUTE, :start_at_calc, :end_at_calc), :reason, \'CHO_DUYET\')'
             );
             $startValue = $startDate->format('Y-m-d H:i:s');
             $endValue = $endDate->format('Y-m-d H:i:s');
             $insert->execute([
-                'employee_id' => $employeeId,
+                'attendance_id' => $attendanceId,
                 'start_at' => $startValue,
                 'end_at' => $endValue,
                 'start_at_calc' => $startValue,
@@ -966,95 +1035,18 @@ class WorkforceModel extends BaseModel
     public function reviewOvertime(int $requestId, string $status, ?int $reviewerId): void
     {
         $databaseStatus = $status === 'approved' ? 'DA_DUYET' : 'TU_CHOI';
-        $this->pdo->beginTransaction();
-        try {
-            $requestStatement = $this->pdo->prepare(
-                'SELECT o.id, o.nhan_vien_id, o.cham_cong_id,
-                        o.gio_bat_dau, o.gio_ket_thuc, o.trang_thai
-                 FROM tang_ca o
-                 WHERE o.id = :id AND o.trang_thai = \'CHO_DUYET\' FOR UPDATE'
-            );
-            $requestStatement->execute(['id' => $requestId]);
-            $request = $requestStatement->fetch();
-            if ($request === false) {
-                throw new InvalidArgumentException('Đơn tăng ca không tồn tại hoặc đã được xử lý.');
-            }
-
-            if ($status === 'approved') {
-                $employeeId = (int) ($request['nhan_vien_id'] ?? 0);
-                if ($employeeId === 0 && $request['cham_cong_id'] !== null) {
-                    $legacyStatement = $this->pdo->prepare(
-                        'SELECT nhan_vien_id FROM cham_cong WHERE id = :attendance_id'
-                    );
-                    $legacyStatement->execute(['attendance_id' => $request['cham_cong_id']]);
-                    $employeeId = (int) ($legacyStatement->fetchColumn() ?: 0);
-                }
-                if ($employeeId < 1) {
-                    throw new InvalidArgumentException('Đơn tăng ca chưa gắn hồ sơ nhân viên.');
-                }
-                $start = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string) $request['gio_bat_dau']);
-                $end = DateTimeImmutable::createFromFormat('Y-m-d H:i:s', (string) $request['gio_ket_thuc']);
-                if (!$start || !$end || $end <= $start || $this->overlapsAdministrativeHours($start, $end)) {
-                    throw new InvalidArgumentException('Chỉ được duyệt tăng ca ngoài giờ hành chính 08:00 - 17:00.');
-                }
-                if ($request['cham_cong_id'] === null) {
-                    $shiftStart = $start->format('H:i:s');
-                    $shiftEnd = $end->format('H:i:s');
-                    $shiftId = $this->findOrCreateShiftType($shiftStart, $shiftEnd);
-
-                    $assignmentStatement = $this->pdo->prepare(
-                        'INSERT INTO phan_ca (nhan_vien_id, ca_lam_viec_id, ngay_lam, dia_diem, trang_thai)
-                         VALUES (:employee_id, :shift_id, :work_date, :location, \'DA_PHAN\')'
-                    );
-                    $assignmentStatement->execute([
-                        'employee_id' => $employeeId,
-                        'shift_id' => $shiftId,
-                        'work_date' => $start->format('Y-m-d'),
-                        'location' => 'Tăng ca',
-                    ]);
-                    $assignmentId = (int) $this->pdo->lastInsertId();
-
-                    $attendanceStatement = $this->pdo->prepare(
-                        'INSERT INTO cham_cong (nhan_vien_id, phan_ca_id, trang_thai)
-                         VALUES (:employee_id, :assignment_id, \'CHUA_CHECK_IN\')'
-                    );
-                    $attendanceStatement->execute([
-                        'employee_id' => $employeeId,
-                        'assignment_id' => $assignmentId,
-                    ]);
-                    $attendanceId = (int) $this->pdo->lastInsertId();
-
-                    $linkStatement = $this->pdo->prepare(
-                        'UPDATE tang_ca
-                         SET cham_cong_id = :attendance_id
-                         WHERE id = :id'
-                    );
-                    $linkStatement->execute([
-                        'attendance_id' => $attendanceId,
-                        'id' => $requestId,
-                    ]);
-                }
-            }
-
-            $statement = $this->pdo->prepare(
-                'UPDATE tang_ca
-                 SET trang_thai = :status, nguoi_duyet_id = :reviewer_id
-                 WHERE id = :id AND trang_thai = \'CHO_DUYET\''
-            );
-            $statement->execute([
-                'status' => $databaseStatus,
-                'reviewer_id' => $reviewerId,
-                'id' => $requestId,
-            ]);
-            if ($statement->rowCount() === 0) {
-                throw new InvalidArgumentException('Đơn tăng ca không tồn tại hoặc đã được xử lý.');
-            }
-            $this->pdo->commit();
-        } catch (Throwable $exception) {
-            if ($this->pdo->inTransaction()) {
-                $this->pdo->rollBack();
-            }
-            throw $exception;
+        $statement = $this->pdo->prepare(
+            'UPDATE tang_ca
+             SET trang_thai = :status, nguoi_duyet_id = :reviewer_id
+             WHERE id = :id AND trang_thai = \'CHO_DUYET\''
+        );
+        $statement->execute([
+            'status' => $databaseStatus,
+            'reviewer_id' => $reviewerId,
+            'id' => $requestId,
+        ]);
+        if ($statement->rowCount() === 0) {
+            throw new InvalidArgumentException('Đơn tăng ca không tồn tại hoặc đã được xử lý.');
         }
     }
 
@@ -1073,7 +1065,7 @@ class WorkforceModel extends BaseModel
     public function addHoliday(string $date, string $name, string $type): void
     {
         $this->validateDate($date);
-        if (lumicineUtf8Length(trim($name)) === 0 || lumicineUtf8Length(trim($name)) > 150) {
+        if (mb_strlen(trim($name)) === 0 || mb_strlen(trim($name)) > 150) {
             throw new InvalidArgumentException('Tên ngày nghỉ không hợp lệ.');
         }
         if (!in_array($type, ['holiday', 'workday'], true)) {
@@ -1104,58 +1096,12 @@ class WorkforceModel extends BaseModel
         }
     }
 
-    public function payrollStartDay(): int
-    {
-        $statement = $this->pdo->prepare(
-            'SELECT setting_value FROM lumicine_settings WHERE setting_key = :setting_key'
-        );
-        $statement->execute(['setting_key' => 'payroll_start_day']);
-        $value = $statement->fetchColumn();
-        $day = filter_var($value, FILTER_VALIDATE_INT);
-        if ($value === false || $day === false || $day < 1 || $day > 31) {
-            throw new RuntimeException('Ngày bắt đầu kỳ lương trong cài đặt không hợp lệ.');
-        }
-
-        return $day;
-    }
-
-    public function savePayrollStartDay(int $day): void
-    {
-        if ($day < 1 || $day > 31) {
-            throw new InvalidArgumentException('Ngày bắt đầu kỳ lương phải từ 1 đến 31.');
-        }
-
-        $statement = $this->pdo->prepare(
-            'INSERT INTO lumicine_settings (setting_key, setting_value)
-             VALUES (\'payroll_start_day\', :insert_value)
-             ON DUPLICATE KEY UPDATE setting_value = :update_value'
-        );
-        $statement->execute([
-            'insert_value' => (string) $day,
-            'update_value' => (string) $day,
-        ]);
-    }
-
     public function attendanceReport(int $month, int $year): array
     {
         if ($month < 1 || $month > 12 || $year < 2020 || $year > 2100) {
             throw new InvalidArgumentException('Kỳ báo cáo không hợp lệ.');
         }
 
-        $startDay = $this->payrollStartDay();
-        $periodStart = new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
-        $periodStart = $periodStart->setDate(
-            $year,
-            $month,
-            min($startDay, (int) $periodStart->format('t'))
-        );
-        $nextPeriodStart = $periodStart->modify('first day of next month');
-        $nextPeriodStart = $nextPeriodStart->setDate(
-            (int) $nextPeriodStart->format('Y'),
-            (int) $nextPeriodStart->format('n'),
-            min($startDay, (int) $nextPeriodStart->format('t'))
-        );
-        $periodEnd = $nextPeriodStart->modify('-1 day')->format('Y-m-d');
         $statement = $this->pdo->prepare(
             'SELECT e.id, e.ma_nhan_vien AS employee_code, e.ho_ten AS name,
                     COALESCE(d.ten_phong_ban, \'\') AS department,
@@ -1168,7 +1114,8 @@ class WorkforceModel extends BaseModel
              LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
              LEFT JOIN phan_ca a ON a.nhan_vien_id = e.id
                   AND a.trang_thai = \'DA_PHAN\'
-                  AND a.ngay_lam BETWEEN :period_start AND :period_end
+                  AND MONTH(a.ngay_lam) = :month
+                  AND YEAR(a.ngay_lam) = :year
              LEFT JOIN cham_cong c ON c.phan_ca_id = a.id
              LEFT JOIN (
                  SELECT t.cham_cong_id, SUM(t.tong_phut_tang_ca) AS overtime_minutes
@@ -1178,10 +1125,7 @@ class WorkforceModel extends BaseModel
              WHERE e.trang_thai = 1
              ORDER BY e.ho_ten, a.ngay_lam'
         );
-        $statement->execute([
-            'period_start' => $periodStart->format('Y-m-d'),
-            'period_end' => $periodEnd,
-        ]);
+        $statement->execute(['month' => $month, 'year' => $year]);
         $rows = $statement->fetchAll();
         $employees = [];
 
@@ -1318,22 +1262,5 @@ class WorkforceModel extends BaseModel
         }
 
         return $parsed;
-    }
-
-    private function overlapsAdministrativeHours(DateTimeImmutable $start, DateTimeImmutable $end): bool
-    {
-        $date = $start->setTime(0, 0);
-        $lastDate = $end->setTime(0, 0);
-
-        while ($date <= $lastDate) {
-            $workStart = $date->setTime(8, 0);
-            $workEnd = $date->setTime(17, 0);
-            if ($start < $workEnd && $end > $workStart) {
-                return true;
-            }
-            $date = $date->modify('+1 day');
-        }
-
-        return false;
     }
 }
