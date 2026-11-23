@@ -8,6 +8,7 @@ $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'U
 $pages = [
     'overview' => ['title' => 'Tổng quan', 'kicker' => 'KHÔNG GIAN LÀM VIỆC', 'description' => 'Tổng quan hoạt động nhân sự và chấm công.'],
     'employees' => ['title' => 'Quản lý nhân viên', 'kicker' => 'NHÂN SỰ', 'description' => 'Quản lý thông tin và hồ sơ nhân viên.'],
+    'accounts' => ['title' => 'Quản lý tài khoản', 'kicker' => 'TÀI KHOẢN NHÂN VIÊN', 'description' => 'Cấp và quản lý thông tin đăng nhập cho nhân viên.'],
     'schedule' => ['title' => 'Phân ca làm việc', 'kicker' => 'LỊCH LÀM VIỆC', 'description' => 'Tạo và quản lý ca làm việc cho nhân viên theo từng ngày.'],
     'attendance' => ['title' => 'Quản lý chấm công', 'kicker' => 'CHẤM CÔNG', 'description' => 'Theo dõi và quản lý dữ liệu chấm công nhân viên.'],
     'overtime' => ['title' => 'Duyệt tăng ca và nghỉ phép', 'kicker' => 'TĂNG CA & NGHỈ PHÉP', 'description' => 'Xem và xử lý đơn đăng ký tăng ca, nghỉ phép.'],
@@ -41,6 +42,7 @@ $isSchedule = $section === 'schedule';
         <nav class="nav flex-column sidebar-nav">
             <a class="nav-link <?= $section === 'overview' ? 'active' : '' ?>" href="?action=admin-overview"><i class="bi bi-grid-1x2"></i><span>Tổng quan</span></a>
             <a class="nav-link <?= $section === 'employees' ? 'active' : '' ?>" href="?action=admin-employees"><i class="bi bi-people"></i><span>Quản lý nhân viên</span></a>
+            <a class="nav-link <?= $section === 'accounts' ? 'active' : '' ?>" href="?action=admin-accounts"><i class="bi bi-person-lock"></i><span>Quản lý tài khoản</span></a>
             <a class="nav-link <?= $section === 'schedule' ? 'active' : '' ?>" href="?action=admin-schedule"><i class="bi bi-calendar-week"></i><span>Phân ca làm việc</span></a>
             <a class="nav-link <?= $section === 'attendance' ? 'active' : '' ?>" href="?action=admin-attendance"><i class="bi bi-calendar2-check"></i><span>Quản lý chấm công</span></a>
             <a class="nav-link <?= $section === 'overtime' ? 'active' : '' ?>" href="?action=admin-overtime"><i class="bi bi-clock-history"></i><span>Duyệt tăng ca & nghỉ phép</span></a>
@@ -296,6 +298,41 @@ $isSchedule = $section === 'schedule';
                 <?php else: ?>
                     <section class="data-card"><div class="table-card-header"><div><h2><?= $section === 'attendance' ? 'Dữ liệu chấm công' : 'Danh sách nhân viên' ?></h2><p><?= $section === 'attendance' ? 'Tổng hợp ngày công theo nhân viên.' : 'Thông tin nhân viên trong hệ thống.' ?></p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th><?php if ($section === 'attendance'): ?><th>Ngày công</th><th>Nghỉ phép</th><th>Vắng không phép</th><th>Đi muộn</th><th>Phút về sớm</th><?php endif; ?></tr></thead><tbody><?php foreach ($employees as $employee): ?><tr><td><?= $escape($employee['id']) ?></td><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= $escape($employee['position']) ?></td><?php if ($section === 'attendance'): ?><td><?= (int) $employee['worked'] ?> ngày</td><td><?= (int) $employee['leave'] ?> ngày</td><td><?= (int) $employee['absent'] ?> ngày</td><td><?= (int) $employee['late'] ?> lượt / <?= (int) $employee['lateMinutes'] ?> phút</td><td><?= (int) $employee['earlyMinutes'] ?></td><?php endif; ?></tr><?php endforeach; ?></tbody></table></div></section>
                 <?php endif; ?>
+            <?php elseif ($section === 'accounts'): ?>
+                <section class="data-card account-management" aria-labelledby="employee-accounts-title">
+                    <div class="table-card-header workforce-card-header">
+                        <div>
+                            <h2 id="employee-accounts-title">Tài khoản nhân viên</h2>
+                            <p>Mỗi hồ sơ nhân viên chỉ được cấp một tài khoản. Mật khẩu được lưu dạng mã hóa và không thể xem lại.</p>
+                        </div>
+                        <button class="button button-primary" type="button" id="add-employee-account" <?= $accountEmployees === [] ? 'disabled' : '' ?>><i class="bi bi-person-plus"></i> Thêm tài khoản</button>
+                    </div>
+                    <?php if ($accountEmployees === []): ?><p class="account-management-feedback">Không có nhân viên đang làm việc chưa được cấp tài khoản.</p><?php endif; ?>
+                    <p class="account-management-feedback" id="employee-accounts-feedback" role="status" aria-live="polite"></p>
+                    <div class="table-wrap">
+                        <table class="employee-table">
+                            <thead><tr><th>Mã nhân viên</th><th>Nhân viên</th><th>Tên đăng nhập</th><th>Thao tác</th></tr></thead>
+                            <tbody>
+                                <?php if ($employeeAccounts === []): ?>
+                                    <tr><td colspan="4">Chưa có tài khoản nhân viên.</td></tr>
+                                <?php else: ?>
+                                    <?php foreach ($employeeAccounts as $account): ?>
+                                        <tr data-account-row data-id="<?= (int) $account['id'] ?>" data-username="<?= $escape($account['username']) ?>">
+                                            <td><?= $escape($account['code'] ?? '—') ?></td>
+                                            <td><?= $escape($account['employee_name']) ?></td>
+                                            <td><strong><?= $escape($account['username']) ?></strong></td>
+                                            <td class="workforce-row-actions">
+                                                <button class="button button-outline" type="button" data-edit-account>Sửa</button>
+                                                <button class="button button-light" type="button" data-delete-account>Xóa</button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                <p class="account-password-note"><i class="bi bi-shield-lock"></i> Khi sửa tài khoản, để trống mật khẩu nếu không muốn thay đổi. Để đổi mật khẩu, nhập mật khẩu mới.</p>
             <?php elseif ($section === 'settings'): ?>
                 <section class="data-card"><div class="table-card-header"><div><h2>Cài đặt hệ thống</h2><p>Cấu hình chung cho LumiCine.</p></div></div><div class="settings-grid"><label>Giờ bắt đầu ca<input type="time" value="08:00"></label><label>Giờ kết thúc ca<input type="time" value="17:00"></label><label>Ngày công chuẩn/tháng<input type="number" min="1" max="31" value="22"></label><button class="button button-primary" type="button">Lưu cài đặt</button></div></section>
                 <section class="data-card" aria-labelledby="payroll-settings-title">
@@ -346,6 +383,32 @@ $isSchedule = $section === 'schedule';
         </form>
     </dialog>
 <?php endif; ?>
+<?php if ($section === 'accounts'): ?>
+    <dialog class="holiday-dialog workforce-dialog account-dialog" id="employee-account-dialog">
+        <form class="holiday-dialog-content workforce-form" id="employee-account-form">
+            <header class="dialog-heading">
+                <div><span class="page-kicker"><span></span> TÀI KHOẢN NHÂN VIÊN</span><h2 id="employee-account-dialog-title">Thêm tài khoản</h2><p>Mật khẩu phải có ít nhất 8 ký tự; hệ thống chỉ lưu mật khẩu dạng băm.</p></div>
+                <button class="dialog-close" type="button" data-close-account-dialog aria-label="Đóng"><i class="bi bi-x-lg"></i></button>
+            </header>
+            <input id="employee-account-id" type="hidden">
+            <label class="dialog-field" id="account-employee-field">Nhân viên
+                <select id="account-employee" required>
+                    <option value="">Chọn nhân viên</option>
+                    <?php foreach ($accountEmployees as $employee): ?>
+                        <option value="<?= (int) $employee['id'] ?>"><?= $escape($employee['code']) ?> — <?= $escape($employee['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </label>
+            <label class="dialog-field">Tên đăng nhập<input id="account-username" type="text" maxlength="190" autocomplete="username" required></label>
+            <label class="dialog-field" id="account-password-field">Mật khẩu<input id="account-password" type="password" minlength="8" maxlength="72" autocomplete="new-password"></label>
+            <p class="workforce-dialog-feedback" id="employee-account-dialog-feedback" role="status" aria-live="polite"></p>
+            <footer class="dialog-actions">
+                <button class="button button-light" type="button" data-close-account-dialog>Hủy</button>
+                <button class="button button-primary" type="submit" id="save-employee-account">Lưu tài khoản</button>
+            </footer>
+        </form>
+    </dialog>
+<?php endif; ?>
 <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container" aria-live="polite"></div>
 <script src="assets/js/admin-section.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/admin-section.js') ?>" defer></script>
 <script src="assets/js/admin-section.js?v=20261121" defer></script>
@@ -365,6 +428,9 @@ $isSchedule = $section === 'schedule';
     <script src="assets/js/workforce-management.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/workforce-management.js') ?>" defer></script>
 <?php elseif ($section === 'settings'): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
+<?php elseif ($section === 'accounts'): ?>
+    <?php require PATH_VIEW . 'api-config.php'; ?>
+    <script src="assets/js/employee-accounts.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/employee-accounts.js') ?>" defer></script>
 <?php endif; ?>
 </body>
 </html>

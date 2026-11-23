@@ -295,4 +295,89 @@
             }
         });
     }
+
+    const passwordForm = document.getElementById('employee-password-form');
+    if (passwordForm) {
+        const passwordCard = document.getElementById('employee-password-card');
+        const passwordToggle = document.getElementById('toggle-password-form');
+        if (passwordCard && passwordToggle) {
+            const toggleLabel = passwordToggle.querySelector('[data-password-toggle-label]');
+            passwordToggle.addEventListener('click', () => {
+                passwordCard.hidden = !passwordCard.hidden;
+                const isOpen = !passwordCard.hidden;
+                passwordToggle.setAttribute('aria-expanded', String(isOpen));
+                toggleLabel.textContent = isOpen ? 'Đóng đổi mật khẩu' : 'Đổi mật khẩu';
+                if (isOpen) {
+                    passwordForm.elements.newPassword.focus();
+                } else {
+                    passwordForm.reset();
+                    setFeedback(document.getElementById('password-feedback'), '');
+                }
+            });
+        }
+
+        const keepPasswordButton = passwordForm.querySelector('[data-keep-password]');
+        const savePasswordButton = passwordForm.querySelector('button[type="submit"]');
+        const passwordFeedback = document.getElementById('password-feedback');
+        const completeForcedPrompt = () => {
+            if (passwordForm.dataset.required === '1') {
+                window.location.replace('?action=dashboard');
+            }
+        };
+
+        if (keepPasswordButton) {
+            keepPasswordButton.addEventListener('click', async () => {
+                keepPasswordButton.disabled = true;
+                savePasswordButton.disabled = true;
+                setFeedback(passwordFeedback, '');
+                try {
+                    await window.lumiCineApi('change-password', {
+                        method: 'POST',
+                        body: {
+                            operation: 'keep',
+                            dontShowAgain: document.getElementById('dont-show-password-prompt').checked,
+                        },
+                    });
+                    setFeedback(passwordFeedback, 'Bạn đang sử dụng mật khẩu hiện tại.');
+                    completeForcedPrompt();
+                } catch (error) {
+                    setFeedback(passwordFeedback, error instanceof Error ? error.message : 'Không thể lưu lựa chọn.', true);
+                } finally {
+                    keepPasswordButton.disabled = false;
+                    savePasswordButton.disabled = false;
+                }
+            });
+        }
+
+        passwordForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (!passwordForm.reportValidity()) return;
+
+            savePasswordButton.disabled = true;
+            if (keepPasswordButton) keepPasswordButton.disabled = true;
+            setFeedback(passwordFeedback, '');
+            try {
+                const body = {
+                    newPassword: passwordForm.elements.newPassword.value,
+                    confirmation: passwordForm.elements.confirmation.value,
+                };
+                const currentPasswordInput = passwordForm.elements.currentPassword;
+                if (currentPasswordInput) {
+                    body.currentPassword = currentPasswordInput.value;
+                }
+                await window.lumiCineApi('change-password', {
+                    method: 'POST',
+                    body,
+                });
+                passwordForm.reset();
+                setFeedback(passwordFeedback, 'Đã đổi mật khẩu thành công.');
+                completeForcedPrompt();
+            } catch (error) {
+                setFeedback(passwordFeedback, error instanceof Error ? error.message : 'Không thể đổi mật khẩu.', true);
+            } finally {
+                savePasswordButton.disabled = false;
+                if (keepPasswordButton) keepPasswordButton.disabled = false;
+            }
+        });
+    }
 })();

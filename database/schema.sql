@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS lumicine_users (
     display_name VARCHAR(120) NOT NULL,
     employee_code VARCHAR(32) NULL,
     password_hash VARCHAR(255) NOT NULL,
+    must_change_password TINYINT(1) NOT NULL DEFAULT 0,
     role ENUM('employee', 'accountant', 'hr', 'chairman') NOT NULL DEFAULT 'employee',
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

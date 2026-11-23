@@ -17,12 +17,13 @@ $sections = [
     'leave' => ['kicker' => 'NGHỈ PHÉP', 'title' => 'Đăng ký nghỉ phép', 'description' => 'Tạo đơn xin nghỉ và theo dõi trạng thái duyệt.'],
     'requests' => ['kicker' => 'YÊU CẦU CỦA TÔI', 'title' => 'Đơn của tôi', 'description' => 'Theo dõi trạng thái xử lý các đơn bạn đã gửi.'],
     'notifications' => ['kicker' => 'CẬP NHẬT CÁ NHÂN', 'title' => 'Thông báo', 'description' => 'Thông tin liên quan đến chấm công và các đơn của bạn.'],
-    'profile' => ['kicker' => 'HỒ SƠ CÁ NHÂN', 'title' => 'Hồ sơ cá nhân', 'description' => 'Xem thông tin nhân sự và cập nhật thông tin liên hệ được phép.'],
+    'profile' => ['kicker' => 'HỒ SƠ CÁ NHÂN', 'title' => 'Hồ sơ cá nhân', 'description' => 'Xem hồ sơ, cập nhật thông tin liên hệ và đổi mật khẩu.'],
     'schedule' => ['kicker' => 'LỊCH LÀM VIỆC', 'title' => 'Lịch làm việc', 'description' => 'Xem lịch làm việc cá nhân.'],
     'employees' => ['kicker' => 'DANH SÁCH NHÂN VIÊN', 'title' => 'Nhân viên', 'description' => 'Thông tin nhân viên trong tổ chức.'],
     'reports' => ['kicker' => 'BÁO CÁO', 'title' => 'Báo cáo', 'description' => 'Thống kê và báo cáo hoạt động nhân sự.'],
 ];
 $page = $sections[$section] ?? $sections['dashboard'];
+$mustChangePassword = !empty($currentUser['must_change_password']);
 $isOvertime = $section === 'overtime';
 $isLeave = $section === 'leave';
 $isTimesheet = $section === 'timesheet';
@@ -89,7 +90,7 @@ $attendanceSummary = !$attendanceToday
     <title><?= $escape($page['title']) ?> | LumiCine</title>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link href="assets/css/employee.css" rel="stylesheet">
+    <link href="assets/css/employee.css?v=<?= (int) filemtime(__DIR__ . '/../assets/css/employee.css') ?>" rel="stylesheet">
     <?php if ($isOvertime || $isLeave): ?><link href="assets/css/overtime.css" rel="stylesheet"><?php endif; ?>
 </head>
 <body>
@@ -155,7 +156,7 @@ $attendanceSummary = !$attendanceToday
                     </div>
                     <div class="welcome-status"><span>Trạng thái hôm nay</span><strong><?= $escape($attendanceSummary) ?></strong></div>
                 </section>
-                <section class="employee-stats">
+                <section class="employee-stats dashboard-stats">
                     <article class="stat-card"><div class="stat-top"><span>Giờ vào</span><i class="bi bi-box-arrow-in-right"></i></div><strong><?= $escape($attendanceToday['check_in'] ?? '') ?: '—' ?></strong><small>chấm công vào</small></article>
                     <article class="stat-card"><div class="stat-top"><span>Giờ ra</span><i class="bi bi-box-arrow-right"></i></div><strong><?= $escape($attendanceToday['check_out'] ?? '') ?: '—' ?></strong><small>chấm công ra</small></article>
                     <article class="stat-card"><div class="stat-top"><span>Tổng giờ làm hôm nay</span><i class="bi bi-hourglass-split"></i></div><strong><?= $escape($formatHours($todayWorkMinutes)) ?></strong><small>theo dữ liệu chấm công</small></article>
@@ -187,12 +188,29 @@ $attendanceSummary = !$attendanceToday
                         <div><dt>Ngày sinh</dt><dd><?= $escape($profileBirthDate) ?></dd></div>
                         <div><dt>Phòng ban</dt><dd><?= $escape($employeeProfile['department'] ?: 'Chưa cập nhật') ?></dd></div><div><dt>Chức vụ</dt><dd><?= $escape($employeeProfile['position'] ?: 'Chưa cập nhật') ?></dd></div><div><dt>Ngày vào làm</dt><dd><?= $escape($profileHireDate) ?></dd></div>
                     </dl></div>
-                    <?php if ($currentUser['role'] === 'employee'): ?>
+                    <?php if ($currentUser['role'] === 'employee' && $employeeId !== null && !$mustChangePassword): ?>
                         <form id="employee-profile-form" class="profile-form"><div><label for="profile-phone">Số điện thoại</label><input id="profile-phone" name="phone" type="tel" maxlength="30" value="<?= $escape($employeeProfile['phone'] ?? '') ?>" autocomplete="tel"></div><div><label for="profile-email">Email</label><input id="profile-email" name="email" type="email" maxlength="190" value="<?= $escape($employeeProfile['email'] ?? '') ?>" autocomplete="email"></div><p class="profile-form-note">Bạn chỉ có thể tự cập nhật số điện thoại và email. Họ tên, mã nhân viên, phòng ban, chức vụ và ngày công do quản lý hồ sơ cập nhật.</p><div class="profile-form-actions"><span id="profile-feedback" role="status" aria-live="polite"></span><button class="primary-button" type="submit">Lưu thông tin liên hệ</button></div></form>
                     <?php else: ?>
                         <p class="profile-form-note profile-readonly-note">Thông tin hồ sơ chỉ đọc trong không gian này.</p>
                     <?php endif; ?>
                 </section>
+                <?php if ($currentUser['role'] === 'employee'): ?>
+                    <div class="profile-password-toggle">
+                        <button class="primary-button" id="toggle-password-form" type="button" aria-expanded="false" aria-controls="employee-password-card">
+                            <i class="bi bi-key"></i><span data-password-toggle-label>Đổi mật khẩu</span>
+                        </button>
+                    </div>
+                    <section class="schedule-card profile-password-card" id="employee-password-card" hidden>
+                        <div class="schedule-heading"><div><h2>Đổi mật khẩu</h2><p>Nhập mật khẩu hiện tại và mật khẩu mới của bạn.</p></div></div>
+                        <form id="employee-password-form" class="profile-form" data-required="0">
+                            <div><label for="current-password">Mật khẩu hiện tại</label><input id="current-password" name="currentPassword" type="password" autocomplete="current-password" required></div>
+                            <div><label for="new-password">Mật khẩu mới</label><input id="new-password" name="newPassword" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></div>
+                            <div><label for="confirm-password">Nhập lại mật khẩu mới</label><input id="confirm-password" name="confirmation" type="password" minlength="8" maxlength="72" autocomplete="new-password" required></div>
+                            <p class="profile-form-note">Mật khẩu mới cần có ít nhất 8 ký tự.</p>
+                            <div class="profile-form-actions"><span id="password-feedback" role="status" aria-live="polite"></span><button class="primary-button" type="submit">Cập nhật mật khẩu</button></div>
+                        </form>
+                    </section>
+                <?php endif; ?>
             <?php elseif ($section === 'shift'): ?>
                 <section class="schedule-card"><div class="schedule-heading"><div><h2>Ca làm việc hôm nay</h2><p>Danh sách ca được phân công cho nhân viên.</p></div></div><div class="employee-table-wrap"><table class="employee-table"><thead><tr><th>Nhân viên</th><th>Bộ phận</th><th>Thời gian</th><th>Địa điểm</th><th>Trạng thái</th></tr></thead><tbody><?php foreach ($employeeShifts as $shift): ?><tr><td><?= $escape($shift['name']) ?></td><td><?= $escape($shift['department']) ?></td><td><?= $escape(substr($shift['start'], 0, 5)) ?> – <?= $escape(substr($shift['end'], 0, 5)) ?></td><td><?= $escape($shift['location']) ?></td><td><span class="shift-status <?= $escape($shift['status']) ?>"><?= $escape(['active' => 'Đang diễn ra', 'upcoming' => 'Sắp bắt đầu', 'completed' => 'Hoàn thành'][$shift['status']]) ?></span></td></tr><?php endforeach; ?><?php if (!$employeeShifts): ?><tr><td colspan="5">Chưa có ca làm việc được phân công hôm nay.</td></tr><?php endif; ?></tbody></table></div></section>
             <?php elseif ($section === 'employees'): ?>

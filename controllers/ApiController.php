@@ -29,6 +29,59 @@ class ApiController
         }
 
         try {
+            if ($resource === 'change-password') {
+                if ($user['role'] !== 'employee') {
+                    $this->respond(['error' => 'Chỉ nhân viên mới có thể đổi mật khẩu tại đây.'], 403);
+                }
+
+                $payload = $this->readPayload();
+                $operation = $payload['operation'] ?? 'change';
+                if ($operation === 'keep') {
+                    $dontShowAgain = $payload['dontShowAgain'] ?? null;
+                    if (!is_bool($dontShowAgain)) {
+                        throw new InvalidArgumentException('Lựa chọn nhắc đổi mật khẩu không hợp lệ.');
+                    }
+
+                    (new UserModel())->dismissEmployeePasswordPrompt(
+                        (int) $user['id'],
+                        $dontShowAgain
+                    );
+                    $_SESSION['user']['must_change_password'] = false;
+                    $this->respond(['success' => true]);
+                }
+                if ($operation !== 'change') {
+                    throw new InvalidArgumentException('Thao tác đổi mật khẩu không hợp lệ.');
+                }
+
+                $currentPassword = $payload['currentPassword'] ?? null;
+                $newPassword = $payload['newPassword'] ?? null;
+                $confirmation = $payload['confirmation'] ?? null;
+                if (
+                    ($currentPassword !== null && !is_string($currentPassword))
+                    || !is_string($newPassword)
+                    || !is_string($confirmation)
+                ) {
+                    throw new InvalidArgumentException('Thông tin đổi mật khẩu không hợp lệ.');
+                }
+
+                (new UserModel())->changeEmployeePassword(
+                    (int) $user['id'],
+                    $currentPassword,
+                    $newPassword,
+                    $confirmation
+                );
+                $_SESSION['user']['must_change_password'] = false;
+                $this->respond(['success' => true]);
+            }
+            if (
+                $user['role'] === 'employee'
+                && !empty($user['must_change_password'])
+            ) {
+                $this->respond([
+                    'error' => 'Bạn cần đổi mật khẩu trước khi sử dụng chức năng này.',
+                ], 403);
+            }
+
             $workforce = new WorkforceModel();
             $linkedEmployeeId = $workforce->findEmployeeIdByUserEmployeeId(
                 isset($user['employee_id']) ? (int) $user['employee_id'] : null
@@ -110,6 +163,30 @@ class ApiController
 
                 $workforce->updateEmployeeAccountMapping($userId, $employeeCode);
                 $this->respond(['success' => true]);
+            }
+            if ($resource === 'employee-accounts') {
+                $this->requireAdmin($user['role']);
+                $accounts = new UserModel();
+                if ($method === 'GET') {
+                    $this->respond([
+                        'accounts' => $accounts->listEmployeeAccounts(),
+                        'employees' => $accounts->listEmployeesWithoutAccounts(),
+                    ]);
+                }
+
+                $payload = $this->readPayload();
+                if (($payload['operation'] ?? 'save') === 'delete') {
+                    $id = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
+                    if (!$id || $id < 1) {
+                        throw new InvalidArgumentException('Tài khoản cần xóa không hợp lệ.');
+                    }
+                    $accounts->deleteEmployeeAccount($id, (int) $user['id']);
+                    $this->respond(['success' => true]);
+                }
+
+                $this->respond([
+                    'id' => $accounts->saveEmployeeAccount($payload, (int) $user['id']),
+                ], 201);
             }
             if ($resource === 'schedule') {
                 $date = $_GET['date'] ?? '';

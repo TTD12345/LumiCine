@@ -44,9 +44,11 @@ Get-Content -Raw .\database\migrations\2026-11-21-add-workforce-storage.sql |
     & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
 Get-Content -Raw .\database\migrations\2026-11-21-add-payroll-settings.sql |
     & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
+Get-Content -Raw .\database\migrations\2026-11-23-add-password-change-required.sql |
+    & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
 ```
 
-Các migration thêm `lumicine_users.employee_code`, `phan_ca.dia_diem`, bảng lịch nghỉ `lumicine_holidays` và cấu hình `lumicine_settings` (mặc định ngày bắt đầu kỳ lương là 10). Migration có thể chạy lại an toàn. Nếu MySQL không nằm ở đường dẫn trên, dùng đường dẫn `mysql.exe` tương ứng với cài đặt của bạn.
+Các migration thêm `lumicine_users.employee_code`, `phan_ca.dia_diem`, bảng lịch nghỉ `lumicine_holidays` và cấu hình `lumicine_settings` (mặc định ngày bắt đầu kỳ lương là 10). Migration mật khẩu đánh dấu các tài khoản nhân viên hiện có cần đổi mật khẩu một lần; chạy lại migration không đặt lại trạng thái này. Nếu MySQL không nằm ở đường dẫn trên, dùng đường dẫn `mysql.exe` tương ứng với cài đặt của bạn.
 
 Khi nâng cấp luồng tăng ca, chạy thêm migration riêng để cho phép đơn tăng ca lưu trước khi có phân ca:
 
@@ -109,6 +111,8 @@ Trang nhân viên và quản trị đọc/ghi dữ liệu qua PHP/MySQL; trình 
 
 - Quản trị viên phân ca cho nhân viên trong `phan_ca`; ca được lưu theo ngày và liên kết với `ca_lam_viec`. Có thể sửa/hủy ca khi chưa phát sinh chấm công hoặc tăng ca.
 - Tại **Quản lý nhân viên**, quản trị viên có thể thêm/sửa hồ sơ nhân viên, phân phòng ban, ngừng hoạt động hoặc kích hoạt lại hồ sơ, đồng thời thêm/sửa/xóa phòng ban. Ngừng hoạt động là khóa mềm để giữ lịch sử phân ca và chấm công; phòng ban đang được gán cho nhân viên không thể xóa. Khi đổi mã nhân viên đã liên kết với tài khoản, mapping được cập nhật cùng giao dịch.
+- Tại **Quản lý tài khoản**, quản trị viên có thể tạo, sửa tên đăng nhập, đặt lại mật khẩu và xóa tài khoản nhân viên. Mỗi nhân viên chỉ có một tài khoản; mật khẩu luôn được lưu bằng `password_hash` và không thể xem lại. Xóa tài khoản không xóa hồ sơ nhân viên.
+- Nhân viên có thể đổi mật khẩu trong **Hồ sơ cá nhân** bằng cách xác nhận mật khẩu hiện tại. Tài khoản nhân viên mới và các tài khoản đang có tại thời điểm chạy migration được chuyển đến màn hình riêng ngay sau khi đăng nhập; nhân viên có thể đổi mật khẩu hoặc giữ mật khẩu hiện tại. Chọn “Không hiện lại” sẽ lưu lựa chọn bỏ lời nhắc ở các lần đăng nhập sau; giữ mật khẩu mà không chọn thì lời nhắc sẽ xuất hiện lại ở lần đăng nhập kế tiếp.
 - Nhân viên chỉ xem lịch của mã nhân viên được liên kết với tài khoản.
 - Chấm công chỉ được ghi nhận trong ngày hiện tại khi nhân viên có phân ca. Thời gian lấy từ máy chủ; dữ liệu vào/ra được ghi vào `cham_cong`.
 - Đơn tăng ca được liên kết với bản ghi `cham_cong`, lưu trong `tang_ca`; quản trị viên duyệt hoặc từ chối trực tiếp trên database.
