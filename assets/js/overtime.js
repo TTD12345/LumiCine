@@ -48,6 +48,18 @@
         return false;
     };
 
+    const updateOvertimeDuration = () => {
+        const start = Date.parse(document.getElementById('overtime-form').elements.start.value);
+        const end = Date.parse(document.getElementById('overtime-form').elements.end.value);
+        const output = document.getElementById('overtime-duration');
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+            output.textContent = '—';
+            return;
+        }
+        const minutes = Math.floor((end - start) / 60000);
+        output.textContent = `${Math.floor(minutes / 60)} giờ${minutes % 60 ? ` ${minutes % 60} phút` : ''}`;
+    };
+
     const renderEmployeeRequests = () => {
         if (!employeeRows) return;
         employeeRows.replaceChildren();
@@ -134,6 +146,8 @@
         const employeeName = document.getElementById('overtime-employee-name');
         const submitButton = document.getElementById('overtime-open-form');
         if (submitButton) {
+            form.elements.start.addEventListener('input', updateOvertimeDuration);
+            form.elements.end.addEventListener('input', updateOvertimeDuration);
             submitButton.addEventListener('click', () => {
                 const start = new Date();
                 start.setHours(start.getHours() + 1, 0, 0, 0);
@@ -145,6 +159,7 @@
                 ].join('-') + `T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
                 form.elements.start.value = toLocalInput(start);
                 form.elements.end.value = toLocalInput(end);
+                updateOvertimeDuration();
                 dialog.showModal();
             });
             ['overtime-close-form', 'overtime-cancel-form'].forEach((id) => {
@@ -155,6 +170,7 @@
                 const start = form.elements.start.value;
                 const end = form.elements.end.value;
                 const reason = form.elements.reason.value.trim();
+                const note = form.elements.note.value.trim();
                 if (!reason || reason.length < 5 || !start || !end ||
                     Date.parse(end) <= Date.parse(start)) {
                     showMessage('Vui lòng nhập lý do (ít nhất 5 ký tự) và thời gian kết thúc sau thời gian bắt đầu.', true);
@@ -171,7 +187,7 @@
                 try {
                     await window.lumiCineApi('overtime', {
                         method: 'POST',
-                        body: { start, end, reason },
+                        body: { start, end, reason: note ? `${reason}\nGhi chú: ${note}` : reason },
                     });
                     form.reset();
                     dialog.close();

@@ -103,6 +103,14 @@ class HomeController
         $attendanceToday = $employeeId === null
             ? null
             : $workforce->getAttendance($employeeId, date('Y-m-d'));
+        $employeeProfile = $employeeId === null || !in_array($section, ['dashboard', 'profile'], true)
+            ? null
+            : $workforce->employeeProfile($employeeId);
+        $employeeMonth = (int) date('n');
+        $employeeYear = (int) date('Y');
+        $employeeTimesheet = $employeeId === null || $section !== 'dashboard'
+            ? ['records' => [], 'summary' => ['work_days' => 0, 'overtime_minutes' => 0, 'leave_days' => 0]]
+            : $workforce->employeeTimesheet($employeeId, $employeeMonth, $employeeYear);
         $roleLabel = self::ROLE_LABELS[$currentUser['role']];
         $csrfToken = $this->csrfToken();
         require_once PATH_VIEW . 'employee_section.php';

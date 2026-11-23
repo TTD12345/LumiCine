@@ -39,12 +39,17 @@ foreach ($shifts as $shift) {
         </a>
         <p class="nav-caption">TỔNG QUAN</p>
         <nav class="employee-nav">
-            <a class="employee-nav-link" href="index.php?action=dashboard"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Bảng điều khiển</span></a>
-            <a class="employee-nav-link active" href="index.php?action=schedule" aria-current="page"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
-            <a class="employee-nav-link" href="index.php?action=shift"><i class="bi bi-people" aria-hidden="true"></i><span>Ca làm việc</span></a>
+            <a class="employee-nav-link" href="index.php?action=dashboard"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Tổng quan</span></a>
+            <a class="employee-nav-link" href="index.php?action=attendance"><i class="bi bi-fingerprint" aria-hidden="true"></i><span>Chấm công</span></a>
+            <a class="employee-nav-link" href="index.php?action=timesheet"><i class="bi bi-calendar2-week" aria-hidden="true"></i><span>Bảng công</span></a>
+            <a class="employee-nav-link" href="index.php?action=leave"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Xin nghỉ phép</span></a>
             <a class="employee-nav-link" href="index.php?action=overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
-            <a class="employee-nav-link" href="index.php?action=leave"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Đăng ký nghỉ phép</span></a>
-            <a class="employee-nav-link" href="index.php?action=attendance"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
+            <a class="employee-nav-link" href="index.php?action=requests"><i class="bi bi-inboxes" aria-hidden="true"></i><span>Đơn của tôi</span></a>
+            <a class="employee-nav-link" href="index.php?action=notifications"><i class="bi bi-bell" aria-hidden="true"></i><span>Thông báo</span></a>
+            <a class="employee-nav-link" href="index.php?action=profile"><i class="bi bi-person-circle" aria-hidden="true"></i><span>Hồ sơ cá nhân</span></a>
+            <p class="nav-caption nav-caption-spaced">LỊCH LÀM VIỆC</p>
+            <a class="employee-nav-link active" href="index.php?action=schedule" aria-current="page"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
+            <a class="employee-nav-link" href="index.php?action=shift"><i class="bi bi-clock" aria-hidden="true"></i><span>Ca làm việc</span></a>
         </nav>
         <div class="employee-sidebar-bottom">
             <?php if (in_array($currentUser['role'], ['accountant', 'hr', 'chairman'], true)): ?>

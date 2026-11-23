@@ -31,6 +31,22 @@
         timeStyle: 'short',
     }).format(new Date(value));
 
+    const updateLeaveDuration = () => {
+        const form = document.getElementById('leave-form');
+        const startValue = form.elements.start.value;
+        const endValue = form.elements.end.value;
+        const output = document.getElementById('leave-duration');
+        if (!startValue || !endValue || Date.parse(endValue) < Date.parse(startValue)) {
+            output.textContent = '—';
+            return;
+        }
+        const dayNumber = (value) => {
+            const [year, month, day] = value.slice(0, 10).split('-').map(Number);
+            return Date.UTC(year, month - 1, day) / 86400000;
+        };
+        output.textContent = `${dayNumber(endValue) - dayNumber(startValue) + 1} ngày`;
+    };
+
     const createStatus = (status) => {
         const badge = document.createElement('span');
         badge.className = `overtime-status overtime-status-${status}`;
@@ -127,6 +143,8 @@
         const form = document.getElementById('leave-form');
         const openButton = document.getElementById('leave-open-form');
         if (openButton) {
+            form.elements.start.addEventListener('input', updateLeaveDuration);
+            form.elements.end.addEventListener('input', updateLeaveDuration);
             openButton.addEventListener('click', () => {
                 const start = new Date();
                 start.setHours(start.getHours() + 24, 0, 0, 0);
@@ -139,6 +157,7 @@
                 ].join('-') + `T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
                 form.elements.start.value = toLocalInput(start);
                 form.elements.end.value = toLocalInput(end);
+                updateLeaveDuration();
                 dialog.showModal();
             });
             ['leave-close-form', 'leave-cancel-form'].forEach((id) => {

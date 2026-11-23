@@ -24,12 +24,4 @@
             accountButton.setAttribute('aria-expanded', 'false');
         }
     });
-    document.getElementById('notifications-button').addEventListener('click', () => {
-        const region = document.getElementById('toast-region');
-        const toast = document.createElement('div');
-        toast.className = 'employee-toast';
-        toast.textContent = 'Không có thông báo mới.';
-        region.append(toast);
-        window.setTimeout(() => toast.remove(), 4000);
-    });
 })();
