@@ -141,6 +141,12 @@ class HomeController
         $departments = $section === 'employees'
             ? $workforce->listDepartments()
             : [];
+        $employeeAccounts = $section === 'accounts'
+            ? (new UserModel())->listEmployeeAccounts()
+            : [];
+        $accountEmployees = $section === 'accounts'
+            ? (new UserModel())->listEmployeesWithoutAccounts()
+            : [];
         $scheduleDate = date('Y-m-d');
         $scheduleAssignments = $section === 'schedule'
             ? $workforce->listAssignments($scheduleDate)
@@ -185,13 +191,13 @@ class HomeController
                     } catch (PDOException | RuntimeException $exception) {
                         error_log('LumiCine login database error: ' . $exception->getMessage());
                         $user = null;
-                        $errorMessage = 'Không thể truy cập dữ liệu đăng nhập. Kiểm tra cấu hình MySQL và chạy database/migrations/2026-11-21-add-workforce-storage.sql.';
+                        $errorMessage = 'Không thể truy cập dữ liệu đăng nhập. Kiểm tra cấu hình MySQL và đã chạy các migration cần thiết, gồm database/migrations/2026-11-23-add-password-change-required.sql.';
                     }
 
                     if ($errorMessage === '') {
                         if (
                             $user !== null
-                            && isset($user['id'], $user['username'], $user['display_name'], $user['role'], $user['password_hash'], $user['is_active'])
+                            && isset($user['id'], $user['username'], $user['display_name'], $user['role'], $user['password_hash'], $user['is_active'], $user['must_change_password'])
                             && is_string($user['username'])
                             && is_string($user['display_name'])
                             && is_string($user['role'])
@@ -212,6 +218,7 @@ class HomeController
                                     ? null
                                     : (int) $user['employee_id'],
                                 'role' => $user['role'],
+                                'must_change_password' => (int) $user['must_change_password'] === 1,
                             ];
                             $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
                             $this->redirectForRole($user['role']);
@@ -226,6 +233,21 @@ class HomeController
         }
 
         require_once PATH_VIEW . 'login.php';
+    }
+
+    public function forcePasswordChange()
+    {
+        $currentUser = $this->requireUser();
+        if ($currentUser['role'] !== 'employee') {
+            $this->redirectForRole($currentUser['role']);
+        }
+        if (empty($currentUser['must_change_password'])) {
+            header('Location: index.php?action=dashboard');
+            exit;
+        }
+
+        $csrfToken = $this->csrfToken();
+        require_once PATH_VIEW . 'force_password_change.php';
     }
 
     public function logout()
@@ -264,6 +286,16 @@ class HomeController
         $user = $this->authenticatedUser();
         if ($user === null) {
             header('Location: index.php?action=login');
+            exit;
+        }
+
+        $action = $_GET['action'] ?? '/';
+        if (
+            $user['role'] === 'employee'
+            && !empty($user['must_change_password'])
+            && !in_array($action, ['change-password', 'api'], true)
+        ) {
+            header('Location: index.php?action=change-password');
             exit;
         }
 
