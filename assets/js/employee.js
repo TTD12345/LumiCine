@@ -328,8 +328,7 @@
         }
     });
     document.getElementById('notifications-button').addEventListener('click', () => {
-        const upcoming = shifts.filter((shift) => shift.status === 'upcoming').length;
-        notify(upcoming ? `Hôm nay còn ${upcoming} ca sắp bắt đầu.` : 'Không có ca nào sắp bắt đầu.');
+        window.location.href = '?action=notifications';
     });
     document.getElementById('account-menu-button').addEventListener('click', () => {
         const menu = document.getElementById('account-menu');

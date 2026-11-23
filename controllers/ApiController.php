@@ -169,9 +169,47 @@ class ApiController
                 }
                 $this->respond($workforce->punch($linkedEmployeeId, $date));
             }
+            if ($resource === 'employee-timesheet') {
+                if ($linkedEmployeeId === null) {
+                    $this->respond(['error' => 'Tài khoản chưa được liên kết với hồ sơ nhân viên.'], 403);
+                }
+                $month = filter_var($_GET['month'] ?? null, FILTER_VALIDATE_INT);
+                $year = filter_var($_GET['year'] ?? null, FILTER_VALIDATE_INT);
+                if (!$month || !$year) {
+                    throw new InvalidArgumentException('Tháng bảng công không hợp lệ.');
+                }
+                $this->respond($workforce->employeeTimesheet($linkedEmployeeId, $month, $year));
+            }
+            if ($resource === 'employee-profile') {
+                if ($linkedEmployeeId === null) {
+                    $this->respond(['error' => 'Tài khoản chưa được liên kết với hồ sơ nhân viên.'], 403);
+                }
+                if ($method === 'GET') {
+                    $this->respond(['profile' => $workforce->employeeProfile($linkedEmployeeId)]);
+                }
+                if ($user['role'] !== 'employee') {
+                    $this->respond(['error' => 'Chỉ nhân viên mới có thể cập nhật thông tin liên hệ cá nhân.'], 403);
+                }
+                $payload = $this->readPayload();
+                $phone = $payload['phone'] ?? null;
+                $email = $payload['email'] ?? null;
+                if (!is_string($phone) || !is_string($email)) {
+                    throw new InvalidArgumentException('Thông tin liên hệ không hợp lệ.');
+                }
+                $workforce->saveEmployeeProfile($linkedEmployeeId, $phone, $email);
+                $this->respond(['success' => true]);
+            }
             if ($resource === 'overtime') {
                 if ($method === 'GET') {
-                    $this->respond(['requests' => $workforce->overtimeRequests($employeeId)]);
+                    $personalOnly = ($_GET['mine'] ?? '') === '1';
+                    if ($personalOnly && $linkedEmployeeId === null) {
+                        $this->respond(['error' => 'Tài khoản chưa được liên kết với hồ sơ nhân viên.'], 403);
+                    }
+                    $this->respond([
+                        'requests' => $workforce->overtimeRequests(
+                            $personalOnly ? $linkedEmployeeId : $employeeId
+                        ),
+                    ]);
                 }
                 $payload = $this->readPayload();
                 $operation = $payload['operation'] ?? 'submit';
@@ -204,8 +242,14 @@ class ApiController
             }
             if ($resource === 'leave') {
                 if ($method === 'GET') {
+                    $personalOnly = ($_GET['mine'] ?? '') === '1';
+                    if ($personalOnly && $linkedEmployeeId === null) {
+                        $this->respond(['error' => 'Tài khoản chưa được liên kết với hồ sơ nhân viên.'], 403);
+                    }
                     $this->respond([
-                        'requests' => $workforce->leaveRequests($employeeId),
+                        'requests' => $workforce->leaveRequests(
+                            $personalOnly ? $linkedEmployeeId : $employeeId
+                        ),
                         'types' => $workforce->leaveTypes(),
                     ]);
                 }

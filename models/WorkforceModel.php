@@ -14,6 +14,7 @@ class WorkforceModel extends BaseModel
     {
         parent::__construct();
         $this->ensureLeaveRequestsTable();
+        $this->ensureEmployeeProfilesTable();
         $this->ensureUserEmployeeIdColumn();
     }
 
@@ -57,6 +58,176 @@ class WorkforceModel extends BaseModel
                 KEY idx_leave_employee_period (nhan_vien_id, gio_bat_dau, gio_ket_thuc)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+    }
+
+    private function ensureEmployeeProfilesTable(): void
+    {
+        $this->pdo->exec(
+            'CREATE TABLE IF NOT EXISTS lumicine_employee_profiles (
+                employee_id INT NOT NULL,
+                birth_date DATE NULL,
+                phone VARCHAR(30) NULL,
+                email VARCHAR(190) NULL,
+                hire_date DATE NULL,
+                avatar_path VARCHAR(255) NULL,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (employee_id),
+                CONSTRAINT fk_lumicine_employee_profile_employee
+                    FOREIGN KEY (employee_id) REFERENCES nhan_vien(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    public function employeeProfile(int $employeeId): array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT e.ma_nhan_vien AS employee_code, e.ho_ten AS name,
+                    COALESCE(e.chuc_vu, \'\') AS position,
+                    COALESCE(d.ten_phong_ban, \'\') AS department,
+                    p.birth_date, p.phone, p.email, p.hire_date
+             FROM nhan_vien e
+             LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
+             LEFT JOIN lumicine_employee_profiles p ON p.employee_id = e.id
+             WHERE e.id = :employee_id
+             LIMIT 1'
+        );
+        $statement->execute(['employee_id' => $employeeId]);
+        $profile = $statement->fetch();
+        if ($profile === false) {
+            throw new InvalidArgumentException('Không tìm thấy hồ sơ nhân viên.');
+        }
+
+        return $profile;
+    }
+
+    public function saveEmployeeProfile(int $employeeId, string $phone, string $email): void
+    {
+        $phone = trim($phone);
+        $email = trim($email);
+        if (
+            lumicineUtf8Length($phone) > 30
+            || ($phone !== '' && preg_match('/^[0-9+().\\s-]+$/', $phone) !== 1)
+            || lumicineUtf8Length($email) > 190
+            || ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false)
+        ) {
+            throw new InvalidArgumentException('Số điện thoại hoặc email không hợp lệ.');
+        }
+
+        $statement = $this->pdo->prepare(
+            'INSERT INTO lumicine_employee_profiles (employee_id, phone, email)
+             VALUES (:employee_id, :phone, :email)
+             ON DUPLICATE KEY UPDATE phone = VALUES(phone), email = VALUES(email)'
+        );
+        $statement->execute([
+            'employee_id' => $employeeId,
+            'phone' => $phone !== '' ? $phone : null,
+            'email' => $email !== '' ? $email : null,
+        ]);
+    }
+
+    public function employeeTimesheet(int $employeeId, int $month, int $year): array
+    {
+        if ($month < 1 || $month > 12 || $year < 2020 || $year > 2100) {
+            throw new InvalidArgumentException('Tháng bảng công không hợp lệ.');
+        }
+
+        $statement = $this->pdo->prepare(
+            'SELECT a.ngay_lam AS date,
+                    MIN(s.gio_bat_dau) AS shift_start, MAX(s.gio_ket_thuc) AS shift_end,
+                    DATE_FORMAT(MIN(c.thoi_gian_vao), \'%H:%i\') AS check_in,
+                    DATE_FORMAT(MAX(c.thoi_gian_ra), \'%H:%i\') AS check_out,
+                    COALESCE(SUM(c.tong_phut_lam), 0) AS worked_minutes,
+                    COALESCE(MAX(c.so_phut_di_muon), 0) AS late_minutes,
+                    COALESCE(MAX(c.so_phut_ve_som), 0) AS early_minutes,
+                    MAX(c.trang_thai = \'VANG_MAT\') AS is_absent,
+                    EXISTS (
+                        SELECT 1 FROM lumicine_leave_requests l
+                        WHERE l.nhan_vien_id = a.nhan_vien_id
+                          AND l.trang_thai = \'DA_DUYET\'
+                          AND DATE(l.gio_bat_dau) <= a.ngay_lam
+                          AND DATE(l.gio_ket_thuc) >= a.ngay_lam
+                    ) AS approved_leave,
+                    COALESCE((
+                        SELECT SUM(t.tong_phut_tang_ca)
+                        FROM tang_ca t
+                        WHERE t.nhan_vien_id = a.nhan_vien_id
+                          AND t.trang_thai = \'DA_DUYET\'
+                          AND DATE(t.gio_bat_dau) = a.ngay_lam
+                    ), 0) AS overtime_minutes
+             FROM phan_ca a
+             INNER JOIN ca_lam_viec s ON s.id = a.ca_lam_viec_id
+             INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
+             LEFT JOIN cham_cong c ON c.phan_ca_id = a.id
+             WHERE a.nhan_vien_id = :employee_id
+               AND a.trang_thai = \'DA_PHAN\'
+               AND a.ngay_lam >= :month_start
+               AND a.ngay_lam < :next_month
+               AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)
+             GROUP BY a.nhan_vien_id, a.ngay_lam
+             ORDER BY a.ngay_lam DESC'
+        );
+        $statement->execute([
+            'employee_id' => $employeeId,
+            'month_start' => sprintf('%04d-%02d-01', $year, $month),
+            'next_month' => (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month)))
+                ->modify('first day of next month')
+                ->format('Y-m-d'),
+        ]);
+
+        $records = $statement->fetchAll();
+        $summary = ['work_days' => 0, 'overtime_minutes' => 0, 'leave_days' => 0];
+        $today = date('Y-m-d');
+        $now = new DateTimeImmutable();
+        foreach ($records as &$record) {
+            $date = (string) $record['date'];
+            $record['worked_minutes'] = (int) $record['worked_minutes'];
+            $record['late_minutes'] = (int) $record['late_minutes'];
+            $record['early_minutes'] = (int) $record['early_minutes'];
+            $record['overtime_minutes'] = (int) $record['overtime_minutes'];
+            $hasCheckIn = !empty($record['check_in']);
+            $hasCheckOut = !empty($record['check_out']);
+            if ($hasCheckIn && $hasCheckOut && $record['worked_minutes'] === 0) {
+                $checkInTimestamp = strtotime($date . ' ' . $record['check_in']);
+                $checkOutTimestamp = strtotime($date . ' ' . $record['check_out']);
+                if ($checkOutTimestamp <= $checkInTimestamp) {
+                    $checkOutTimestamp += 86400;
+                }
+                $record['worked_minutes'] = max(
+                    0,
+                    (int) (($checkOutTimestamp - $checkInTimestamp) / 60)
+                );
+            }
+
+            if ($record['approved_leave'] && !$hasCheckIn) {
+                $record['status'] = 'leave';
+                $summary['leave_days']++;
+            } elseif (!$hasCheckIn && (int) $record['is_absent'] === 1) {
+                $record['status'] = 'absent';
+            } elseif ($hasCheckIn && $hasCheckOut) {
+                $record['status'] = $record['late_minutes'] > 0
+                    ? 'late'
+                    : ($record['early_minutes'] > 0 ? 'early' : 'complete');
+                $summary['work_days']++;
+            } elseif ($hasCheckIn) {
+                $record['status'] = $date < $today ? 'incomplete' : 'working';
+            } elseif ($date < $today) {
+                $record['status'] = 'absent';
+            } elseif ($date === $today) {
+                $shiftStart = new DateTimeImmutable($date . ' ' . $record['shift_start']);
+                $shiftEnd = new DateTimeImmutable($date . ' ' . $record['shift_end']);
+                if ($shiftEnd <= $shiftStart) {
+                    $shiftEnd = $shiftEnd->modify('+1 day');
+                }
+                $record['status'] = $now >= $shiftEnd ? 'absent' : 'not_started';
+            } else {
+                $record['status'] = 'not_started';
+            }
+            $summary['overtime_minutes'] += $record['overtime_minutes'];
+            unset($record['approved_leave'], $record['is_absent'], $record['shift_start'], $record['shift_end']);
+        }
+        unset($record);
+
+        return ['records' => $records, 'summary' => $summary];
     }
 
     public function findEmployeeIdByCode(?string $employeeCode): ?int
@@ -867,6 +1038,8 @@ class WorkforceModel extends BaseModel
                        DATE_FORMAT(o.gio_bat_dau, \'%Y-%m-%dT%H:%i\') AS start,
                        DATE_FORMAT(o.gio_ket_thuc, \'%Y-%m-%dT%H:%i\') AS end,
                        o.ly_do AS reason,
+                       o.created_at AS submitted_at,
+                       COALESCE(reviewer.ho_ten, \'\') AS reviewer_name,
                        CASE o.trang_thai
                            WHEN \'CHO_DUYET\' THEN \'pending\'
                            WHEN \'DA_DUYET\' THEN \'approved\'
@@ -875,7 +1048,8 @@ class WorkforceModel extends BaseModel
                 FROM tang_ca o
                 LEFT JOIN cham_cong c ON c.id = o.cham_cong_id
                 LEFT JOIN phan_ca a ON a.id = c.phan_ca_id
-                INNER JOIN nhan_vien e ON e.id = COALESCE(o.nhan_vien_id, a.nhan_vien_id)';
+                INNER JOIN nhan_vien e ON e.id = COALESCE(o.nhan_vien_id, a.nhan_vien_id)
+                LEFT JOIN nhan_vien reviewer ON reviewer.id = o.nguoi_duyet_id';
         $parameters = [];
         if ($employeeId !== null) {
             $sql .= ' WHERE COALESCE(o.nhan_vien_id, a.nhan_vien_id) = :employee_id';
@@ -1029,13 +1203,16 @@ class WorkforceModel extends BaseModel
                        DATE_FORMAT(l.gio_ket_thuc, \'%Y-%m-%dT%H:%i\') AS end,
                        l.loai_nghi AS leave_type,
                        l.ly_do AS reason,
+                       l.created_at AS submitted_at,
+                       COALESCE(reviewer.ho_ten, \'\') AS reviewer_name,
                        CASE l.trang_thai
                            WHEN \'CHO_DUYET\' THEN \'pending\'
                            WHEN \'DA_DUYET\' THEN \'approved\'
                            ELSE \'rejected\'
                        END AS status
                 FROM lumicine_leave_requests l
-                INNER JOIN nhan_vien e ON e.id = l.nhan_vien_id';
+                INNER JOIN nhan_vien e ON e.id = l.nhan_vien_id
+                LEFT JOIN nhan_vien reviewer ON reviewer.id = l.nguoi_duyet_id';
         $parameters = [];
         if ($employeeId !== null) {
             $sql .= ' WHERE l.nhan_vien_id = :employee_id';

@@ -54,6 +54,10 @@
 .overtime-dialog textarea:focus { border-color: #a59bf2; box-shadow: 0 0 0 3px #6d5ce81a; }
 .overtime-dialog .dialog-heading strong { color: #55556b; }
 .overtime-dialog .dialog-grid { margin-top: 12px; }
+.duration-preview { display: flex; align-items: baseline; gap: 5px; border-radius: 7px; background: #f8f7fc; padding: 9px 10px; color: #89899b; font-size: 9px; }
+.duration-preview strong { color: #5143bd; font-size: 10px; }
+.duration-preview small { color: #9998a8; font-size: 8px; }
+.overtime-dialog .dialog-field textarea { max-width: 100%; }
 
 @media (max-width: 520px) {
     .overtime-heading { align-items: flex-start; flex-direction: column; }

@@ -25,18 +25,23 @@ $currentUserInitials = $escape($currentUser['initials']);
 <body>
 <div class="employee-app">
     <aside class="employee-sidebar" id="employee-sidebar" aria-label="Điều hướng chính">
-        <a class="employee-brand" href="?action=/">
+        <a class="employee-brand" href="?action=dashboard">
             <span class="brand-icon"><i class="bi bi-buildings-fill" aria-hidden="true"></i></span>
             <span class="brand-title">LumiCine</span>
         </a>
         <p class="nav-caption">TỔNG QUAN</p>
         <nav class="employee-nav">
-            <a class="employee-nav-link" href="index.php?action=dashboard"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Bảng điều khiển</span></a>
+            <a class="employee-nav-link" href="index.php?action=dashboard"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Tổng quan</span></a>
+            <a class="employee-nav-link active" href="index.php?action=attendance" aria-current="page"><i class="bi bi-fingerprint" aria-hidden="true"></i><span>Chấm công</span></a>
+            <a class="employee-nav-link" href="index.php?action=timesheet"><i class="bi bi-calendar2-week" aria-hidden="true"></i><span>Bảng công</span></a>
+            <a class="employee-nav-link" href="index.php?action=leave"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Xin nghỉ phép</span></a>
+            <a class="employee-nav-link" href="index.php?action=overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
+            <a class="employee-nav-link" href="index.php?action=requests"><i class="bi bi-inboxes" aria-hidden="true"></i><span>Đơn của tôi</span></a>
+            <a class="employee-nav-link" href="index.php?action=notifications"><i class="bi bi-bell" aria-hidden="true"></i><span>Thông báo</span></a>
+            <a class="employee-nav-link" href="index.php?action=profile"><i class="bi bi-person-circle" aria-hidden="true"></i><span>Hồ sơ cá nhân</span></a>
+            <p class="nav-caption nav-caption-spaced">LỊCH LÀM VIỆC</p>
             <a class="employee-nav-link" href="index.php?action=schedule"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
             <a class="employee-nav-link" href="index.php?action=shift"><i class="bi bi-people" aria-hidden="true"></i><span>Ca làm việc</span></a>
-            <a class="employee-nav-link" href="index.php?action=overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
-            <a class="employee-nav-link" href="index.php?action=leave"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Đăng ký nghỉ phép</span></a>
-            <a class="employee-nav-link active" href="index.php?action=attendance" aria-current="page"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Chấm công</span></a>
         </nav>
         <div class="employee-sidebar-bottom">
             <?php if (in_array($currentUser['role'], ['accountant', 'hr', 'chairman'], true)): ?>
@@ -54,7 +59,7 @@ $currentUserInitials = $escape($currentUser['initials']);
         <header class="employee-topbar">
             <div class="topbar-leading">
                 <button class="mobile-menu" type="button" id="mobile-menu-button" aria-label="Mở menu"><i class="bi bi-list" aria-hidden="true"></i></button>
-                <div><strong>Chấm công</strong><div class="breadcrumbs"><a href="?action=/">Trang chủ</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span>Chấm công</span></div></div>
+                <div><strong>Chấm công</strong><div class="breadcrumbs"><a href="?action=dashboard">Trang chủ</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span>Chấm công</span></div></div>
             </div>
             <div class="topbar-trailing">
                 <button class="notification-button" type="button" id="notifications-button" aria-label="Thông báo"><i class="bi bi-bell" aria-hidden="true"></i></button>

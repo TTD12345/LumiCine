@@ -79,6 +79,16 @@
         const isCurrentDate = dateInput.value === currentDate;
         const nextType = isWorking ? 'check_out' : 'check_in';
         const isAbsent = attendanceRecord.attendance_status === 'VANG_MAT';
+        const shiftEnd = attendanceRecord.shift_end
+            ? new Date(`${dateInput.value}T${attendanceRecord.shift_end}:00`)
+            : null;
+        if (shiftEnd && attendanceRecord.shift_start && attendanceRecord.shift_end <= attendanceRecord.shift_start) {
+            shiftEnd.setDate(shiftEnd.getDate() + 1);
+        }
+        const shiftEndPassed = Boolean(shiftEnd) && now >= shiftEnd;
+        const missingPunch = attendanceRecord.has_assignment
+            && !checkIn
+            && (dateInput.value < currentDate || shiftEndPassed);
 
         document.getElementById('attendance-check-in').textContent = checkIn || 'Chưa ghi nhận';
         document.getElementById('attendance-check-out').textContent = checkOut || 'Chưa ghi nhận';
@@ -94,7 +104,11 @@
         checkOutState.classList.toggle('is-recorded', Boolean(checkOut));
         status.textContent = attendanceLoadError
             ? 'Lỗi tải dữ liệu'
-            : isAbsent ? 'Vắng mặt' : isComplete ? 'Đã hoàn thành' : isWorking ? 'Đang làm việc' : 'Chưa bắt đầu';
+            : isAbsent ? 'Nghỉ không phép'
+                : missingPunch ? 'Thiếu chấm công'
+                : lateMinutes > 0 ? 'Đi muộn'
+                    : earlyMinutes > 0 ? 'Về sớm'
+                        : isComplete ? 'Đã hoàn thành' : isWorking ? 'Đang làm việc' : 'Chưa bắt đầu';
         status.classList.toggle('is-working', isWorking);
         status.classList.toggle('is-complete', isComplete);
         punchButton.disabled = isLoading || !attendanceRecord.has_assignment || !isCurrentDate || isComplete || isAbsent;
@@ -135,8 +149,10 @@
             const status = document.createElement('span');
             status.className = `attendance-history-status${record.check_out ? ' complete' : record.check_in ? ' working' : ''}`;
             status.textContent = record.attendance_status === 'VANG_MAT'
-                ? 'Vắng mặt'
-                : record.check_out ? 'Hoàn thành' : record.check_in ? 'Đang làm' : 'Chưa chấm công';
+                ? 'Nghỉ không phép'
+                : Number(record.late_minutes) > 0 ? 'Đi muộn'
+                    : Number(record.early_minutes) > 0 ? 'Về sớm'
+                        : record.check_out ? 'Hoàn thành' : record.check_in ? 'Đang làm' : 'Chưa chấm công';
             statusCell.append(status);
             rowsElement.append(row);
         });
@@ -231,7 +247,7 @@
     dateInput.addEventListener('change', loadAttendance);
     document.getElementById('attendance-punch').addEventListener('click', recordTime);
     document.getElementById('notifications-button').addEventListener('click', () => {
-        notify('Dữ liệu chấm công được lưu tập trung trong database.');
+        window.location.href = '?action=notifications';
     });
     document.addEventListener('click', (event) => {
         const menu = document.getElementById('account-menu');

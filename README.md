@@ -120,3 +120,16 @@ Trang nhân viên và quản trị đọc/ghi dữ liệu qua PHP/MySQL; trình 
 - Xuất báo cáo Excel tương thích định dạng `.xls`, có màu phân biệt các nhóm dữ liệu, và in báo cáo.
 
 Phân quyền thao tác database được xác thực ở máy chủ; các thao tác ghi dùng CSRF token. Trước khi sử dụng thật, hãy kiểm tra mapping tài khoản và sao lưu database định kỳ.
+
+## Không gian nhân viên
+
+Trang Employee có tổng quan cá nhân, chấm công, bảng công theo tháng, đơn nghỉ phép/tăng ca, danh sách đơn, thông báo và hồ sơ. Bảng công và thông báo chỉ lấy dữ liệu theo hồ sơ đã liên kết với tài khoản; tăng ca chỉ cộng khi đơn có trạng thái đã duyệt. Ngày đã phân ca nhưng thiếu giờ vào được ghi nhận là thiếu chấm công hoặc nghỉ không phép theo dữ liệu nghỉ phép đã duyệt; hệ thống không tự áp dụng quy tắc trừ công.
+
+Ứng dụng tự tạo bảng hồ sơ cá nhân khi kết nối database lần đầu. Nếu tài khoản database không có quyền `CREATE TABLE`, hãy áp dụng migration sau trước khi mở trang tổng quan hoặc hồ sơ:
+
+```powershell
+Get-Content -Raw .\database\migrations\2026-11-23-create-employee-profiles.sql |
+    & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
+```
+
+Nhân viên chỉ tự cập nhật số điện thoại và email. Ngày sinh, ngày vào làm và ảnh đại diện có thể để trống cho đến khi được bổ sung từ quy trình quản lý hồ sơ; các thay đổi chấm công và duyệt đơn vẫn thuộc quyền quản trị/ quản lý.
