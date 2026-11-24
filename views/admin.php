@@ -67,6 +67,7 @@ $statusFor = static function (array $employee): array {
         <nav class="nav flex-column sidebar-nav">
             <a class="nav-link" href="index.php?action=admin-overview"><i class="bi bi-grid-1x2" aria-hidden="true"></i><span>Tổng quan</span></a>
             <a class="nav-link" href="index.php?action=admin-employees"><i class="bi bi-people" aria-hidden="true"></i><span>Quản lý nhân viên</span></a>
+            <a class="nav-link" href="index.php?action=admin-accounts"><i class="bi bi-person-lock" aria-hidden="true"></i><span>Quản lý tài khoản</span></a>
             <a class="nav-link" href="index.php?action=admin-schedule"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Phân ca làm việc</span></a>
             <a class="nav-link" href="index.php?action=admin-attendance"><i class="bi bi-calendar2-check" aria-hidden="true"></i><span>Quản lý chấm công</span></a>
             <a class="nav-link" href="index.php?action=admin-overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Duyệt tăng ca & nghỉ phép</span></a>
