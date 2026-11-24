@@ -536,6 +536,61 @@ class ApiController
                     'payrollStartDay' => $workforce->payrollStartDay(),
                 ]);
             }
+            if ($resource === 'report-dashboard') {
+                $this->requireAdmin($user['role']);
+                $from = isset($_GET['from']) && is_string($_GET['from']) ? $_GET['from'] : date('Y-m-01');
+                $to = isset($_GET['to']) && is_string($_GET['to']) ? $_GET['to'] : date('Y-m-t');
+                $department = null;
+                if (isset($_GET['department']) && $_GET['department'] !== '') {
+                    $department = filter_var($_GET['department'], FILTER_VALIDATE_INT);
+                    if ($department === false || $department < 1) {
+                        throw new InvalidArgumentException('Phòng ban không hợp lệ.');
+                    }
+                }
+                $this->respond([
+                    'departments' => $workforce->listDepartments(),
+                    'report' => $workforce->dashboardReport($from, $to, $department),
+                ]);
+            }
+            if ($resource === 'report-export') {
+                $this->requireAdmin($user['role']);
+                $from = isset($_GET['from']) && is_string($_GET['from']) ? $_GET['from'] : date('Y-m-01');
+                $to = isset($_GET['to']) && is_string($_GET['to']) ? $_GET['to'] : date('Y-m-t');
+                $department = null;
+                if (isset($_GET['department']) && $_GET['department'] !== '') {
+                    $department = filter_var($_GET['department'], FILTER_VALIDATE_INT);
+                    if ($department === false || $department < 1) {
+                        throw new InvalidArgumentException('Phòng ban không hợp lệ.');
+                    }
+                }
+                $result = $workforce->dashboardReport($from, $to, $department);
+                header('Content-Type: text/csv; charset=utf-8');
+                header('Content-Disposition: attachment; filename="lumicine-report-' . $from . '-to-' . $to . '.csv"');
+                echo "\xEF\xBB\xBF";
+                $output = fopen('php://output', 'w');
+                fputcsv($output, ['LumiCine - Báo cáo thống kê']);
+                fputcsv($output, ['Thời gian báo cáo', $from . ' đến ' . $to]);
+                fputcsv($output, []);
+                fputcsv($output, ['Tổng nhân viên', 'Tổng ngày công', 'Tổng lượt đi muộn', 'Tổng ngày nghỉ phép']);
+                fputcsv($output, [
+                    $result['summary']['total_employees'],
+                    $result['summary']['total_work_days'],
+                    $result['summary']['total_late'],
+                    $result['summary']['total_leave_days'],
+                ]);
+                fputcsv($output, []);
+                fputcsv($output, ['Trạng thái tăng ca', 'Số giờ']);
+                fputcsv($output, ['Đã duyệt', $result['overtime_totals']['approved_hours']]);
+                fputcsv($output, ['Đang chờ duyệt', $result['overtime_totals']['pending_hours']]);
+                fputcsv($output, ['Bị từ chối', $result['overtime_totals']['rejected_hours']]);
+                fputcsv($output, []);
+                fputcsv($output, ['Top nhân viên', 'Ngày công']);
+                foreach ($result['top_employees'] as $employee) {
+                    fputcsv($output, [$employee['name'], $employee['work_days']]);
+                }
+                fclose($output);
+                exit;
+            }
 
             $this->respond(['error' => 'Không tìm thấy chức năng.'], 404);
         } catch (InvalidArgumentException $exception) {
