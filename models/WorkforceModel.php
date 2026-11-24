@@ -605,7 +605,10 @@ class WorkforceModel extends BaseModel
         }
 
         $account = $this->pdo->prepare(
-            'SELECT id FROM lumicine_users WHERE id = :user_id AND role = \'employee\' LIMIT 1'
+            'SELECT id FROM lumicine_users
+             WHERE id = :user_id
+               AND role IN (\'employee\', \'accountant\', \'hr\', \'chairman\')
+             LIMIT 1'
         );
         $account->execute(['user_id' => $userId]);
         if ($account->fetchColumn() === false) {
@@ -649,6 +652,56 @@ class WorkforceModel extends BaseModel
         $assignments = $statement->fetchAll();
         $now = new DateTimeImmutable();
 
+        foreach ($assignments as &$assignment) {
+            $start = new DateTimeImmutable($assignment['work_date'] . ' ' . $assignment['start']);
+            $end = new DateTimeImmutable($assignment['work_date'] . ' ' . $assignment['end']);
+            if ($end <= $start) {
+                $end = $end->modify('+1 day');
+            }
+            $assignment['status'] = $now < $start ? 'upcoming' : ($now < $end ? 'active' : 'completed');
+            $assignment['id'] = (string) $assignment['id'];
+            $assignment['employee_id'] = (int) $assignment['employee_id'];
+        }
+        unset($assignment);
+
+        return $assignments;
+    }
+
+    public function listAssignmentsRange(
+        string $fromDate,
+        string $toDate,
+        ?int $scopeEmployeeId = null,
+        ?int $departmentId = null,
+        ?int $selectedEmployeeId = null
+    ): array {
+        $this->validateDate($fromDate);
+        $this->validateDate($toDate);
+        $startDate = new DateTimeImmutable($fromDate);
+        $endDate = new DateTimeImmutable($toDate);
+        if ($endDate < $startDate || (int) $startDate->diff($endDate)->format('%a') > 366) {
+            throw new InvalidArgumentException('Khoảng thời gian lọc lịch phân ca không hợp lệ.');
+        }
+
+        $sql = $this->assignmentQuery()
+            . ' WHERE a.ngay_lam BETWEEN :from_date AND :to_date
+                    AND a.trang_thai = \'DA_PHAN\'
+                    AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)';
+        $parameters = ['from_date' => $fromDate, 'to_date' => $toDate];
+        $employeeId = $scopeEmployeeId ?? $selectedEmployeeId;
+        if ($employeeId !== null) {
+            $sql .= ' AND a.nhan_vien_id = :employee_id';
+            $parameters['employee_id'] = $employeeId;
+        }
+        if ($departmentId !== null) {
+            $sql .= ' AND e.ma_phong_ban = :department_id';
+            $parameters['department_id'] = $departmentId;
+        }
+        $sql .= ' ORDER BY a.ngay_lam, c.gio_bat_dau, e.ho_ten';
+
+        $statement = $this->pdo->prepare($sql);
+        $statement->execute($parameters);
+        $assignments = $statement->fetchAll();
+        $now = new DateTimeImmutable();
         foreach ($assignments as &$assignment) {
             $start = new DateTimeImmutable($assignment['work_date'] . ' ' . $assignment['start']);
             $end = new DateTimeImmutable($assignment['work_date'] . ' ' . $assignment['end']);

@@ -48,6 +48,10 @@ Get-Content -Raw .\database\migrations\2026-11-23-add-password-change-required.s
     & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
 Get-Content -Raw .\database\migrations\2026-11-24-add-face-attendance.sql |
     & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
+Get-Content -Raw .\database\migrations\2026-11-24-create-auto-schedule-rules.sql |
+    & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
+Get-Content -Raw .\database\migrations\2026-11-24-add-schedule-rule-management.sql |
+    & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
 ```
 
 Các migration thêm `lumicine_users.employee_code`, `phan_ca.dia_diem`, bảng lịch nghỉ `lumicine_holidays` và cấu hình `lumicine_settings` (mặc định ngày bắt đầu kỳ lương là 10). Migration mật khẩu đánh dấu các tài khoản nhân viên hiện có cần đổi mật khẩu một lần; chạy lại migration không đặt lại trạng thái này. Nếu MySQL không nằm ở đường dẫn trên, dùng đường dẫn `mysql.exe` tương ứng với cài đặt của bạn.
@@ -112,6 +116,10 @@ Sau đó mở `http://127.0.0.1:8000/` để vào trang nhân viên hoặc `http
 Trang nhân viên và quản trị đọc/ghi dữ liệu qua PHP/MySQL; trình duyệt không còn lưu dữ liệu nghiệp vụ trong `localStorage`.
 
 - Quản trị viên phân ca cho nhân viên trong `phan_ca`; ca được lưu theo ngày và liên kết với `ca_lam_viec`. Có thể sửa/hủy ca khi chưa phát sinh chấm công hoặc tăng ca.
+- Tự động phân ca dùng quy tắc theo ca và phòng ban trong `lumicine_schedule_requirements`; danh sách chức vụ cho phép được lưu riêng. Hệ thống chỉ tạo bản xem trước, giữ nguyên các ca đã có và chỉ lấp đến số lượng tối thiểu. Quản trị viên có thể đổi hoặc bỏ nhân viên trong bản xem trước; máy chủ kiểm tra lại lịch, nghỉ phép đã duyệt, chức vụ, phòng ban, giờ làm và sức chứa trong transaction trước khi xác nhận lưu.
+- **Danh mục quy tắc phân ca** hiển thị 12 mã QT, tìm kiếm/lọc/phân trang và trạng thái cấu hình. Các quy tắc bắt buộc không thể tắt; cấu hình ca/phòng ban được ngừng áp dụng theo trạng thái để giữ lại lịch sử. Có thể bật/tắt và sắp thứ tự các tiêu chí ưu tiên được hỗ trợ.
+- Giới hạn tối đa giờ/ngày, giờ/tuần, nghỉ giữa ca và số ca đêm liên tiếp được thiết lập trong **Tự động phân ca**. Migration khởi tạo các giới hạn giờ/ca đêm ở trạng thái chưa áp dụng; chỉ các giới hạn quản trị viên cấu hình mới được dùng. QT012 ưu tiên người có ít ca đêm liên tiếp và, khi bật, chặn vượt số ca đêm tối đa. Nghỉ phép lấy từ `lumicine_leave_requests` với trạng thái đã duyệt. Database hiện chưa có chức năng lưu nguyện vọng ca/ngày không thể làm, nên QT011 được hiển thị là chưa khả dụng và không tác động đến kết quả.
+- **Quản lý phân ca** hỗ trợ lọc lịch theo ngày, tuần hoặc tháng, phòng ban và nhân viên.
 - Tại **Quản lý nhân viên**, quản trị viên có thể thêm/sửa hồ sơ nhân viên, phân phòng ban, ngừng hoạt động hoặc kích hoạt lại hồ sơ, đồng thời thêm/sửa/xóa phòng ban. Ngừng hoạt động là khóa mềm để giữ lịch sử phân ca và chấm công; phòng ban đang được gán cho nhân viên không thể xóa. Khi đổi mã nhân viên đã liên kết với tài khoản, mapping được cập nhật cùng giao dịch.
 - Tại **Quản lý tài khoản**, quản trị viên có thể tạo, sửa tên đăng nhập, đặt lại mật khẩu và xóa tài khoản nhân viên. Mỗi nhân viên chỉ có một tài khoản; mật khẩu luôn được lưu bằng `password_hash` và không thể xem lại. Xóa tài khoản không xóa hồ sơ nhân viên.
 - Nhân viên có thể đổi mật khẩu trong **Hồ sơ cá nhân** bằng cách xác nhận mật khẩu hiện tại. Tài khoản nhân viên mới và các tài khoản đang có tại thời điểm chạy migration được chuyển đến màn hình riêng ngay sau khi đăng nhập; nhân viên có thể đổi mật khẩu hoặc giữ mật khẩu hiện tại. Chọn “Không hiện lại” sẽ lưu lựa chọn bỏ lời nhắc ở các lần đăng nhập sau; giữ mật khẩu mà không chọn thì lời nhắc sẽ xuất hiện lại ở lần đăng nhập kế tiếp.

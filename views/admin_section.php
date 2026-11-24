@@ -31,7 +31,7 @@ $isSchedule = $section === 'schedule';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     <link href="assets/css/hrm.css?v=<?= (int) filemtime(__DIR__ . '/../assets/css/hrm.css') ?>" rel="stylesheet">
     <?php if ($isOvertime): ?><link href="assets/css/overtime.css?v=<?= (int) filemtime(__DIR__ . '/../assets/css/overtime.css') ?>" rel="stylesheet"><?php endif; ?>
-    <?php if ($isSchedule): ?><link href="assets/css/schedule.css" rel="stylesheet"><?php endif; ?>
+    <?php if ($isSchedule): ?><link href="assets/css/schedule.css?v=<?= (int) filemtime(__DIR__ . '/../assets/css/schedule.css') ?>" rel="stylesheet"><?php endif; ?>
 </head>
 <body<?= $isOvertime ? ' class="overtime-page"' : '' ?>>
 <div class="app-shell">
@@ -77,8 +77,116 @@ $isSchedule = $section === 'schedule';
             <section class="page-intro"><div><div class="page-kicker"><span></span> <?= $escape($page['kicker']) ?></div><h1><?= $escape($page['title']) ?></h1><p><?= $escape($page['description']) ?></p></div></section>
             <?php if ($isSchedule): ?>
                 <section class="schedule-page">
+                    <nav class="schedule-mode-switch" aria-label="Chế độ quản lý phân ca">
+                        <a class="<?= $scheduleMode === 'manage' ? 'active' : '' ?>" href="?action=admin-schedule">Lịch phân ca</a>
+                        <a class="<?= $scheduleMode === 'auto' ? 'active' : '' ?>" href="?action=admin-schedule&amp;mode=auto">Quy tắc & tự động phân ca</a>
+                    </nav>
+                    <?php if ($scheduleMode === 'auto'): ?>
+                        <div class="auto-schedule-layout">
+                            <section class="schedule-board auto-schedule-card auto-catalog-card">
+                                <header class="schedule-board-header">
+                                    <div><h2>Danh mục quy tắc phân ca</h2><p>Quy tắc bắt buộc luôn được kiểm tra; chỉ các quy tắc ưu tiên có thể bật/tắt và sắp thứ tự.</p></div>
+                                    <button class="button button-outline" id="auto-add-rule" type="button"><i class="bi bi-plus-lg"></i> Thêm quy tắc ca/phòng ban</button>
+                                </header>
+                                <div class="auto-rule-stats">
+                                    <article><span>Tổng quy tắc</span><strong id="auto-rule-total">12</strong></article>
+                                    <article><span>Đang áp dụng</span><strong id="auto-rule-active">0</strong></article>
+                                    <article><span>Bắt buộc</span><strong id="auto-rule-mandatory">8</strong></article>
+                                    <article><span>Ưu tiên</span><strong id="auto-rule-priority">4</strong></article>
+                                </div>
+                                <div class="auto-rule-filters">
+                                    <label>Tìm kiếm<input id="auto-rule-search" type="search" placeholder="Mã hoặc tên quy tắc"></label>
+                                    <label>Loại<select id="auto-rule-type-filter"><option value="">Tất cả</option><option value="mandatory">Bắt buộc</option><option value="priority">Ưu tiên</option></select></label>
+                                    <label>Trạng thái<select id="auto-rule-status-filter"><option value="">Tất cả</option><option value="active">Đang áp dụng</option><option value="inactive">Đã tắt</option><option value="not_configured">Chưa cấu hình</option><option value="unavailable">Chưa hỗ trợ dữ liệu</option></select></label>
+                                    <label>Phạm vi<select id="auto-rule-scope-filter"><option value="">Tất cả</option><option value="Toàn công ty">Toàn công ty</option><option value="Phòng ban">Phòng ban</option><option value="Chức vụ">Chức vụ</option></select></label>
+                                </div>
+                                <div class="schedule-table-wrap">
+                                    <table class="schedule-table auto-catalog-table">
+                                        <thead><tr><th>Mã</th><th>Tên quy tắc</th><th>Loại</th><th>Phạm vi</th><th>Cấu hình</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                                        <tbody id="auto-rule-catalog-rows"><tr><td colspan="7">Đang tải quy tắc...</td></tr></tbody>
+                                    </table>
+                                </div>
+                                <footer class="schedule-table-footer auto-catalog-footer">
+                                    <span id="auto-rule-page-label">—</span>
+                                    <div><button class="button button-light" id="auto-rule-prev" type="button" aria-label="Trang trước"><i class="bi bi-chevron-left"></i></button><button class="button button-light" id="auto-rule-next" type="button" aria-label="Trang sau"><i class="bi bi-chevron-right"></i></button></div>
+                                </footer>
+                                <div class="auto-rule-details" id="auto-rule-details" hidden></div>
+                            </section>
+
+                            <section class="schedule-board auto-schedule-card">
+                                <header class="schedule-board-header">
+                                    <div><h2>Quy tắc nhân sự theo ca</h2><p>Cấu hình số người tối thiểu/tối đa và chức vụ phù hợp theo từng phòng ban.</p></div>
+                                </header>
+                                <form class="auto-schedule-rule-form" id="auto-rule-form">
+                                    <label>Loại ca<select id="auto-rule-shift" required></select></label>
+                                    <label>Phòng ban<select id="auto-rule-department" required></select></label>
+                                    <label>Ít nhất<input id="auto-rule-min" type="number" min="0" max="200" value="1" required></label>
+                                    <label>Nhiều nhất<input id="auto-rule-max" type="number" min="1" max="200" value="5" required></label>
+                                    <fieldset class="auto-position-field"><legend>Chức vụ được phép</legend><div id="auto-rule-positions"><span class="auto-schedule-muted">Đang tải chức vụ...</span></div><small>Không chọn chức vụ nào nghĩa là mọi chức vụ trong phòng ban đều phù hợp.</small></fieldset>
+                                    <button class="button button-primary" type="submit"><i class="bi bi-plus-lg"></i> Lưu quy tắc</button>
+                                </form>
+                                <div class="auto-rule-list" id="auto-rule-list"><p class="auto-schedule-muted">Đang tải quy tắc...</p></div>
+                            </section>
+
+                            <section class="schedule-board auto-schedule-card">
+                                <header class="schedule-board-header">
+                                    <div><h2>Cấu hình tham số quy tắc</h2><p>Chọn “Cấu hình” tại quy tắc tương ứng để chỉ chỉnh các tham số của quy tắc đó.</p></div>
+                                </header>
+                                <form class="auto-policy-form" id="auto-policy-form">
+                                    <div class="auto-policy-rule-fields">
+                                        <fieldset class="auto-policy-rule-fields-group" id="auto-policy-qt005" data-policy-rule hidden>
+                                            <legend>QT005 · Giới hạn giờ làm</legend>
+                                            <label>Giờ tối đa/ngày<input id="auto-max-daily" type="number" min="1" max="24" step="0.5" placeholder="Không giới hạn"></label>
+                                            <label>Giờ tối đa/tuần<input id="auto-max-weekly" type="number" min="1" max="168" step="0.5" placeholder="Không giới hạn"></label>
+                                        </fieldset>
+                                        <fieldset class="auto-policy-rule-fields-group" id="auto-policy-qt006" data-policy-rule hidden>
+                                            <legend>QT006 · Thời gian nghỉ tối thiểu</legend>
+                                            <label>Nghỉ tối thiểu giữa ca (giờ)<input id="auto-min-rest" type="number" min="0" max="48" step="0.5" value="0"></label>
+                                        </fieldset>
+                                        <fieldset class="auto-policy-rule-fields-group" id="auto-policy-qt012" data-policy-rule hidden>
+                                            <legend>QT012 · Hạn chế ca đêm liên tiếp</legend>
+                                            <label>Ca đêm liên tiếp tối đa<input id="auto-max-consecutive-nights" type="number" min="1" max="14" placeholder="Không giới hạn"></label>
+                                        </fieldset>
+                                    </div>
+                                    <button class="button button-outline" id="auto-save-policy" type="submit" disabled>Lưu tham số quy tắc</button>
+                                </form>
+                                <p class="auto-schedule-policy-note" id="auto-policy-note">Đang tải quy tắc áp dụng...</p>
+                            </section>
+
+                            <section class="schedule-board auto-schedule-card">
+                                <header class="schedule-board-header">
+                                    <div><h2>Tạo lịch dự kiến</h2><p>Lịch hiện có được giữ nguyên; hệ thống chỉ bổ sung đến mức nhân sự tối thiểu.</p></div>
+                                </header>
+                                <form class="auto-generate-form" id="auto-generate-form">
+                                    <label>Từ ngày<input id="auto-from-date" type="date" value="<?= $escape($scheduleDate) ?>" required></label>
+                                    <label>Đến ngày<input id="auto-to-date" type="date" value="<?= $escape((new DateTimeImmutable($scheduleDate))->modify('+6 days')->format('Y-m-d')) ?>" required></label>
+                                    <label>Phòng ban<select id="auto-department"><option value="">Tất cả phòng ban có quy tắc</option></select></label>
+                                    <label>Ca làm việc<select id="auto-shifts" multiple required aria-label="Chọn ca làm việc"></select></label>
+                                    <label class="auto-location-field">Địa điểm<input id="auto-location" type="text" maxlength="100" required placeholder="Ví dụ: Quầy vé tầng 1"></label>
+                                    <button class="button button-primary" id="auto-preview-button" type="submit"><i class="bi bi-magic"></i> Tự động phân ca</button>
+                                </form>
+                                <p class="auto-schedule-policy-note" id="auto-policy-note">Đang tải quy tắc áp dụng...</p>
+                            </section>
+
+                            <section class="schedule-board auto-schedule-card auto-preview-card" id="auto-preview" hidden>
+                                <header class="schedule-board-header auto-preview-header">
+                                    <div><h2>Kết quả phân ca dự kiến</h2><p id="auto-preview-summary"></p></div>
+                                    <div class="auto-preview-actions">
+                                        <button class="button button-outline" id="auto-rerun" type="button"><i class="bi bi-arrow-repeat"></i> Chạy lại</button>
+                                        <button class="button button-primary" id="auto-confirm" type="button"><i class="bi bi-check2"></i> Xác nhận và lưu</button>
+                                    </div>
+                                </header>
+                                <div class="auto-result-sections">
+                                    <section><h3>Lịch dự kiến</h3><div class="schedule-table-wrap"><table class="schedule-table auto-plan-table"><thead><tr><th>Ngày</th><th>Phòng ban</th><th>Ca làm</th><th>Nhân viên</th><th>Trạng thái</th><th></th></tr></thead><tbody id="auto-plan-rows"></tbody></table></div></section>
+                                    <section><h3>Ca còn thiếu nhân sự</h3><div class="auto-result-list" id="auto-shortages"></div></section>
+                                    <section><h3>Cảnh báo và nhân viên không thể phân</h3><div class="auto-result-list" id="auto-issues"></div></section>
+                                </div>
+                            </section>
+                            <p class="auto-schedule-feedback" id="auto-schedule-feedback" role="status" aria-live="polite"></p>
+                        </div>
+                    <?php else: ?>
                     <div class="schedule-stats">
-                        <article><span class="schedule-stat-icon blue"><i class="bi bi-calendar2-week"></i></span><div><span>Tổng ca trong ngày</span><strong id="schedule-total"><?= count($scheduleAssignments) ?></strong></div></article>
+                        <article><span class="schedule-stat-icon blue"><i class="bi bi-calendar2-week"></i></span><div><span>Tổng ca trong kỳ</span><strong id="schedule-total"><?= count($scheduleAssignments) ?></strong></div></article>
                         <article><span class="schedule-stat-icon green"><i class="bi bi-clock-history"></i></span><div><span>Đang diễn ra</span><strong id="schedule-active"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] === 'active')) ?></strong></div></article>
                         <article><span class="schedule-stat-icon orange"><i class="bi bi-hourglass-split"></i></span><div><span>Sắp bắt đầu</span><strong id="schedule-upcoming"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] === 'upcoming')) ?></strong></div></article>
                         <article><span class="schedule-stat-icon purple"><i class="bi bi-people"></i></span><div><span>Nhân viên hoạt động</span><strong><?= count($scheduleEmployees) ?></strong></div></article>
@@ -91,6 +199,9 @@ $isSchedule = $section === 'schedule';
                                 <button class="button button-light" type="button" id="schedule-prev"><i class="bi bi-chevron-left"></i></button>
                                 <label class="schedule-date"><i class="bi bi-calendar3"></i><input id="schedule-date" type="date" value="<?= $escape($scheduleDate) ?>" aria-label="Chọn ngày phân ca"></label>
                                 <button class="button button-light" type="button" id="schedule-next"><i class="bi bi-chevron-right"></i></button>
+                                <select id="schedule-view" aria-label="Khoảng thời gian"><option value="day">Ngày</option><option value="week">Tuần</option><option value="month">Tháng</option></select>
+                                <select id="schedule-department-filter" aria-label="Lọc phòng ban"><option value="">Tất cả phòng ban</option><?php foreach ($scheduleDepartments as $department): ?><option value="<?= (int) $department['id'] ?>"><?= $escape($department['name']) ?></option><?php endforeach; ?></select>
+                                <select id="schedule-employee-filter" aria-label="Lọc nhân viên"><option value="">Tất cả nhân viên</option><?php foreach ($scheduleEmployees as $employee): ?><option value="<?= (int) $employee['id'] ?>"><?= $escape($employee['name']) ?></option><?php endforeach; ?></select>
                                 <button class="button button-outline" type="button" id="schedule-manage-shifts"><i class="bi bi-sliders"></i> Quản lý loại ca</button>
                                 <button class="button button-primary" type="button" id="schedule-create"><i class="bi bi-plus-lg"></i> Tạo ca mới</button>
                             </div>
@@ -106,15 +217,15 @@ $isSchedule = $section === 'schedule';
                         </div>
                         <div class="schedule-table-wrap">
                             <table class="schedule-table">
-                                <thead><tr><th>Nhân viên</th><th>Bộ phận</th><th>Ca làm</th><th>Thời gian</th><th>Địa điểm</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                                <thead><tr><th>Nhân viên</th><th>Ngày làm</th><th>Bộ phận</th><th>Ca làm</th><th>Thời gian</th><th>Địa điểm</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
                                 <tbody id="schedule-rows">
                                     <?php if ($scheduleAssignments === []): ?>
-                                        <tr class="schedule-empty-row"><td colspan="7">Chưa có ca làm việc trong ngày này.</td></tr>
+                                        <tr class="schedule-empty-row"><td colspan="8">Chưa có ca làm việc trong ngày này.</td></tr>
                                     <?php else: ?>
                                         <?php foreach ($scheduleAssignments as $index => $assignment): ?>
                                             <tr data-assignment-id="<?= $escape($assignment['id']) ?>">
                                                 <td><div class="schedule-employee"><span><?= $escape(lumicineUtf8Substring($assignment['name'], 0, 1)) ?></span><div><strong><?= $escape($assignment['name']) ?></strong><small><?= $escape($assignment['role']) ?></small></div></div></td>
-                                                <td><?= $escape($assignment['department']) ?></td><td><strong><?= $escape($assignment['shift_name'] ?? ('Ca ' . ($index + 1))) ?></strong></td>
+                                                <td><?= $escape($assignment['work_date']) ?></td><td><?= $escape($assignment['department']) ?></td><td><strong><?= $escape($assignment['shift_name'] ?? ('Ca ' . ($index + 1))) ?></strong></td>
                                                 <td><strong><?= $escape(substr($assignment['start'], 0, 5)) ?> - <?= $escape(substr($assignment['end'], 0, 5)) ?></strong></td>
                                                 <td><?= $escape($assignment['location']) ?></td>
                                                 <td><span class="schedule-status <?= $escape($assignment['status']) ?>"><?= $assignment['status'] === 'active' ? 'Đang diễn ra' : ($assignment['status'] === 'upcoming' ? 'Sắp bắt đầu' : 'Hoàn thành') ?></span></td>
@@ -127,8 +238,10 @@ $isSchedule = $section === 'schedule';
                         </div>
                         <footer class="schedule-table-footer"><span id="schedule-result-count">Hiển thị <?= count($scheduleAssignments) ?> ca</span><button class="button button-outline" type="button" id="schedule-export"><i class="bi bi-download"></i> Xuất danh sách</button></footer>
                     </section>
+                    <?php endif; ?>
                 </section>
 
+                <?php if ($scheduleMode === 'manage'): ?>
                 <dialog class="schedule-dialog" id="schedule-dialog">
                     <form id="schedule-form">
                         <header><div><span>THÔNG TIN CA</span><h2 id="schedule-dialog-title">Tạo ca làm việc</h2></div><button type="button" id="schedule-dialog-close" aria-label="Đóng"><i class="bi bi-x-lg"></i></button></header>
@@ -156,6 +269,7 @@ $isSchedule = $section === 'schedule';
                         <footer><button type="button" class="button button-light" id="shift-types-cancel">Đóng</button></footer>
                     </form>
                 </dialog>
+                <?php endif; ?>
             <?php elseif ($isOvertime): ?>
                 <section class="overtime-card" id="overtime-requests" aria-labelledby="overtime-requests-title">
                     <div class="overtime-heading"><div><h2 id="overtime-requests-title">Đơn đăng ký tăng ca</h2><p>Xem lý do, thời gian và xử lý các đơn nhân viên gửi.</p></div><div class="overtime-summary"><span>Chờ duyệt</span><strong id="overtime-pending-count">0</strong></div></div>
@@ -414,11 +528,15 @@ $isSchedule = $section === 'schedule';
 <script src="assets/js/admin-section.js?v=20261121" defer></script>
 <?php if ($isSchedule): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
-    <script>
-        window.scheduleInitialData = <?= json_encode($scheduleAssignments, JSON_UNESCAPED_UNICODE) ?>;
-        window.scheduleInitialShiftTypes = <?= json_encode($scheduleShiftTypes, JSON_UNESCAPED_UNICODE) ?>;
-    </script>
-    <script src="assets/js/schedule.js" defer></script>
+    <?php if ($scheduleMode === 'auto'): ?>
+        <script src="assets/js/auto-schedule.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/auto-schedule.js') ?>" defer></script>
+    <?php else: ?>
+        <script>
+            window.scheduleInitialData = <?= json_encode($scheduleAssignments, JSON_UNESCAPED_UNICODE) ?>;
+            window.scheduleInitialShiftTypes = <?= json_encode($scheduleShiftTypes, JSON_UNESCAPED_UNICODE) ?>;
+        </script>
+        <script src="assets/js/schedule.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/schedule.js') ?>" defer></script>
+    <?php endif; ?>
 <?php elseif ($isOvertime): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/overtime.js" defer></script>
