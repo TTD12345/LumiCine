@@ -46,6 +46,8 @@ Get-Content -Raw .\database\migrations\2026-11-21-add-payroll-settings.sql |
     & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
 Get-Content -Raw .\database\migrations\2026-11-23-add-password-change-required.sql |
     & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
+Get-Content -Raw .\database\migrations\2026-11-24-add-face-attendance.sql |
+    & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
 ```
 
 Các migration thêm `lumicine_users.employee_code`, `phan_ca.dia_diem`, bảng lịch nghỉ `lumicine_holidays` và cấu hình `lumicine_settings` (mặc định ngày bắt đầu kỳ lương là 10). Migration mật khẩu đánh dấu các tài khoản nhân viên hiện có cần đổi mật khẩu một lần; chạy lại migration không đặt lại trạng thái này. Nếu MySQL không nằm ở đường dẫn trên, dùng đường dẫn `mysql.exe` tương ứng với cài đặt của bạn.
@@ -115,6 +117,7 @@ Trang nhân viên và quản trị đọc/ghi dữ liệu qua PHP/MySQL; trình 
 - Nhân viên có thể đổi mật khẩu trong **Hồ sơ cá nhân** bằng cách xác nhận mật khẩu hiện tại. Tài khoản nhân viên mới và các tài khoản đang có tại thời điểm chạy migration được chuyển đến màn hình riêng ngay sau khi đăng nhập; nhân viên có thể đổi mật khẩu hoặc giữ mật khẩu hiện tại. Chọn “Không hiện lại” sẽ lưu lựa chọn bỏ lời nhắc ở các lần đăng nhập sau; giữ mật khẩu mà không chọn thì lời nhắc sẽ xuất hiện lại ở lần đăng nhập kế tiếp.
 - Nhân viên chỉ xem lịch của mã nhân viên được liên kết với tài khoản.
 - Chấm công chỉ được ghi nhận trong ngày hiện tại khi nhân viên có phân ca. Thời gian lấy từ máy chủ; dữ liệu vào/ra được ghi vào `cham_cong`.
+- Chấm công khuôn mặt yêu cầu đăng ký descriptor khuôn mặt một lần và xác thực camera trước mỗi lần vào/ra. Descriptor được lưu trong `lumicine_face_profiles`; ứng dụng không lưu ảnh khuôn mặt riêng. Trình duyệt cần truy cập camera qua `localhost` hoặc HTTPS, và mô hình nhận diện được tải từ CDN.
 - Đơn tăng ca được liên kết với bản ghi `cham_cong`, lưu trong `tang_ca`; quản trị viên duyệt hoặc từ chối trực tiếp trên database.
 - Ngày bắt đầu kỳ lương có thể thay đổi trong **Cài đặt**; bảng tổng hợp công và lịch chi tiết áp dụng từ ngày này đến trước ngày bắt đầu kỳ tiếp theo. Nếu tháng thiếu ngày đã chọn, hệ thống dùng ngày cuối tháng.
 - Nhân viên gửi đơn tăng ca trước, đơn được lưu trong `tang_ca` với hồ sơ nhân viên và chưa cần phân ca. Khi quản trị viên duyệt, hệ thống tự tạo ca tăng ca, phân ca và bản ghi `cham_cong`; đơn bị từ chối thì không tạo phân ca.

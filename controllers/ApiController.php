@@ -237,12 +237,42 @@ class ApiController
                     $this->respond([
                         'record' => $workforce->getAttendance($linkedEmployeeId, $date),
                         'history' => $workforce->attendanceHistory($linkedEmployeeId),
+                        'face' => $workforce->faceProfileStatus($linkedEmployeeId),
                     ]);
                 }
                 $payload = $this->readPayload();
                 $date = $payload['date'] ?? null;
                 if (!is_string($date)) {
                     throw new InvalidArgumentException('Ngày chấm công không hợp lệ.');
+                }
+                $operation = $payload['operation'] ?? 'punch';
+                if ($operation === 'enroll') {
+                    $descriptor = $payload['descriptor'] ?? null;
+                    if (!is_array($descriptor)) {
+                        throw new InvalidArgumentException('Chưa nhận diện được khuôn mặt.');
+                    }
+                    $workforce->enrollFace($linkedEmployeeId, $descriptor);
+                    $this->respond([
+                        'success' => true,
+                        'face' => $workforce->faceProfileStatus($linkedEmployeeId),
+                    ]);
+                }
+                if ($operation === 'verify') {
+                    $descriptor = $payload['descriptor'] ?? null;
+                    if (!is_array($descriptor)) {
+                        throw new InvalidArgumentException('Chưa nhận diện được khuôn mặt.');
+                    }
+                    if (!$workforce->verifyFace($linkedEmployeeId, $descriptor)) {
+                        throw new InvalidArgumentException('Khuôn mặt không khớp. Vui lòng thử lại hoặc căn chỉnh đèn.');
+                    }
+                    $this->respond(['success' => true]);
+                }
+                $descriptor = $payload['descriptor'] ?? null;
+                if (!is_array($descriptor)) {
+                    throw new InvalidArgumentException('Vui lòng xác thực khuôn mặt trước khi chấm công.');
+                }
+                if (!$workforce->verifyFace($linkedEmployeeId, $descriptor)) {
+                    throw new InvalidArgumentException('Khuôn mặt không khớp. Chấm công đã bị hủy.');
                 }
                 $this->respond($workforce->punch($linkedEmployeeId, $date));
             }

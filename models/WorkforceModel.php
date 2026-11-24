@@ -15,7 +15,23 @@ class WorkforceModel extends BaseModel
         parent::__construct();
         $this->ensureLeaveRequestsTable();
         $this->ensureEmployeeProfilesTable();
+        $this->ensureFaceProfilesTable();
         $this->ensureUserEmployeeIdColumn();
+    }
+
+    private function ensureFaceProfilesTable(): void
+    {
+        $this->pdo->exec(
+            'CREATE TABLE IF NOT EXISTS lumicine_face_profiles (
+                employee_id INT NOT NULL,
+                face_descriptor JSON NOT NULL,
+                enrolled_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (employee_id),
+                CONSTRAINT fk_lumicine_face_profile_employee
+                    FOREIGN KEY (employee_id) REFERENCES nhan_vien(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
     }
 
     private function ensureUserEmployeeIdColumn(): void
@@ -904,6 +920,90 @@ class WorkforceModel extends BaseModel
         $statement->execute(['employee_id' => $employeeId]);
 
         return $statement->fetchAll();
+    }
+
+    public function faceProfileStatus(int $employeeId): array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT enrolled_at, updated_at
+             FROM lumicine_face_profiles
+             WHERE employee_id = :employee_id
+             LIMIT 1'
+        );
+        $statement->execute(['employee_id' => $employeeId]);
+        $profile = $statement->fetch();
+
+        return [
+            'enrolled' => $profile !== false,
+            'updated_at' => $profile['updated_at'] ?? null,
+        ];
+    }
+
+    public function validateFaceDescriptor(array $descriptor): array
+    {
+        if (count($descriptor) !== 128) {
+            throw new InvalidArgumentException('Dữ liệu khuôn mặt không hợp lệ.');
+        }
+
+        $normalized = [];
+        foreach ($descriptor as $value) {
+            if (!is_int($value) && !is_float($value) && !is_string($value)) {
+                throw new InvalidArgumentException('Dữ liệu khuôn mặt không hợp lệ.');
+            }
+            $number = (float) $value;
+            if (!is_finite($number)) {
+                throw new InvalidArgumentException('Dữ liệu khuôn mặt không hợp lệ.');
+            }
+            $normalized[] = $number;
+        }
+
+        return $normalized;
+    }
+
+    public function enrollFace(int $employeeId, array $descriptor): void
+    {
+        $descriptor = $this->validateFaceDescriptor($descriptor);
+        $statement = $this->pdo->prepare(
+            'INSERT INTO lumicine_face_profiles (employee_id, face_descriptor)
+             VALUES (:employee_id, :descriptor)
+             ON DUPLICATE KEY UPDATE
+                 face_descriptor = VALUES(face_descriptor)'
+        );
+        $statement->execute([
+            'employee_id' => $employeeId,
+            'descriptor' => json_encode($descriptor, JSON_UNESCAPED_UNICODE),
+        ]);
+    }
+
+    public function verifyFace(int $employeeId, array $descriptor): bool
+    {
+        $descriptor = $this->validateFaceDescriptor($descriptor);
+        $statement = $this->pdo->prepare(
+            'SELECT face_descriptor
+             FROM lumicine_face_profiles
+             WHERE employee_id = :employee_id
+             LIMIT 1'
+        );
+        $statement->execute(['employee_id' => $employeeId]);
+        $profile = $statement->fetch();
+        if ($profile === false) {
+            throw new InvalidArgumentException('Bạn chưa đăng ký khuôn mặt.');
+        }
+
+        $savedDescriptor = json_decode((string) $profile['face_descriptor'], true);
+        if (!is_array($savedDescriptor)) {
+            throw new RuntimeException('Dữ liệu khuôn mặt đã đăng ký không hợp lệ.');
+        }
+        $savedDescriptor = $this->validateFaceDescriptor($savedDescriptor);
+
+        $distance = 0.0;
+        foreach ($descriptor as $index => $value) {
+            $difference = $value - $savedDescriptor[$index];
+            $distance += $difference * $difference;
+        }
+        $distance = sqrt($distance);
+
+        return $distance <= 0.45;
     }
 
     public function punch(int $employeeId, string $date): array

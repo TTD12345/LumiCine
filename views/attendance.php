@@ -134,7 +134,7 @@ $currentUserInitials = $escape($currentUser['initials']);
                         <span class="attendance-clock-label">THỜI GIAN HIỆN TẠI</span>
                         <strong id="attendance-live-clock">--:--:--</strong>
                         <span id="attendance-live-date"></span>
-                        <button class="attendance-punch-button" id="attendance-punch" type="button"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i><span>Chấm công vào</span></button>
+                        <button class="attendance-punch-button" id="attendance-punch" type="button"><i class="bi bi-camera" aria-hidden="true"></i><span>Quét khuôn mặt</span></button>
                     </div>
                 </div>
                 <div class="attendance-card-foot"><i class="bi bi-info-circle" aria-hidden="true"></i> Dữ liệu chấm công được lưu tập trung trong database.</div>
@@ -173,8 +173,29 @@ $currentUserInitials = $escape($currentUser['initials']);
         </div>
     </main>
 </div>
+<dialog class="face-attendance-dialog" id="face-attendance-dialog" aria-labelledby="face-dialog-title">
+    <div class="face-dialog-heading">
+        <div>
+            <span class="page-kicker" id="face-dialog-kicker">XÁC THỰC KHUÔN MẶT</span>
+            <h2 id="face-dialog-title">Quét khuôn mặt</h2>
+            <p id="face-dialog-description">Nhìn thẳng vào camera và giữ khuôn mặt trong khung.</p>
+        </div>
+        <button class="dialog-close" type="button" id="close-face-dialog" aria-label="Đóng"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+    </div>
+    <div class="face-camera-wrap" id="face-camera-wrap">
+        <video id="face-video" autoplay muted playsinline></video>
+        <canvas id="face-overlay"></canvas>
+        <span class="face-guide" aria-hidden="true"></span>
+        <span class="face-camera-status" id="face-camera-status">Đang khởi tạo camera...</span>
+    </div>
+    <div class="face-dialog-actions">
+        <button class="secondary-button" type="button" id="cancel-face-dialog">Hủy</button>
+        <button class="primary-button" type="button" id="face-action-button" disabled><i class="bi bi-camera" aria-hidden="true"></i><span>Đang tải mô hình</span></button>
+    </div>
+</dialog>
 <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
 <?php require PATH_VIEW . 'api-config.php'; ?>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 <script src="assets/js/employee-attendance.js" defer></script>
 </body>
 </html>

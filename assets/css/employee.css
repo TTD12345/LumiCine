@@ -308,6 +308,18 @@ a { color: inherit; }
 .attendance-punch-button:hover:not(:disabled) { transform: translateY(-1px); background: var(--employee-purple-dark); }
 .attendance-punch-button:disabled { cursor: default; background: #edf7f1; box-shadow: none; color: #438763; }
 .attendance-punch-button i { font-size: 12px; }
+.face-attendance-dialog { width: min(520px, calc(100% - 30px)); border: 0; border-radius: 14px; background: #fff; box-shadow: 0 22px 60px #25213b33; padding: 0; }
+.face-attendance-dialog::backdrop { background: #25213b66; backdrop-filter: blur(3px); }
+.face-dialog-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid #f0eff5; padding: 18px 20px 14px; }
+.face-dialog-heading h2 { margin: 6px 0 3px; color: #303044; font-family: Manrope, sans-serif; font-size: 18px; }
+.face-dialog-heading p { margin: 0; color: #9090a1; font-size: 9px; }
+.face-camera-wrap { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #171720; }
+.face-camera-wrap video, .face-camera-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.face-camera-wrap canvas { z-index: 2; }
+.face-guide { position: absolute; z-index: 3; top: 50%; left: 50%; width: 42%; aspect-ratio: 3 / 4; transform: translate(-50%, -50%); border: 2px solid #ffffffb8; border-radius: 48%; box-shadow: 0 0 0 999px #17172055; pointer-events: none; }
+.face-camera-status { position: absolute; z-index: 4; bottom: 10px; left: 50%; max-width: calc(100% - 20px); transform: translateX(-50%); border-radius: 20px; background: #171720d9; padding: 7px 10px; color: #fff; font-size: 9px; text-align: center; }
+.face-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #f0eff5; padding: 13px 20px; }
+.face-dialog-actions button:disabled { cursor: wait; opacity: .58; }
 .attendance-card-foot { display: flex; align-items: center; gap: 6px; border-top: 1px solid #f3f2f7; background: #fcfcfe; padding: 9px 21px; color: #a09faf; font-size: 8px; }
 .attendance-card-foot i { color: #9287df; }
 
