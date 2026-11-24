@@ -148,6 +148,10 @@ class HomeController
             ? (new UserModel())->listEmployeesWithoutAccounts()
             : [];
         $scheduleDate = date('Y-m-d');
+        $requestedScheduleMode = $_GET['mode'] ?? 'manage';
+        $scheduleMode = is_string($requestedScheduleMode) && $requestedScheduleMode === 'auto'
+            ? 'auto'
+            : 'manage';
         $scheduleAssignments = $section === 'schedule'
             ? $workforce->listAssignments($scheduleDate)
             : [];
@@ -156,6 +160,9 @@ class HomeController
             : [];
         $scheduleShiftTypes = $section === 'schedule'
             ? $workforce->listShiftTypes()
+            : [];
+        $scheduleDepartments = $section === 'schedule'
+            ? $workforce->listDepartments()
             : [];
         $roleLabel = self::ROLE_LABELS[$currentUser['role']];
         $csrfToken = $this->csrfToken();

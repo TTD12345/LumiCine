@@ -195,8 +195,38 @@ class ApiController
                     if (!is_string($date)) {
                         throw new InvalidArgumentException('Ngày không hợp lệ.');
                     }
+                    $fromDate = $_GET['from'] ?? null;
+                    $toDate = $_GET['to'] ?? null;
+                    if ($fromDate !== null || $toDate !== null) {
+                        if (!is_string($fromDate) || !is_string($toDate)) {
+                            throw new InvalidArgumentException('Khoảng ngày không hợp lệ.');
+                        }
+                        $departmentId = null;
+                        if (isset($_GET['departmentId']) && $_GET['departmentId'] !== '') {
+                            $departmentId = filter_var($_GET['departmentId'], FILTER_VALIDATE_INT);
+                            if (!$departmentId || $departmentId < 1) {
+                                throw new InvalidArgumentException('Phòng ban không hợp lệ.');
+                            }
+                        }
+                        $selectedEmployeeId = null;
+                        if (isset($_GET['employeeId']) && $_GET['employeeId'] !== '') {
+                            $selectedEmployeeId = filter_var($_GET['employeeId'], FILTER_VALIDATE_INT);
+                            if (!$selectedEmployeeId || $selectedEmployeeId < 1) {
+                                throw new InvalidArgumentException('Nhân viên không hợp lệ.');
+                            }
+                        }
+                        $assignments = $workforce->listAssignmentsRange(
+                            $fromDate,
+                            $toDate,
+                            $employeeId,
+                            $departmentId,
+                            $selectedEmployeeId
+                        );
+                    } else {
+                        $assignments = $workforce->listAssignments($date, $employeeId);
+                    }
                     $this->respond([
-                        'assignments' => $workforce->listAssignments($date, $employeeId),
+                        'assignments' => $assignments,
                         'shiftTypes' => $workforce->listShiftTypes($includeInactive),
                     ]);
                 }
@@ -224,6 +254,47 @@ class ApiController
                     $this->respond(['success' => true]);
                 }
                 $this->respond(['assignment' => $workforce->saveAssignment($payload)], 201);
+            }
+            if ($resource === 'schedule-planner') {
+                $this->requireAdmin($user['role']);
+                $planner = new SchedulePlanner();
+                if ($method === 'GET') {
+                    $this->respond($planner->configuration());
+                }
+
+                $payload = $this->readPayload();
+                $operation = $payload['operation'] ?? '';
+                if ($operation === 'save-rule') {
+                    $this->respond($planner->saveRequirement($payload));
+                }
+                if ($operation === 'save-rule-settings') {
+                    $this->respond($planner->saveRuleSettings($payload));
+                }
+                if ($operation === 'set-rule-status') {
+                    $id = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
+                    $active = $payload['active'] ?? null;
+                    if (!$id || $id < 1 || !is_bool($active)) {
+                        throw new InvalidArgumentException('Thông tin trạng thái quy tắc không hợp lệ.');
+                    }
+                    $this->respond($planner->setRequirementStatus($id, $active));
+                }
+                if ($operation === 'delete-rule') {
+                    $id = filter_var($payload['id'] ?? null, FILTER_VALIDATE_INT);
+                    if (!$id || $id < 1) {
+                        throw new InvalidArgumentException('Quy tắc phân ca không hợp lệ.');
+                    }
+                    $this->respond($planner->deleteRequirement($id));
+                }
+                if ($operation === 'save-policy') {
+                    $this->respond($planner->savePolicy($payload));
+                }
+                if ($operation === 'preview') {
+                    $this->respond($planner->preview($payload));
+                }
+                if ($operation === 'confirm') {
+                    $this->respond($planner->confirm($payload));
+                }
+                throw new InvalidArgumentException('Thao tác tự động phân ca không hợp lệ.');
             }
             if ($resource === 'attendance') {
                 if ($linkedEmployeeId === null) {
