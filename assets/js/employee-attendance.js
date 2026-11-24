@@ -104,6 +104,7 @@
         checkOutState.classList.toggle('is-recorded', Boolean(checkOut));
         status.textContent = attendanceLoadError
             ? 'Lỗi tải dữ liệu'
+            : !attendanceRecord.has_assignment ? 'Chưa phân ca'
             : isAbsent ? 'Nghỉ không phép'
                 : missingPunch ? 'Thiếu chấm công'
                 : lateMinutes > 0 ? 'Đi muộn'
@@ -112,9 +113,11 @@
         status.classList.toggle('is-working', isWorking);
         status.classList.toggle('is-complete', isComplete);
         punchButton.disabled = isLoading || !attendanceRecord.has_assignment || !isCurrentDate || isComplete || isAbsent;
-        punchButton.querySelector('span').textContent = nextType === 'check_out'
-            ? 'Chấm công ra'
-            : 'Chấm công vào';
+        punchButton.querySelector('span').textContent = !attendanceRecord.has_assignment
+            ? 'Chưa được phân ca'
+            : nextType === 'check_out'
+                ? 'Chấm công ra'
+                : 'Chấm công vào';
         punchButton.querySelector('i').className =
             `bi ${nextType === 'check_out' ? 'bi-box-arrow-right' : 'bi-box-arrow-in-right'}`;
         document.getElementById('attendance-status-summary').textContent = attendanceLoadError
