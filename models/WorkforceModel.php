@@ -1896,6 +1896,231 @@ class WorkforceModel extends BaseModel
         return array_values($employees);
     }
 
+    public function dashboardReport(string $fromDate, string $toDate, ?int $departmentId = null): array
+    {
+        $this->validateDate($fromDate);
+        $this->validateDate($toDate);
+        $start = new DateTimeImmutable($fromDate);
+        $end = new DateTimeImmutable($toDate);
+        if ($end < $start || (int) $start->diff($end)->format('%a') > 366) {
+            throw new InvalidArgumentException('Khoảng thời gian báo cáo không hợp lệ.');
+        }
+
+        $departmentClause = $departmentId !== null ? ' AND e.ma_phong_ban = :department_id' : '';
+        $employeeParams = ['start' => $fromDate, 'end' => $toDate];
+        if ($departmentId !== null) {
+            $employeeParams['department_id'] = $departmentId;
+        }
+
+        $employeeStatement = $this->pdo->prepare(
+            'SELECT COUNT(DISTINCT e.id) AS total_employees
+             FROM nhan_vien e
+             WHERE e.trang_thai = 1
+               AND (e.ngay_nghi_viec IS NULL OR e.ngay_nghi_viec > :end)'
+               . ($departmentId !== null ? ' AND e.ma_phong_ban = :department_id' : '')
+        );
+        $employeeCountParams = ['end' => $toDate];
+        if ($departmentId !== null) {
+            $employeeCountParams['department_id'] = $departmentId;
+        }
+        $employeeStatement->execute($employeeCountParams);
+        $totalEmployees = (int) $employeeStatement->fetchColumn();
+
+        $attendanceStatement = $this->pdo->prepare(
+            'SELECT a.ngay_lam AS work_date,
+                    a.nhan_vien_id AS employee_id,
+                    COUNT(DISTINCT a.id) AS assignment_count,
+                    COUNT(DISTINCT CASE
+                        WHEN c.thoi_gian_vao IS NOT NULL AND c.thoi_gian_ra IS NOT NULL
+                        THEN a.id END) AS completed_count,
+                    MAX(CASE WHEN c.thoi_gian_vao IS NOT NULL AND c.thoi_gian_ra IS NOT NULL
+                             AND COALESCE(c.so_phut_di_muon, 0) > 0 THEN 1 ELSE 0 END) AS is_late,
+                    MAX(CASE WHEN c.thoi_gian_vao IS NOT NULL AND c.thoi_gian_ra IS NOT NULL
+                             AND COALESCE(c.so_phut_di_muon, 0) = 0 THEN 1 ELSE 0 END) AS is_on_time,
+                    EXISTS (
+                        SELECT 1 FROM lumicine_leave_requests l
+                        WHERE l.nhan_vien_id = a.nhan_vien_id
+                          AND l.trang_thai = \'DA_DUYET\'
+                          AND DATE(l.gio_bat_dau) <= a.ngay_lam
+                          AND DATE(l.gio_ket_thuc) >= a.ngay_lam
+                    ) AS is_leave
+             FROM phan_ca a
+             INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
+             LEFT JOIN cham_cong c ON c.phan_ca_id = a.id
+             WHERE a.trang_thai = \'DA_PHAN\'
+               AND a.ngay_lam BETWEEN :start AND :end
+               AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)'
+               . $departmentClause
+               . ' GROUP BY a.ngay_lam, a.nhan_vien_id
+                 ORDER BY a.ngay_lam, a.nhan_vien_id'
+        );
+        $attendanceStatement->execute($employeeParams);
+
+        $daily = [];
+        $worked = 0;
+        $late = 0;
+        $leaveDays = 0;
+        $leaveSeen = [];
+        $topEmployees = [];
+        $departmentWork = [];
+        foreach ($attendanceStatement->fetchAll() as $row) {
+            $date = (string) $row['work_date'];
+            $employeeId = (int) $row['employee_id'];
+            if (!isset($daily[$date])) {
+                $daily[$date] = ['date' => $date, 'on_time' => 0, 'late' => 0, 'absent' => 0];
+            }
+            if ((int) $row['completed_count'] > 0) {
+                $worked++;
+                if ((int) $row['is_late'] === 1) {
+                    $late++;
+                    $daily[$date]['late']++;
+                } else {
+                    $daily[$date]['on_time']++;
+                }
+                $topEmployees[$employeeId] = ($topEmployees[$employeeId] ?? 0) + 1;
+            } elseif ((int) $row['is_leave'] === 1) {
+                $leaveKey = $date . ':' . $employeeId;
+                if (!isset($leaveSeen[$leaveKey])) {
+                    $leaveSeen[$leaveKey] = true;
+                    $leaveDays++;
+                }
+            } else {
+                $daily[$date]['absent']++;
+            }
+        }
+
+        $leaveStatement = $this->pdo->prepare(
+            'SELECT l.trang_thai,
+                    COUNT(DISTINCT l.id) AS request_count
+             FROM lumicine_leave_requests l
+             INNER JOIN nhan_vien e ON e.id = l.nhan_vien_id
+             WHERE DATE(l.gio_bat_dau) <= :end
+               AND DATE(l.gio_ket_thuc) >= :start'
+               . $departmentClause
+               . ' GROUP BY l.trang_thai'
+        );
+        $leaveStatement->execute($employeeParams);
+        $leaveStatus = ['approved' => 0, 'pending' => 0, 'rejected' => 0];
+        foreach ($leaveStatement->fetchAll() as $row) {
+            $key = $row['trang_thai'] === 'DA_DUYET' ? 'approved'
+                : ($row['trang_thai'] === 'CHO_DUYET' ? 'pending' : 'rejected');
+            $leaveStatus[$key] = (int) $row['request_count'];
+        }
+
+        $overtimeStatement = $this->pdo->prepare(
+            'SELECT DATE(o.gio_bat_dau) AS overtime_date,
+                    o.trang_thai,
+                    SUM(COALESCE(o.tong_phut_tang_ca, 0)) AS overtime_minutes
+             FROM tang_ca o
+             INNER JOIN nhan_vien e ON e.id = COALESCE(o.nhan_vien_id,
+                 (SELECT c.nhan_vien_id FROM cham_cong c WHERE c.id = o.cham_cong_id LIMIT 1))
+             WHERE DATE(o.gio_bat_dau) BETWEEN :start AND :end'
+               . $departmentClause
+               . ' GROUP BY DATE(o.gio_bat_dau), o.trang_thai
+                 ORDER BY overtime_date'
+        );
+        $overtimeStatement->execute($employeeParams);
+        $overtimeDaily = [];
+        $overtimeTotals = ['approved' => 0, 'pending' => 0, 'rejected' => 0];
+        foreach ($overtimeStatement->fetchAll() as $row) {
+            $date = (string) $row['overtime_date'];
+            $key = $row['trang_thai'] === 'DA_DUYET' ? 'approved'
+                : ($row['trang_thai'] === 'CHO_DUYET' ? 'pending' : 'rejected');
+            $minutes = (int) $row['overtime_minutes'];
+            $overtimeTotals[$key] += $minutes;
+            if (!isset($overtimeDaily[$date])) {
+                $overtimeDaily[$date] = ['date' => $date, 'approved' => 0, 'pending' => 0, 'rejected' => 0];
+            }
+            $overtimeDaily[$date][$key] += round($minutes / 60, 2);
+        }
+
+        $departmentStatement = $this->pdo->prepare(
+            'SELECT COALESCE(d.ten_phong_ban, \'Chưa phân công\') AS department,
+                    COUNT(DISTINCT CONCAT(a.ngay_lam, "-", a.nhan_vien_id)) AS work_days
+             FROM phan_ca a
+             INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
+             LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
+             INNER JOIN cham_cong c ON c.phan_ca_id = a.id
+             WHERE a.trang_thai = \'DA_PHAN\'
+               AND c.thoi_gian_vao IS NOT NULL
+               AND c.thoi_gian_ra IS NOT NULL
+               AND a.ngay_lam BETWEEN :start AND :end
+               AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)'
+               . $departmentClause
+               . ' GROUP BY d.id, d.ten_phong_ban
+                 ORDER BY d.ten_phong_ban'
+        );
+        $departmentStatement->execute($employeeParams);
+        $departmentWork = array_map(
+            static fn (array $row): array => [
+                'department' => (string) $row['department'],
+                'work_days' => (int) $row['work_days'],
+            ],
+            $departmentStatement->fetchAll()
+        );
+
+        $topStatement = $this->pdo->prepare(
+            'SELECT e.id, e.ho_ten AS name, COUNT(DISTINCT a.ngay_lam) AS work_days
+             FROM phan_ca a
+             INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
+             INNER JOIN cham_cong c ON c.phan_ca_id = a.id
+             WHERE a.trang_thai = \'DA_PHAN\'
+               AND c.thoi_gian_vao IS NOT NULL
+               AND c.thoi_gian_ra IS NOT NULL
+               AND a.ngay_lam BETWEEN :start AND :end
+               AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)'
+               . $departmentClause
+               . ' GROUP BY e.id, e.ho_ten
+                 ORDER BY work_days DESC, e.ho_ten ASC
+                 LIMIT 5'
+        );
+        $topStatement->execute($employeeParams);
+        $topEmployees = array_map(
+            static fn (array $row): array => [
+                'name' => (string) $row['name'],
+                'work_days' => (int) $row['work_days'],
+            ],
+            $topStatement->fetchAll()
+        );
+
+        $cursor = new DateTimeImmutable($fromDate);
+        $last = new DateTimeImmutable($toDate);
+        $dailyFilled = [];
+        while ($cursor <= $last) {
+            $date = $cursor->format('Y-m-d');
+            $dailyFilled[] = $daily[$date] ?? ['date' => $date, 'on_time' => 0, 'late' => 0, 'absent' => 0];
+            $cursor = $cursor->modify('+1 day');
+        }
+
+        $overtimeFilled = [];
+        $cursor = new DateTimeImmutable($fromDate);
+        while ($cursor <= $last) {
+            $date = $cursor->format('Y-m-d');
+            $overtimeFilled[] = $overtimeDaily[$date] ?? ['date' => $date, 'approved' => 0, 'pending' => 0, 'rejected' => 0];
+            $cursor = $cursor->modify('+1 day');
+        }
+
+        return [
+            'period' => ['from' => $fromDate, 'to' => $toDate],
+            'summary' => [
+                'total_employees' => $totalEmployees,
+                'total_work_days' => $worked,
+                'total_late' => $late,
+                'total_leave_days' => $leaveDays,
+            ],
+            'attendance_daily' => $dailyFilled,
+            'department_work' => $departmentWork,
+            'leave_status' => $leaveStatus,
+            'overtime_daily' => $overtimeFilled,
+            'overtime_totals' => [
+                'approved_hours' => round($overtimeTotals['approved'] / 60, 2),
+                'pending_hours' => round($overtimeTotals['pending'] / 60, 2),
+                'rejected_hours' => round($overtimeTotals['rejected'] / 60, 2),
+            ],
+            'top_employees' => $topEmployees,
+        ];
+    }
+
     private function assignmentQuery(): string
     {
         return 'SELECT a.id, a.ngay_lam AS work_date, e.id AS employee_id,

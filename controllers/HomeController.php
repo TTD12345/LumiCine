@@ -141,6 +141,9 @@ class HomeController
         $departments = $section === 'employees'
             ? $workforce->listDepartments()
             : [];
+        $reportDepartments = $section === 'reports'
+            ? $workforce->listDepartments()
+            : [];
         $employeeAccounts = $section === 'accounts'
             ? (new UserModel())->listEmployeeAccounts()
             : [];

@@ -290,11 +290,38 @@ $isSchedule = $section === 'schedule';
                 </section>
             <?php elseif (in_array($section, ['employees', 'attendance', 'reports'], true)): ?>
                 <?php if ($section === 'reports'): ?>
-                    <section class="summary-grid">
-                        <article class="summary-card"><p class="summary-label">Tổng nhân viên</p><div class="summary-value"><?= count($employees) ?></div></article>
-                        <article class="summary-card"><p class="summary-label">Tổng ngày công</p><div class="summary-value"><?= array_sum(array_column($employees, 'worked')) ?></div></article>
-                        <article class="summary-card"><p class="summary-label">Lượt đi muộn</p><div class="summary-value"><?= array_sum(array_column($employees, 'late')) ?></div></article>
-                        <article class="summary-card"><p class="summary-label">Ngày nghỉ phép</p><div class="summary-value"><?= array_sum(array_column($employees, 'leave')) ?></div></article>
+                    <section class="report-filter data-card" aria-label="Bộ lọc báo cáo">
+                        <form id="report-filter-form" class="report-filter-grid">
+                            <label>Từ ngày<input type="date" id="report-from" required></label>
+                            <label>Đến ngày<input type="date" id="report-to" required></label>
+                            <label>Phòng ban
+                                <select id="report-department">
+                                    <option value="">Tất cả phòng ban</option>
+                                    <?php foreach ($reportDepartments as $department): ?>
+                                        <option value="<?= (int) $department['id'] ?>"><?= $escape($department['name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <div class="report-filter-actions">
+                                <button class="button button-primary" type="submit"><i class="bi bi-funnel"></i> Lọc dữ liệu</button>
+                                <button class="button button-outline" type="button" id="report-reset"><i class="bi bi-arrow-counterclockwise"></i> Đặt lại</button>
+                                <button class="button button-light" type="button" id="report-export"><i class="bi bi-file-earmark-spreadsheet"></i> Xuất CSV</button>
+                            </div>
+                        </form>
+                        <p class="report-feedback" id="report-feedback" role="status" aria-live="polite"></p>
+                    </section>
+                    <section class="summary-grid" id="report-summary">
+                        <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-blue"><i class="bi bi-people-fill"></i></span></div><p class="summary-label">Tổng nhân viên</p><div class="summary-value" id="report-total-employees">0</div></article>
+                        <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-green"><i class="bi bi-calendar2-check-fill"></i></span></div><p class="summary-label">Tổng ngày công</p><div class="summary-value" id="report-total-work">0</div></article>
+                        <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-orange"><i class="bi bi-clock-history"></i></span></div><p class="summary-label">Lượt đi muộn</p><div class="summary-value" id="report-total-late">0</div></article>
+                        <article class="summary-card"><div class="summary-heading"><span class="summary-icon icon-purple"><i class="bi bi-calendar2-heart-fill"></i></span></div><p class="summary-label">Ngày nghỉ phép</p><div class="summary-value" id="report-total-leave">0</div></article>
+                    </section>
+                    <section class="report-chart-grid">
+                        <article class="report-chart-card report-chart-wide"><header><h2>Chấm công theo ngày</h2><p>Số lượt đúng giờ, đi muộn và vắng mặt</p></header><div class="report-chart-body"><canvas id="attendanceChart"></canvas><p class="report-empty" id="attendance-empty" hidden>Chưa có dữ liệu thống kê trong khoảng thời gian này</p></div></article>
+                        <article class="report-chart-card"><header><h2>Nghỉ phép</h2><p>Phân loại đơn nghỉ phép theo trạng thái</p></header><div class="report-chart-body report-doughnut"><canvas id="leaveChart"></canvas><p class="report-empty" id="leave-empty" hidden>Chưa có dữ liệu thống kê trong khoảng thời gian này</p></div></article>
+                        <article class="report-chart-card"><header><h2>Ngày công theo phòng ban</h2><p>Tổng ngày công trong khoảng thời gian đã lọc</p></header><div class="report-chart-body"><canvas id="departmentChart"></canvas><p class="report-empty" id="department-empty" hidden>Chưa có dữ liệu thống kê trong khoảng thời gian này</p></div></article>
+                        <article class="report-chart-card"><header><h2>Tăng ca</h2><p>Giờ tăng ca theo ngày và trạng thái đơn</p></header><div class="report-chart-body"><canvas id="overtimeChart"></canvas><p class="report-empty" id="overtime-empty" hidden>Chưa có dữ liệu thống kê trong khoảng thời gian này</p></div></article>
+                        <article class="report-chart-card report-chart-wide"><header><h2>Top 5 nhân viên có ngày công cao nhất</h2><p>Xếp hạng trong khoảng thời gian đã lọc</p></header><div class="report-chart-body"><canvas id="topChart"></canvas><p class="report-empty" id="top-empty" hidden>Chưa có dữ liệu thống kê trong khoảng thời gian này</p></div></article>
                     </section>
                 <?php elseif ($section === 'employees'): ?>
                     <section class="data-card" aria-labelledby="workforce-employees-title">
@@ -549,6 +576,10 @@ $isSchedule = $section === 'schedule';
 <?php elseif ($section === 'accounts'): ?>
     <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/employee-accounts.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/employee-accounts.js') ?>" defer></script>
+<?php elseif ($section === 'reports'): ?>
+    <?php require PATH_VIEW . 'api-config.php'; ?>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+    <script src="assets/js/reports.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/reports.js') ?>" defer></script>
 <?php endif; ?>
 </body>
 </html>
