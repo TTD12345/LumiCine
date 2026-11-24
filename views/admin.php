@@ -192,7 +192,6 @@ $statusFor = static function (array $employee): array {
                     <div class="data-card-tools">
                         <div class="working-day-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Số ca được phân: <strong id="standard-workdays"><?= (int) ($employees[0]['workingDays'] ?? 0) ?> ngày</strong></div>
                         <div class="holiday-source-tools">
-                            <span id="holiday-source-status" role="status" aria-live="polite">Đang chờ tải lịch lễ Việt Nam...</span>
                             <button class="button button-outline" id="manage-holidays" type="button"><i class="bi bi-calendar2-heart" aria-hidden="true"></i><span>Lịch nghỉ Việt Nam</span></button>
                         </div>
                     </div>
@@ -353,7 +352,6 @@ $statusFor = static function (array $employee): array {
             <button class="dialog-close" type="button" id="close-holiday-dialog" aria-label="Đóng"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
         </header>
         <div class="holiday-dialog-body">
-            <p class="holiday-source-note">Lịch API là dữ liệu tham khảo. Nager.Date hiện thiếu một số lịch nghỉ Việt Nam như Tết, Giỗ Tổ và lịch nghỉ/làm bù; hãy đối chiếu thông báo chính thức từng năm. Ngày bổ sung được lưu trong database và dùng chung giữa người quản trị.</p>
             <ul class="holiday-list" id="holiday-list" aria-label="Danh sách ngày lễ"></ul>
             <div class="holiday-add-form">
                 <label class="dialog-field">Ngày<input type="date" id="holiday-date" required></label>

@@ -120,6 +120,7 @@
     };
 
     const setHolidaySourceStatus = (message, state) => {
+        if (!holidaySourceStatus) return;
         holidaySourceStatus.textContent = message;
         holidaySourceStatus.dataset.state = state;
         holidayApiStatus.textContent = message;
