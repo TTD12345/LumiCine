@@ -108,6 +108,7 @@
         checkOutState.classList.toggle('is-recorded', Boolean(checkOut));
         status.textContent = attendanceLoadError
             ? 'Lỗi tải dữ liệu'
+            : !attendanceRecord.has_assignment ? 'Chưa phân ca'
             : isAbsent ? 'Nghỉ không phép'
                 : missingPunch ? 'Thiếu chấm công'
                 : lateMinutes > 0 ? 'Đi muộn'
@@ -115,10 +116,18 @@
                         : isComplete ? 'Đã hoàn thành' : isWorking ? 'Đang làm việc' : 'Chưa bắt đầu';
         status.classList.toggle('is-working', isWorking);
         status.classList.toggle('is-complete', isComplete);
-        punchButton.disabled = isLoading || !isCurrentDate || isComplete || isAbsent;
-        punchButton.querySelector('span').textContent = faceProfile.enrolled
-            ? (nextType === 'check_out' ? 'Chấm công ra bằng khuôn mặt' : 'Chấm công vào bằng khuôn mặt')
-            : 'Đăng ký khuôn mặt';
+        punchButton.disabled = isLoading
+            || !isCurrentDate
+            || isComplete
+            || isAbsent
+            || (faceProfile.enrolled && !attendanceRecord.has_assignment);
+        punchButton.querySelector('span').textContent = !faceProfile.enrolled
+            ? 'Đăng ký khuôn mặt'
+            : !attendanceRecord.has_assignment
+                ? 'Chưa được phân ca'
+                : nextType === 'check_out'
+                    ? 'Chấm công ra bằng khuôn mặt'
+                    : 'Chấm công vào bằng khuôn mặt';
         punchButton.querySelector('i').className = 'bi bi-camera';
         document.getElementById('attendance-status-summary').textContent = attendanceLoadError
             ? 'Không tải được'
