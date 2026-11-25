@@ -408,6 +408,7 @@ class SchedulePlanner extends BaseModel
                 $employeeIds[] = $employeeId;
             }
             $employeeIds = array_values(array_unique($employeeIds));
+            sort($employeeIds, SORT_NUMERIC);
             $lockEmployeeRows = $this->pdo->prepare(
                 'SELECT id FROM nhan_vien WHERE id = :id FOR UPDATE'
             );
@@ -480,6 +481,49 @@ class SchedulePlanner extends BaseModel
                     $context['policy']
                 );
                 if ($reasons !== []) {
+                    if (in_array('schedule_conflict', $reasons, true)) {
+                        $candidate = $this->eventForRule($employee, $rule, $date);
+                        foreach ($context['events'][$employeeId] ?? [] as $existingEvent) {
+                            if (
+                                SchedulePlanningEngine::intervalsOverlap(
+                                    $candidate['start_at'],
+                                    $candidate['end_at'],
+                                    $existingEvent['start_at'],
+                                    $existingEvent['end_at']
+                                )
+                            ) {
+                                $existingShift = $existingEvent['shift_name']
+                                    ?? (($existingEvent['source'] ?? '') === 'approved_overtime'
+                                        ? 'tăng ca đã duyệt'
+                                        : 'tăng ca');
+                                $existingStart = new DateTimeImmutable($existingEvent['start_at']);
+                                $existingEnd = new DateTimeImmutable($existingEvent['end_at']);
+                                $candidateStart = new DateTimeImmutable($candidate['start_at']);
+                                $candidateEnd = new DateTimeImmutable($candidate['end_at']);
+                                $existingStartLabel = $existingStart->format('H:i')
+                                    . ($existingStart->format('Y-m-d') !== $date
+                                        ? ' ngày ' . $existingStart->format('d/m/Y')
+                                        : '');
+                                $existingEndLabel = $existingEnd->format('H:i')
+                                    . ($existingEnd->format('Y-m-d') !== $existingStart->format('Y-m-d')
+                                        ? ' ngày ' . $existingEnd->format('d/m/Y')
+                                        : '');
+                                $candidateEndLabel = $candidateEnd->format('H:i')
+                                    . ($candidateEnd->format('Y-m-d') !== $candidateStart->format('Y-m-d')
+                                        ? ' ngày ' . $candidateEnd->format('d/m/Y')
+                                        : '');
+                                throw new InvalidArgumentException(
+                                    'Không thể phân ca cho ' . $employee['name'] . ' ngày '
+                                    . (new DateTimeImmutable($date))->format('d/m/Y')
+                                    . '. Nhân viên đã có lịch ' . $existingShift . ' từ ' . $existingStartLabel
+                                    . ' đến ' . $existingEndLabel
+                                    . ', bị chồng lấn với ca mới ' . $rule['shift_name'] . ' từ '
+                                    . $candidateStart->format('H:i') . ' đến ' . $candidateEndLabel
+                                    . '. Vui lòng điều chỉnh lịch trước khi lưu.'
+                                );
+                            }
+                        }
+                    }
                     throw new InvalidArgumentException(
                         'Không thể lưu ca của ' . $employee['name'] . ': ' . $this->reasonLabels($reasons) . '.'
                     );
@@ -693,7 +737,7 @@ class SchedulePlanner extends BaseModel
         $scheduleStatement = $this->pdo->prepare(
             'SELECT a.nhan_vien_id AS employee_id, e.ma_phong_ban AS department_id,
                     a.ngay_lam AS work_date,
-                    a.ca_lam_viec_id AS shift_id, s.gio_bat_dau AS start,
+                    a.ca_lam_viec_id AS shift_id, s.ten_ca AS shift_name, s.gio_bat_dau AS start,
                     s.gio_ket_thuc AS end, s.gio_nghi_bat_dau AS break_start,
                     s.gio_nghi_ket_thuc AS break_end
              FROM phan_ca a
@@ -709,6 +753,7 @@ class SchedulePlanner extends BaseModel
             $employee = ['id' => $employeeId, 'department_id' => (int) $row['department_id']];
             $rule = [
                 'shift_id' => (int) $row['shift_id'],
+                'shift_name' => $row['shift_name'],
                 'start' => $row['start'],
                 'end' => $row['end'],
                 'break_start' => $row['break_start'],
@@ -802,6 +847,7 @@ class SchedulePlanner extends BaseModel
             'employee_id' => (int) $employee['id'],
             'department_id' => (int) $employee['department_id'],
             'shift_id' => (int) $rule['shift_id'],
+            'shift_name' => $rule['shift_name'] ?? null,
             'date' => $date,
             'start_at' => $start->format('Y-m-d H:i:s'),
             'end_at' => $end->format('Y-m-d H:i:s'),

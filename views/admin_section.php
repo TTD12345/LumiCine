@@ -189,19 +189,20 @@ $isSchedule = $section === 'schedule';
                         <article><span class="schedule-stat-icon blue"><i class="bi bi-calendar2-week"></i></span><div><span>Tổng ca trong kỳ</span><strong id="schedule-total"><?= count($scheduleAssignments) ?></strong></div></article>
                         <article><span class="schedule-stat-icon green"><i class="bi bi-clock-history"></i></span><div><span>Đang diễn ra</span><strong id="schedule-active"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] === 'active')) ?></strong></div></article>
                         <article><span class="schedule-stat-icon orange"><i class="bi bi-hourglass-split"></i></span><div><span>Sắp bắt đầu</span><strong id="schedule-upcoming"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] === 'upcoming')) ?></strong></div></article>
-                        <article><span class="schedule-stat-icon purple"><i class="bi bi-people"></i></span><div><span>Nhân viên hoạt động</span><strong><?= count($scheduleEmployees) ?></strong></div></article>
+                        <article><span class="schedule-stat-icon purple"><i class="bi bi-hourglass-split"></i></span><div><span>Tổng giờ dự kiến</span><strong id="schedule-hours">0 giờ</strong></div></article>
                     </div>
 
                     <section class="schedule-board" aria-labelledby="schedule-list-title">
                         <header class="schedule-board-header">
-                            <div><h2 id="schedule-list-title">Lịch phân ca</h2><p id="schedule-date-caption">Ca làm việc trong ngày</p></div>
+                            <div><h2 id="schedule-list-title">Lịch phân ca</h2><p id="schedule-date-caption">Ca làm việc trong ngày</p><p id="schedule-employee-caption">Chọn nhân viên để xem lịch cá nhân theo ngày, tuần hoặc tháng.</p></div>
                             <div class="schedule-actions">
                                 <button class="button button-light" type="button" id="schedule-prev"><i class="bi bi-chevron-left"></i></button>
                                 <label class="schedule-date"><i class="bi bi-calendar3"></i><input id="schedule-date" type="date" value="<?= $escape($scheduleDate) ?>" aria-label="Chọn ngày phân ca"></label>
                                 <button class="button button-light" type="button" id="schedule-next"><i class="bi bi-chevron-right"></i></button>
                                 <select id="schedule-view" aria-label="Khoảng thời gian"><option value="day">Ngày</option><option value="week">Tuần</option><option value="month">Tháng</option></select>
                                 <select id="schedule-department-filter" aria-label="Lọc phòng ban"><option value="">Tất cả phòng ban</option><?php foreach ($scheduleDepartments as $department): ?><option value="<?= (int) $department['id'] ?>"><?= $escape($department['name']) ?></option><?php endforeach; ?></select>
-                                <select id="schedule-employee-filter" aria-label="Lọc nhân viên"><option value="">Tất cả nhân viên</option><?php foreach ($scheduleEmployees as $employee): ?><option value="<?= (int) $employee['id'] ?>"><?= $escape($employee['name']) ?></option><?php endforeach; ?></select>
+                                <select id="schedule-employee-filter" aria-label="Lọc nhân viên"><option value="">Tất cả nhân viên</option><?php foreach ($scheduleFilterEmployees as $employee): ?><option value="<?= (int) $employee['id'] ?>" data-code="<?= $escape($employee['code']) ?>" data-department="<?= $escape($employee['department']) ?>"><?= $escape($employee['name']) ?><?= !empty($employee['code']) ? ' · ' . $escape($employee['code']) : '' ?><?= (int) $employee['active'] !== 1 ? ' (ngừng hoạt động)' : '' ?></option><?php endforeach; ?></select>
+                                <select id="schedule-shift-filter" aria-label="Lọc ca làm việc"><option value="">Tất cả ca làm</option><?php foreach ($scheduleShiftFilters as $shift): ?><option value="<?= (int) $shift['id'] ?>"><?= $escape($shift['name']) ?><?= (int) $shift['active'] !== 1 ? ' (ngừng hoạt động)' : '' ?></option><?php endforeach; ?></select>
                                 <button class="button button-outline" type="button" id="schedule-manage-shifts"><i class="bi bi-sliders"></i> Quản lý loại ca</button>
                                 <button class="button button-primary" type="button" id="schedule-create"><i class="bi bi-plus-lg"></i> Tạo ca mới</button>
                             </div>
@@ -224,7 +225,7 @@ $isSchedule = $section === 'schedule';
                                     <?php else: ?>
                                         <?php foreach ($scheduleAssignments as $index => $assignment): ?>
                                             <tr data-assignment-id="<?= $escape($assignment['id']) ?>">
-                                                <td><div class="schedule-employee"><span><?= $escape(lumicineUtf8Substring($assignment['name'], 0, 1)) ?></span><div><strong><?= $escape($assignment['name']) ?></strong><small><?= $escape($assignment['role']) ?></small></div></div></td>
+                                                <td><div class="schedule-employee"><span><?= $escape(lumicineUtf8Substring($assignment['name'], 0, 1)) ?></span><div><strong><?= $escape($assignment['name']) ?></strong><small><?= !empty($assignment['employee_code']) ? 'Mã: ' . $escape($assignment['employee_code']) . ' · ' : '' ?><?= $escape($assignment['role']) ?></small></div></div></td>
                                                 <td><?= $escape($assignment['work_date']) ?></td><td><?= $escape($assignment['department']) ?></td><td><strong><?= $escape($assignment['shift_name'] ?? ('Ca ' . ($index + 1))) ?></strong></td>
                                                 <td><strong><?= $escape(substr($assignment['start'], 0, 5)) ?> - <?= $escape(substr($assignment['end'], 0, 5)) ?></strong></td>
                                                 <td><?= $escape($assignment['location']) ?></td>

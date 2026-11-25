@@ -161,8 +161,14 @@ class HomeController
         $scheduleEmployees = $section === 'schedule'
             ? $workforce->listEmployees()
             : [];
+        $scheduleFilterEmployees = $section === 'schedule'
+            ? $workforce->listManagedEmployees()
+            : [];
         $scheduleShiftTypes = $section === 'schedule'
             ? $workforce->listShiftTypes()
+            : [];
+        $scheduleShiftFilters = $section === 'schedule'
+            ? $workforce->listShiftTypes(true)
             : [];
         $scheduleDepartments = $section === 'schedule'
             ? $workforce->listDepartments()

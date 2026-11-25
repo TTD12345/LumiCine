@@ -2,6 +2,15 @@
 
 class SchedulePlanningEngine
 {
+    public static function intervalsOverlap(
+        string $startA,
+        string $endA,
+        string $startB,
+        string $endB
+    ): bool {
+        return $startA < $endB && $endA > $startB;
+    }
+
     public function plan(
         string $fromDate,
         string $toDate,
@@ -262,7 +271,12 @@ class SchedulePlanningEngine
 
         $restMinutes = (int) ($policy['min_rest_minutes'] ?? 0);
         foreach ($events as $event) {
-            if ($candidate['start_at'] < $event['end_at'] && $candidate['end_at'] > $event['start_at']) {
+            if (self::intervalsOverlap(
+                $candidate['start_at'],
+                $candidate['end_at'],
+                $event['start_at'],
+                $event['end_at']
+            )) {
                 $reasons[] = 'schedule_conflict';
                 break;
             }

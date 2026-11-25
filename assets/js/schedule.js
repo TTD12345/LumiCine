@@ -11,6 +11,7 @@
     const viewSelect = document.getElementById('schedule-view');
     const departmentFilter = document.getElementById('schedule-department-filter');
     const employeeFilter = document.getElementById('schedule-employee-filter');
+    const shiftFilter = document.getElementById('schedule-shift-filter');
     let assignments = window.scheduleInitialData || [];
     let currentStatus = 'all';
     let editingId = null;
@@ -19,7 +20,7 @@
     const statusLabel = (status) => status === 'active' ? 'Đang diễn ra' : (status === 'upcoming' ? 'Sắp bắt đầu' : 'Hoàn thành');
     const initials = (name) => Array.from(String(name).trim())[0] || '?';
     const formatDate = (date) => new Intl.DateTimeFormat('vi-VN', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
+        weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
     }).format(new Date(`${date}T00:00:00`));
 
     const getDateRange = () => {
@@ -60,9 +61,12 @@
     const updateSummary = () => {
         const counts = { active: 0, upcoming: 0, completed: 0 };
         assignments.forEach((item) => { counts[item.status] = (counts[item.status] || 0) + 1; });
+        const expectedMinutes = assignments.reduce((total, item) => total + Number(item.expected_minutes || 0), 0);
         document.getElementById('schedule-total').textContent = assignments.length;
         document.getElementById('schedule-active').textContent = counts.active;
         document.getElementById('schedule-upcoming').textContent = counts.upcoming;
+        document.getElementById('schedule-hours').textContent =
+            `${(expectedMinutes / 60).toLocaleString('vi-VN', { maximumFractionDigits: 1 })} giờ`;
         document.getElementById('filter-all').textContent = assignments.length;
         document.getElementById('filter-active').textContent = counts.active;
         document.getElementById('filter-upcoming').textContent = counts.upcoming;
@@ -73,20 +77,24 @@
         const query = search.value.trim().toLocaleLowerCase('vi');
         const visible = assignments.filter((item) => {
             const matchesStatus = currentStatus === 'all' || item.status === currentStatus;
-            const haystack = `${item.name} ${item.role} ${item.department} ${item.location}`.toLocaleLowerCase('vi');
+            const haystack = `${item.name} ${item.employee_code || ''} ${item.role} ${item.department} ${item.shift_name} ${item.location}`.toLocaleLowerCase('vi');
             return matchesStatus && haystack.includes(query);
         });
         rows.innerHTML = visible.length ? visible.map((item, index) => `
             <tr data-assignment-id="${escapeHtml(item.id)}">
-                <td><div class="schedule-employee"><span>${escapeHtml(initials(item.name))}</span><div><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.role)}</small></div></div></td>
+                <td><div class="schedule-employee"><span>${escapeHtml(initials(item.name))}</span><div><strong>${escapeHtml(item.name)}</strong><small>${item.employee_code ? `Mã: ${escapeHtml(item.employee_code)} · ` : ''}${escapeHtml(item.role)}</small></div></div></td>
                 <td>${escapeHtml(formatDate(item.work_date))}</td><td>${escapeHtml(item.department)}</td><td><strong>${escapeHtml(item.shift_name || `Ca ${index + 1}`)}</strong></td>
                 <td><strong>${escapeHtml(item.start.slice(0, 5))} - ${escapeHtml(item.end.slice(0, 5))}</strong></td>
                 <td>${escapeHtml(item.location || '—')}</td>
                 <td><span class="schedule-status ${escapeHtml(item.status)}">${statusLabel(item.status)}</span></td>
                 <td><div class="schedule-row-actions"><button type="button" data-action="edit" title="Chỉnh sửa"><i class="bi bi-pencil"></i></button><button type="button" data-action="cancel" title="Hủy ca"><i class="bi bi-trash3"></i></button></div></td>
             </tr>`).join('') :
-            '<tr class="schedule-empty-row"><td colspan="8">Không tìm thấy ca làm việc phù hợp.</td></tr>';
+            `<tr class="schedule-empty-row"><td colspan="8">${assignments.length ? 'Không tìm thấy ca làm việc phù hợp.' : 'Chưa có lịch phân ca trong khoảng thời gian này.'}</td></tr>`;
         document.getElementById('schedule-result-count').textContent = `Hiển thị ${visible.length} ca`;
+        const selectedEmployee = employeeFilter.options[employeeFilter.selectedIndex];
+        document.getElementById('schedule-employee-caption').textContent = selectedEmployee.value
+            ? `Lịch của ${selectedEmployee.textContent}${selectedEmployee.dataset.department ? ` · ${selectedEmployee.dataset.department}` : ''}`
+            : 'Chọn nhân viên để xem lịch cá nhân theo ngày, tuần hoặc tháng.';
         updateSummary();
     };
 
@@ -99,6 +107,7 @@
                     to: range.to,
                     departmentId: departmentFilter.value,
                     employeeId: employeeFilter.value,
+                    shiftId: shiftFilter.value,
                 },
             });
             assignments = result.assignments;
@@ -194,6 +203,7 @@
     viewSelect.addEventListener('change', loadDate);
     departmentFilter.addEventListener('change', loadDate);
     employeeFilter.addEventListener('change', loadDate);
+    shiftFilter.addEventListener('change', loadDate);
     ['schedule-prev', 'schedule-next'].forEach((id) => document.getElementById(id).addEventListener('click', () => {
         const date = new Date(`${dateInput.value}T12:00:00`);
         const direction = id === 'schedule-next' ? 1 : -1;

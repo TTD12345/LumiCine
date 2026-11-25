@@ -195,6 +195,39 @@ expectSchedule(
     in_array('schedule_conflict', $engine->candidateReasons($employeeOne, $rule, $date, $overlap, [], []), true),
     'Overlapping assignments must be blocked.'
 );
+$earlyRule = $rule;
+$earlyRule['start'] = '01:00:00';
+$earlyRule['end'] = '03:00:00';
+$overnightOverlap = [[
+    'source' => 'assignment',
+    'date' => $previousDate,
+    'start_at' => $previousDate . ' 22:00:00',
+    'end_at' => $date . ' 02:00:00',
+    'minutes' => 240,
+    'shift_id' => 12,
+    'department_id' => 2,
+]];
+expectSchedule(
+    in_array(
+        'schedule_conflict',
+        $engine->candidateReasons($employeeOne, $earlyRule, $date, $overnightOverlap, [], []),
+        true
+    ),
+    'An assignment overlapping a shift carried over from the previous day must be blocked.'
+);
+$touchingSchedule = [[
+    'source' => 'assignment',
+    'date' => $date,
+    'start_at' => $date . ' 12:00:00',
+    'end_at' => $date . ' 16:00:00',
+    'minutes' => 240,
+    'shift_id' => 12,
+    'department_id' => 2,
+]];
+expectSchedule(
+    !in_array('schedule_conflict', $engine->candidateReasons($employeeOne, $rule, $date, $touchingSchedule, [], []), true),
+    'Assignments ending exactly when another starts must not count as overlapping.'
+);
 expectSchedule(
     in_array(
         'insufficient_rest',
