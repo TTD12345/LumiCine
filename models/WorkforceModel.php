@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/SchedulePlanningEngine.php';
+
 class WorkforceModel extends BaseModel
 {
     private const LEAVE_TYPES = [
@@ -649,22 +651,7 @@ class WorkforceModel extends BaseModel
 
         $statement = $this->pdo->prepare($sql);
         $statement->execute($parameters);
-        $assignments = $statement->fetchAll();
-        $now = new DateTimeImmutable();
-
-        foreach ($assignments as &$assignment) {
-            $start = new DateTimeImmutable($assignment['work_date'] . ' ' . $assignment['start']);
-            $end = new DateTimeImmutable($assignment['work_date'] . ' ' . $assignment['end']);
-            if ($end <= $start) {
-                $end = $end->modify('+1 day');
-            }
-            $assignment['status'] = $now < $start ? 'upcoming' : ($now < $end ? 'active' : 'completed');
-            $assignment['id'] = (string) $assignment['id'];
-            $assignment['employee_id'] = (int) $assignment['employee_id'];
-        }
-        unset($assignment);
-
-        return $assignments;
+        return $this->prepareAssignments($statement->fetchAll());
     }
 
     public function listAssignmentsRange(
@@ -672,13 +659,17 @@ class WorkforceModel extends BaseModel
         string $toDate,
         ?int $scopeEmployeeId = null,
         ?int $departmentId = null,
-        ?int $selectedEmployeeId = null
+        ?int $selectedEmployeeId = null,
+        ?int $shiftId = null
     ): array {
         $this->validateDate($fromDate);
         $this->validateDate($toDate);
         $startDate = new DateTimeImmutable($fromDate);
         $endDate = new DateTimeImmutable($toDate);
-        if ($endDate < $startDate || (int) $startDate->diff($endDate)->format('%a') > 366) {
+        if (
+            $endDate < $startDate || (int) $startDate->diff($endDate)->format('%a') > 366
+            || ($shiftId !== null && $shiftId < 1)
+        ) {
             throw new InvalidArgumentException('Khoảng thời gian lọc lịch phân ca không hợp lệ.');
         }
 
@@ -696,11 +687,19 @@ class WorkforceModel extends BaseModel
             $sql .= ' AND e.ma_phong_ban = :department_id';
             $parameters['department_id'] = $departmentId;
         }
+        if ($shiftId !== null) {
+            $sql .= ' AND a.ca_lam_viec_id = :shift_id';
+            $parameters['shift_id'] = $shiftId;
+        }
         $sql .= ' ORDER BY a.ngay_lam, c.gio_bat_dau, e.ho_ten';
 
         $statement = $this->pdo->prepare($sql);
         $statement->execute($parameters);
-        $assignments = $statement->fetchAll();
+        return $this->prepareAssignments($statement->fetchAll());
+    }
+
+    private function prepareAssignments(array $assignments): array
+    {
         $now = new DateTimeImmutable();
         foreach ($assignments as &$assignment) {
             $start = new DateTimeImmutable($assignment['work_date'] . ' ' . $assignment['start']);
@@ -708,7 +707,23 @@ class WorkforceModel extends BaseModel
             if ($end <= $start) {
                 $end = $end->modify('+1 day');
             }
+            $minutes = (int) (($end->getTimestamp() - $start->getTimestamp()) / 60);
+            if (!empty($assignment['break_start']) && !empty($assignment['break_end'])) {
+                $breakStart = new DateTimeImmutable($assignment['work_date'] . ' ' . $assignment['break_start']);
+                $breakEnd = new DateTimeImmutable($assignment['work_date'] . ' ' . $assignment['break_end']);
+                if ($breakStart < $start) {
+                    $breakStart = $breakStart->modify('+1 day');
+                }
+                if ($breakEnd <= $breakStart) {
+                    $breakEnd = $breakEnd->modify('+1 day');
+                }
+                if ($breakStart >= $start && $breakEnd <= $end) {
+                    $minutes -= (int) (($breakEnd->getTimestamp() - $breakStart->getTimestamp()) / 60);
+                }
+            }
+
             $assignment['status'] = $now < $start ? 'upcoming' : ($now < $end ? 'active' : 'completed');
+            $assignment['expected_minutes'] = max(0, $minutes);
             $assignment['id'] = (string) $assignment['id'];
             $assignment['employee_id'] = (int) $assignment['employee_id'];
         }
@@ -794,7 +809,8 @@ class WorkforceModel extends BaseModel
             $employeeCheck = $this->pdo->prepare(
                 'SELECT id FROM nhan_vien
                  WHERE id = :id AND trang_thai = 1
-                   AND (ngay_nghi_viec IS NULL OR :work_date < ngay_nghi_viec)'
+                   AND (ngay_nghi_viec IS NULL OR :work_date < ngay_nghi_viec)
+                 FOR UPDATE'
             );
             $employeeCheck->execute(['id' => $employeeId, 'work_date' => $date]);
             if ($employeeCheck->fetchColumn() === false) {
@@ -819,6 +835,10 @@ class WorkforceModel extends BaseModel
             }
 
             $shiftId = $this->findOrCreateShiftType($start, $end);
+            $shiftNameStatement = $this->pdo->prepare('SELECT ten_ca FROM ca_lam_viec WHERE id = :id');
+            $shiftNameStatement->execute(['id' => $shiftId]);
+            $shiftName = (string) $shiftNameStatement->fetchColumn();
+            $this->assertScheduleAvailable($employeeId, $date, $start, $end, $shiftName, $id);
             if ($id === null) {
                 $statement = $this->pdo->prepare(
                     'INSERT INTO phan_ca (nhan_vien_id, ca_lam_viec_id, ngay_lam, dia_diem, trang_thai)
@@ -2124,15 +2144,164 @@ class WorkforceModel extends BaseModel
     private function assignmentQuery(): string
     {
         return 'SELECT a.id, a.ngay_lam AS work_date, e.id AS employee_id,
-                       e.ho_ten AS name, COALESCE(e.chuc_vu, \'\') AS role,
+                       e.ma_nhan_vien AS employee_code, e.ho_ten AS name,
+                       COALESCE(e.chuc_vu, \'\') AS role,
                        COALESCE(d.ten_phong_ban, \'\') AS department,
                        c.id AS shift_id, c.ten_ca AS shift_name,
                        c.gio_bat_dau AS start, c.gio_ket_thuc AS end,
+                       c.gio_nghi_bat_dau AS break_start, c.gio_nghi_ket_thuc AS break_end,
                        COALESCE(a.dia_diem, \'\') AS location
                 FROM phan_ca a
                 INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
                 INNER JOIN ca_lam_viec c ON c.id = a.ca_lam_viec_id
                 LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban';
+    }
+
+    private function assertScheduleAvailable(
+        int $employeeId,
+        string $date,
+        string $startTime,
+        string $endTime,
+        string $shiftName,
+        ?int $excludedAssignmentId
+    ): void {
+        $newStart = new DateTimeImmutable($date . ' ' . $startTime);
+        $newEnd = new DateTimeImmutable($date . ' ' . $endTime);
+        if ($newEnd <= $newStart) {
+            $newEnd = $newEnd->modify('+1 day');
+        }
+
+        $previousDate = (new DateTimeImmutable($date))->modify('-1 day')->format('Y-m-d');
+        $nextDate = (new DateTimeImmutable($date))->modify('+1 day')->format('Y-m-d');
+        $sql = 'SELECT a.id, a.ngay_lam AS work_date, c.ten_ca AS shift_name,
+                       c.gio_bat_dau AS start, c.gio_ket_thuc AS end, e.ho_ten AS employee_name
+                FROM phan_ca a
+                INNER JOIN ca_lam_viec c ON c.id = a.ca_lam_viec_id
+                INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
+                WHERE a.nhan_vien_id = :employee_id
+                  AND a.trang_thai = \'DA_PHAN\'
+                  AND a.ngay_lam BETWEEN :previous_date AND :next_date';
+        $parameters = [
+            'employee_id' => $employeeId,
+            'previous_date' => $previousDate,
+            'next_date' => $nextDate,
+        ];
+        if ($excludedAssignmentId !== null) {
+            $sql .= ' AND a.id <> :excluded_id';
+            $parameters['excluded_id'] = $excludedAssignmentId;
+        }
+        $sql .= ' ORDER BY a.ngay_lam, c.gio_bat_dau FOR UPDATE';
+
+        $existingStatement = $this->pdo->prepare($sql);
+        $existingStatement->execute($parameters);
+        $existingAssignments = $existingStatement->fetchAll();
+        foreach ($existingAssignments as $existing) {
+            $existingStart = new DateTimeImmutable($existing['work_date'] . ' ' . $existing['start']);
+            $existingEnd = new DateTimeImmutable($existing['work_date'] . ' ' . $existing['end']);
+            if ($existingEnd <= $existingStart) {
+                $existingEnd = $existingEnd->modify('+1 day');
+            }
+            if (SchedulePlanningEngine::intervalsOverlap(
+                $newStart->format('Y-m-d H:i:s'),
+                $newEnd->format('Y-m-d H:i:s'),
+                $existingStart->format('Y-m-d H:i:s'),
+                $existingEnd->format('Y-m-d H:i:s')
+            )) {
+                throw new InvalidArgumentException(
+                    $this->scheduleConflictMessage(
+                        (string) $existing['employee_name'],
+                        $date,
+                        $shiftName,
+                        $newStart,
+                        $newEnd,
+                        (string) $existing['shift_name'],
+                        $existingStart,
+                        $existingEnd
+                    )
+                );
+            }
+        }
+
+        $policyTable = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = \'lumicine_schedule_policy\''
+        );
+        $policyTable->execute();
+        if ((int) $policyTable->fetchColumn() === 0) {
+            return;
+        }
+        $policy = $this->pdo->query(
+            'SELECT min_rest_minutes FROM lumicine_schedule_policy WHERE id = 1'
+        )->fetchColumn();
+        $minimumRestMinutes = $policy === false ? 0 : (int) $policy;
+        if ($minimumRestMinutes === 0) {
+            return;
+        }
+        foreach ($existingAssignments as $existing) {
+            $existingStart = new DateTimeImmutable($existing['work_date'] . ' ' . $existing['start']);
+            $existingEnd = new DateTimeImmutable($existing['work_date'] . ' ' . $existing['end']);
+            if ($existingEnd <= $existingStart) {
+                $existingEnd = $existingEnd->modify('+1 day');
+            }
+            $gapMinutes = $newStart >= $existingEnd
+                ? (int) (($newStart->getTimestamp() - $existingEnd->getTimestamp()) / 60)
+                : ($existingStart >= $newEnd
+                    ? (int) (($existingStart->getTimestamp() - $newEnd->getTimestamp()) / 60)
+                    : 0);
+            if ($gapMinutes < $minimumRestMinutes) {
+                $existingStartLabel = $existingStart->format('H:i')
+                    . ($existingStart->format('Y-m-d') !== $newStart->format('Y-m-d')
+                        ? ' ngày ' . $existingStart->format('d/m/Y')
+                        : '');
+                $existingEndLabel = $existingEnd->format('H:i')
+                    . ($existingEnd->format('Y-m-d') !== $existingStart->format('Y-m-d')
+                        ? ' ngày ' . $existingEnd->format('d/m/Y')
+                        : '');
+                $newEndLabel = $newEnd->format('H:i')
+                    . ($newEnd->format('Y-m-d') !== $newStart->format('Y-m-d')
+                        ? ' ngày ' . $newEnd->format('d/m/Y')
+                        : '');
+                throw new InvalidArgumentException(
+                    'Không thể phân ca cho ' . $existing['employee_name'] . ' ngày ' . $newStart->format('d/m/Y')
+                    . '. Ca ' . $shiftName . ' (' . $newStart->format('H:i') . '–' . $newEndLabel
+                    . ') chỉ cách ca ' . $existing['shift_name'] . ' (' . $existingStartLabel
+                    . '–' . $existingEndLabel . ') ' . $gapMinutes
+                    . ' phút, thấp hơn thời gian nghỉ tối thiểu ' . $minimumRestMinutes
+                    . ' phút đã cấu hình. Vui lòng điều chỉnh lịch.'
+                );
+            }
+        }
+    }
+
+    private function scheduleConflictMessage(
+        string $employeeName,
+        string $date,
+        string $newShiftName,
+        DateTimeImmutable $newStart,
+        DateTimeImmutable $newEnd,
+        string $existingShiftName,
+        DateTimeImmutable $existingStart,
+        DateTimeImmutable $existingEnd
+    ): string {
+        $existingStartLabel = $existingStart->format('H:i')
+            . ($existingStart->format('Y-m-d') !== $date
+                ? ' ngày ' . $existingStart->format('d/m/Y')
+                : '');
+        $existingEndLabel = $existingEnd->format('H:i')
+            . ($existingEnd->format('Y-m-d') !== $existingStart->format('Y-m-d')
+                ? ' ngày ' . $existingEnd->format('d/m/Y')
+                : '');
+        $newEndLabel = $newEnd->format('H:i')
+            . ($newEnd->format('Y-m-d') !== $newStart->format('Y-m-d')
+                ? ' ngày ' . $newEnd->format('d/m/Y')
+                : '');
+
+        return 'Không thể phân ca cho ' . $employeeName . ' ngày '
+            . (new DateTimeImmutable($date))->format('d/m/Y')
+            . '. Nhân viên đã có lịch ' . $existingShiftName . ' từ ' . $existingStartLabel
+            . ' đến ' . $existingEndLabel . ', bị chồng lấn với ca mới ' . $newShiftName
+            . ' từ ' . $newStart->format('H:i') . ' đến ' . $newEndLabel
+            . '. Vui lòng điều chỉnh lịch trước khi lưu.';
     }
 
     private function findOrCreateShiftType(string $start, string $end): int

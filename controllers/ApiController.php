@@ -215,12 +215,20 @@ class ApiController
                                 throw new InvalidArgumentException('Nhân viên không hợp lệ.');
                             }
                         }
+                        $shiftId = null;
+                        if (isset($_GET['shiftId']) && $_GET['shiftId'] !== '') {
+                            $shiftId = filter_var($_GET['shiftId'], FILTER_VALIDATE_INT);
+                            if (!$shiftId || $shiftId < 1) {
+                                throw new InvalidArgumentException('Ca làm việc không hợp lệ.');
+                            }
+                        }
                         $assignments = $workforce->listAssignmentsRange(
                             $fromDate,
                             $toDate,
                             $employeeId,
                             $departmentId,
-                            $selectedEmployeeId
+                            $selectedEmployeeId,
+                            $shiftId
                         );
                     } else {
                         $assignments = $workforce->listAssignments($date, $employeeId);
