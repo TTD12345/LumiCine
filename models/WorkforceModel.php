@@ -143,11 +143,28 @@ class WorkforceModel extends BaseModel
         ]);
     }
 
-    public function employeeTimesheet(int $employeeId, int $month, int $year): array
+    public function employeeTimesheet(int $employeeId, int $month, int $year, int $periodStartDay = 1): array
     {
-        if ($month < 1 || $month > 12 || $year < 2020 || $year > 2100) {
+        if (
+            $month < 1 || $month > 12 || $year < 2020 || $year > 2100
+            || $periodStartDay < 1 || $periodStartDay > 31
+        ) {
             throw new InvalidArgumentException('Tháng bảng công không hợp lệ.');
         }
+
+        $periodStart = new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
+        $periodStart = $periodStart->setDate(
+            $year,
+            $month,
+            min($periodStartDay, (int) $periodStart->format('t'))
+        );
+        $nextPeriodStart = $periodStart->modify('first day of next month');
+        $nextPeriodStart = $nextPeriodStart->setDate(
+            (int) $nextPeriodStart->format('Y'),
+            (int) $nextPeriodStart->format('n'),
+            min($periodStartDay, (int) $nextPeriodStart->format('t'))
+        );
+        $periodEnd = $nextPeriodStart->modify('-1 day');
 
         $statement = $this->pdo->prepare(
             'SELECT a.ngay_lam AS date,
@@ -186,16 +203,13 @@ class WorkforceModel extends BaseModel
         );
         $statement->execute([
             'employee_id' => $employeeId,
-            'month_start' => sprintf('%04d-%02d-01', $year, $month),
-            'next_month' => (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month)))
-                ->modify('first day of next month')
-                ->format('Y-m-d'),
+            'month_start' => $periodStart->format('Y-m-d'),
+            'next_month' => $nextPeriodStart->format('Y-m-d'),
         ]);
 
         $records = $statement->fetchAll();
         $summary = ['work_days' => 0, 'overtime_minutes' => 0, 'leave_days' => 0];
         $today = date('Y-m-d');
-        $now = new DateTimeImmutable();
         foreach ($records as &$record) {
             $date = (string) $record['date'];
             $record['worked_minutes'] = (int) $record['worked_minutes'];
@@ -228,24 +242,24 @@ class WorkforceModel extends BaseModel
                 $summary['work_days']++;
             } elseif ($hasCheckIn) {
                 $record['status'] = $date < $today ? 'incomplete' : 'working';
-            } elseif ($date < $today) {
-                $record['status'] = 'absent';
-            } elseif ($date === $today) {
-                $shiftStart = new DateTimeImmutable($date . ' ' . $record['shift_start']);
-                $shiftEnd = new DateTimeImmutable($date . ' ' . $record['shift_end']);
-                if ($shiftEnd <= $shiftStart) {
-                    $shiftEnd = $shiftEnd->modify('+1 day');
-                }
-                $record['status'] = $now >= $shiftEnd ? 'absent' : 'not_started';
             } else {
                 $record['status'] = 'not_started';
             }
             $summary['overtime_minutes'] += $record['overtime_minutes'];
-            unset($record['approved_leave'], $record['is_absent'], $record['shift_start'], $record['shift_end']);
+            $record['shift_start'] = substr((string) $record['shift_start'], 0, 5);
+            $record['shift_end'] = substr((string) $record['shift_end'], 0, 5);
+            unset($record['approved_leave'], $record['is_absent']);
         }
         unset($record);
 
-        return ['records' => $records, 'summary' => $summary];
+        return [
+            'records' => $records,
+            'summary' => $summary,
+            'period' => [
+                'start' => $periodStart->format('Y-m-d'),
+                'end' => $periodEnd->format('Y-m-d'),
+            ],
+        ];
     }
 
     public function findEmployeeIdByCode(?string $employeeCode): ?int

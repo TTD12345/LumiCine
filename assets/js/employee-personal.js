@@ -10,6 +10,7 @@
         not_started: 'Chưa chấm công',
         leave: 'Nghỉ phép',
         absent: 'Nghỉ không phép',
+        unscheduled: 'Không có lịch phân công',
         pending: 'Chờ duyệt',
         approved: 'Đã duyệt',
         rejected: 'Từ chối',
@@ -66,8 +67,161 @@
     const monthInput = document.getElementById('timesheet-month');
     const timesheetRows = document.getElementById('employee-timesheet-rows');
     if (monthInput && timesheetRows) {
+        const calendarPanel = document.getElementById('employee-timesheet-calendar');
+        const calendarGrid = document.getElementById('timesheet-calendar-grid');
+        const calendarCaption = document.getElementById('timesheet-calendar-caption');
+        const calendarTrigger = document.getElementById('timesheet-calendar-trigger');
+        const calendarToggle = document.getElementById('timesheet-calendar-toggle');
+        const periodLabel = document.getElementById('timesheet-period-label');
         let records = [];
+        let period = null;
         let activeStatus = 'all';
+        let calendarError = '';
+        let requestId = 0;
+        let calendarHideTimer = null;
+        const makeElement = (tag, className = '', text = '') => {
+            const element = document.createElement(tag);
+            if (className) element.className = className;
+            if (text) element.textContent = text;
+            return element;
+        };
+        const openDayDetails = (date, record) => {
+            let dialog = document.getElementById('timesheet-day-dialog');
+            if (!dialog) {
+                dialog = makeElement('dialog', 'timesheet-day-dialog');
+                dialog.id = 'timesheet-day-dialog';
+                document.body.append(dialog);
+            }
+            dialog.replaceChildren();
+            const heading = makeElement('header', 'timesheet-day-dialog-heading');
+            const title = makeElement('div');
+            const dateTitle = new Intl.DateTimeFormat('vi-VN', {
+                weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+            }).format(new Date(`${date}T00:00:00`));
+            title.append(
+                makeElement('span', 'page-kicker', 'CHI TIẾT BẢNG CÔNG'),
+                makeElement('h2', '', dateTitle),
+                makeElement('p', '', statusLabels[record?.status || 'unscheduled']),
+            );
+            const close = makeElement('button', 'timesheet-day-close', 'Đóng');
+            close.type = 'button';
+            close.addEventListener('click', () => dialog.close());
+            heading.append(title, close);
+            dialog.append(heading);
+
+            const details = makeElement('dl', 'timesheet-day-details');
+            const values = record
+                ? [
+                    ['Ca dự kiến', record.shift_start && record.shift_end
+                        ? `${String(record.shift_start).slice(0, 5)} – ${String(record.shift_end).slice(0, 5)}`
+                        : 'Đã phân ca'],
+                    ['Giờ vào', record.check_in || '—'],
+                    ['Giờ ra', record.check_out || '—'],
+                    ['Thời gian làm', formatDuration(record.worked_minutes)],
+                    ['Tăng ca đã duyệt', formatDuration(record.overtime_minutes)],
+                    ['Đi muộn', Number(record.late_minutes) > 0 ? `${record.late_minutes} phút` : '—'],
+                    ['Về sớm', Number(record.early_minutes) > 0 ? `${record.early_minutes} phút` : '—'],
+                ]
+                : [['Lịch làm việc', 'Không có ca phân công trong ngày này.']];
+            values.forEach(([label, value]) => {
+                details.append(makeElement('dt', '', label), makeElement('dd', '', value));
+            });
+            dialog.append(details);
+            if (!dialog.open) dialog.showModal();
+        };
+        const renderCalendar = () => {
+            if (!calendarPanel || !calendarGrid || !calendarCaption) return;
+            calendarGrid.replaceChildren();
+            if (calendarError) {
+                calendarCaption.textContent = calendarError;
+                return;
+            }
+            if (!period) {
+                calendarCaption.textContent = 'Chưa có thông tin kỳ công.';
+                return;
+            }
+            const periodStart = new Date(`${period.start}T00:00:00`);
+            const periodEnd = new Date(`${period.end}T00:00:00`);
+            calendarCaption.textContent = `Kỳ công ${formatDate(period.start)} – ${formatDate(period.end)}`;
+
+            const recordByDate = new Map(records.map((record) => [record.date, record]));
+            const firstWeekday = (periodStart.getDay() + 6) % 7;
+            for (let index = 0; index < firstWeekday; index += 1) {
+                const empty = makeElement('span', 'timesheet-calendar-empty');
+                empty.setAttribute('role', 'presentation');
+                calendarGrid.append(empty);
+            }
+            for (let dateCursor = new Date(periodStart); dateCursor <= periodEnd;
+                dateCursor.setDate(dateCursor.getDate() + 1)) {
+                const year = dateCursor.getFullYear();
+                const month = String(dateCursor.getMonth() + 1).padStart(2, '0');
+                const dayNumber = dateCursor.getDate();
+                const date = `${year}-${month}-${String(dayNumber).padStart(2, '0')}`;
+                const record = recordByDate.get(date);
+                const status = record?.status || 'unscheduled';
+                const cell = makeElement('button', `timesheet-calendar-day status-${status}`);
+                cell.type = 'button';
+                cell.setAttribute('role', 'gridcell');
+                cell.setAttribute(
+                    'aria-label',
+                    `${formatDate(date)} · ${statusLabels[status] || status}`,
+                );
+                const dateLabel = dateCursor.getMonth() === periodStart.getMonth()
+                    && dateCursor.getFullYear() === periodStart.getFullYear()
+                    ? String(dayNumber)
+                    : `${String(dayNumber).padStart(2, '0')}/${month}`;
+                cell.append(makeElement('span', 'timesheet-calendar-date', dateLabel));
+                if (record) {
+                    if (record.check_in || record.check_out) {
+                        cell.append(makeElement(
+                            'span',
+                            'timesheet-calendar-times',
+                            `${record.check_in || '—'}–${record.check_out || '—'}`,
+                        ));
+                    }
+                    if (Number(record.worked_minutes) > 0) {
+                        cell.append(makeElement(
+                            'span',
+                            'timesheet-calendar-hours',
+                            formatDuration(record.worked_minutes),
+                        ));
+                    }
+                }
+                cell.append(makeElement(
+                    'span',
+                    'timesheet-calendar-state',
+                    status === 'unscheduled' ? 'Không có ca' : statusLabels[status] || status,
+                ));
+                cell.addEventListener('click', () => openDayDetails(date, record));
+                calendarGrid.append(cell);
+            }
+            while (calendarGrid.children.length % 7 !== 0) {
+                const empty = makeElement('span', 'timesheet-calendar-empty');
+                empty.setAttribute('role', 'presentation');
+                calendarGrid.append(empty);
+            }
+        };
+        const showCalendar = () => {
+            if (calendarHideTimer) window.clearTimeout(calendarHideTimer);
+            if (calendarPanel) calendarPanel.hidden = false;
+            calendarToggle?.setAttribute('aria-expanded', 'true');
+            renderCalendar();
+        };
+        const isCalendarTargetActive = () =>
+            calendarToggle?.matches(':hover')
+            || calendarPanel?.matches(':hover')
+            || calendarToggle === document.activeElement
+            || Boolean(calendarPanel?.contains(document.activeElement));
+        const hideCalendar = () => {
+            if (!calendarPanel) return;
+            if (calendarHideTimer) window.clearTimeout(calendarHideTimer);
+            calendarHideTimer = window.setTimeout(() => {
+                if (!isCalendarTargetActive()) {
+                    calendarPanel.hidden = true;
+                    calendarToggle?.setAttribute('aria-expanded', 'false');
+                }
+            }, 200);
+        };
         const renderTimesheet = () => {
             const visible = records.filter((record) => activeStatus === 'all' || record.status === activeStatus);
             timesheetRows.replaceChildren();
@@ -97,24 +251,46 @@
             }
             document.getElementById('timesheet-result-count').textContent =
                 `Hiển thị ${visible.length} / ${records.length} ngày có phân ca`;
+            renderCalendar();
         };
         const loadTimesheet = async () => {
             const [yearText, monthText] = monthInput.value.split('-');
             if (!yearText || !monthText) return;
+            const currentRequestId = ++requestId;
+            calendarError = 'Đang tải dữ liệu bảng công...';
+            period = null;
+            if (periodLabel) periodLabel.textContent = calendarError;
             timesheetRows.innerHTML = '<tr><td colspan="9">Đang tải bảng công...</td></tr>';
+            renderCalendar();
             try {
                 const result = await window.lumiCineApi('employee-timesheet', {
                     query: { month: Number(monthText), year: Number(yearText) },
                 });
+                if (currentRequestId !== requestId) return;
+                calendarError = '';
                 records = result.records;
+                period = result.period;
+                if (periodLabel && period) {
+                    periodLabel.textContent =
+                        `Kỳ công ${formatDate(period.start)} – ${formatDate(period.end)}`;
+                }
                 renderTimesheet();
             } catch (error) {
+                if (currentRequestId !== requestId) return;
                 records = [];
+                calendarError = error instanceof Error ? error.message : 'Không thể tải bảng công.';
+                if (periodLabel) periodLabel.textContent = calendarError;
                 renderTimesheet();
-                toast(error instanceof Error ? error.message : 'Không thể tải bảng công.', true);
+                toast(calendarError, true);
             }
         };
         monthInput.addEventListener('change', loadTimesheet);
+        calendarToggle?.addEventListener('pointerenter', showCalendar);
+        calendarToggle?.addEventListener('pointerleave', hideCalendar);
+        calendarToggle?.addEventListener('focusin', showCalendar);
+        calendarTrigger?.addEventListener('focusout', hideCalendar);
+        calendarPanel?.addEventListener('pointerenter', showCalendar);
+        calendarPanel?.addEventListener('pointerleave', hideCalendar);
         document.getElementById('timesheet-status-filters').addEventListener('click', (event) => {
             const button = event.target.closest('button[data-status]');
             if (!button) return;

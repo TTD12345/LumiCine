@@ -167,9 +167,31 @@ $attendanceSummary = !$attendanceToday
                 <section class="schedule-card dashboard-attendance-card"><div class="schedule-heading"><div><h2>Chấm công hôm nay</h2><p>Thời gian chấm công theo hồ sơ cá nhân của bạn.</p></div><a class="employee-text-link" href="?action=attendance">Đến chấm công <i class="bi bi-arrow-up-right"></i></a></div><div class="today-attendance-summary"><div><span>Giờ vào</span><strong><?= $escape($attendanceToday['check_in'] ?? '') ?: 'Chưa ghi nhận' ?></strong></div><div><span>Giờ ra</span><strong><?= $escape($attendanceToday['check_out'] ?? '') ?: 'Chưa ghi nhận' ?></strong></div><div><span>Trạng thái</span><strong><?= $escape($attendanceSummary) ?></strong></div></div></section>
             <?php elseif ($isTimesheet): ?>
                 <section class="schedule-card personal-timesheet">
-                    <div class="schedule-heading"><div><h2>Bảng công cá nhân</h2><p>Chỉ hiển thị lịch làm và dữ liệu chấm công gắn với hồ sơ của bạn.</p></div><label class="month-picker"><span>Tháng</span><input id="timesheet-month" type="month" value="<?= $escape(sprintf('%04d-%02d', $employeeYear, $employeeMonth)) ?>"></label></div>
-                    <div class="schedule-toolbar"><div class="status-filters" id="timesheet-status-filters"><button class="filter-chip active" type="button" data-status="all">Tất cả</button><button class="filter-chip" type="button" data-status="complete">Đủ công</button><button class="filter-chip" type="button" data-status="late">Đi muộn</button><button class="filter-chip" type="button" data-status="leave">Nghỉ phép</button><button class="filter-chip" type="button" data-status="absent">Vắng mặt</button><button class="filter-chip" type="button" data-status="incomplete">Thiếu chấm công</button></div></div>
-                    <div class="employee-table-wrap"><table class="employee-table timesheet-table"><thead><tr><th>Ngày</th><th>Thứ</th><th>Giờ vào</th><th>Giờ ra</th><th>Tổng giờ làm</th><th>Tăng ca</th><th>Công</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead><tbody id="employee-timesheet-rows"><tr><td colspan="9">Đang tải bảng công...</td></tr></tbody></table></div>
+                    <div class="schedule-heading">
+                        <div><h2>Bảng công cá nhân</h2><p>Chỉ hiển thị lịch làm và dữ liệu chấm công gắn với hồ sơ của bạn.</p></div>
+                        <div class="timesheet-calendar-trigger" id="timesheet-calendar-trigger">
+                            <label class="month-picker"><span>Tháng</span><input id="timesheet-month" type="month" value="<?= $escape(sprintf('%04d-%02d', $employeeYear, $employeeMonth)) ?>"></label>
+                            <button class="timesheet-view-button" id="timesheet-calendar-toggle" type="button" aria-controls="employee-timesheet-calendar" aria-expanded="false"><i class="bi bi-calendar3" aria-hidden="true"></i><span>Xem lịch</span></button>
+                            <section class="timesheet-calendar-panel" id="employee-timesheet-calendar" aria-label="Lịch công theo tháng" hidden>
+                                <p class="timesheet-calendar-caption" id="timesheet-calendar-caption"></p>
+                                <div class="timesheet-calendar-scroll">
+                                    <div class="timesheet-calendar-weekdays" aria-hidden="true"><span>Thứ 2</span><span>Thứ 3</span><span>Thứ 4</span><span>Thứ 5</span><span>Thứ 6</span><span>Thứ 7</span><span>Chủ nhật</span></div>
+                                    <div class="timesheet-calendar-grid" id="timesheet-calendar-grid" role="grid" aria-label="Các ngày trong tháng"></div>
+                                </div>
+                                <div class="timesheet-calendar-legend" aria-label="Chú giải trạng thái">
+                                    <span><i class="status-complete"></i> Đủ công</span>
+                                    <span><i class="status-late"></i> Đi muộn</span>
+                                    <span><i class="status-leave"></i> Nghỉ phép</span>
+                                    <span><i class="status-absent"></i> Vắng mặt đã xác nhận</span>
+                                    <span><i class="status-unscheduled"></i> Không có lịch phân công</span>
+                                </div>
+                                <p class="timesheet-calendar-hint">Nhấn vào một ngày để xem chi tiết giờ vào, giờ ra và thời gian làm.</p>
+                            </section>
+                        </div>
+                    </div>
+                    <p class="timesheet-period-label" id="timesheet-period-label">Đang tải kỳ công...</p>
+                    <div class="schedule-toolbar" id="timesheet-toolbar"><div class="status-filters" id="timesheet-status-filters"><button class="filter-chip active" type="button" data-status="all">Tất cả</button><button class="filter-chip" type="button" data-status="complete">Đủ công</button><button class="filter-chip" type="button" data-status="late">Đi muộn</button><button class="filter-chip" type="button" data-status="leave">Nghỉ phép</button><button class="filter-chip" type="button" data-status="absent">Vắng mặt</button><button class="filter-chip" type="button" data-status="incomplete">Thiếu chấm công</button></div></div>
+                    <div class="employee-table-wrap" id="employee-timesheet-table-wrap"><table class="employee-table timesheet-table"><thead><tr><th>Ngày</th><th>Thứ</th><th>Giờ vào</th><th>Giờ ra</th><th>Tổng giờ làm</th><th>Tăng ca</th><th>Công</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead><tbody id="employee-timesheet-rows"><tr><td colspan="9">Đang tải bảng công...</td></tr></tbody></table></div>
                     <footer class="schedule-footer"><span id="timesheet-result-count">Đang tải dữ liệu...</span><span>Thời gian tăng ca chỉ cộng các đơn đã duyệt. Không áp dụng quy tắc trừ công.</span></footer>
                 </section>
             <?php elseif ($isRequests): ?>

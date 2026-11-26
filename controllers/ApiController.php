@@ -364,7 +364,12 @@ class ApiController
                 if (!$month || !$year) {
                     throw new InvalidArgumentException('Tháng bảng công không hợp lệ.');
                 }
-                $this->respond($workforce->employeeTimesheet($linkedEmployeeId, $month, $year));
+                $this->respond($workforce->employeeTimesheet(
+                    $linkedEmployeeId,
+                    $month,
+                    $year,
+                    $workforce->payrollStartDay()
+                ));
             }
             if ($resource === 'employee-profile') {
                 if ($linkedEmployeeId === null) {
