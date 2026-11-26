@@ -178,7 +178,7 @@ $currentUserInitials = $escape($currentUser['initials']);
         <div>
             <span class="page-kicker" id="face-dialog-kicker">XÁC THỰC KHUÔN MẶT</span>
             <h2 id="face-dialog-title">Quét khuôn mặt</h2>
-            <p id="face-dialog-description">Nhìn thẳng, sau đó xoay mặt lần lượt sang hai bên để đăng ký nhiều góc.</p>
+            <p id="face-dialog-description">Nhìn thẳng vào camera và giữ yên vài giây để đăng ký khuôn mặt.</p>
         </div>
         <button class="dialog-close" type="button" id="close-face-dialog" aria-label="Đóng"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
     </div>

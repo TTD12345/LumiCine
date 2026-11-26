@@ -1182,7 +1182,7 @@ class WorkforceModel extends BaseModel
                     'id' => $attendance['id'],
                 ]);
                 $punchType = 'check_in';
-            } elseif ($attendance['thoi_gian_ra'] === null) {
+            } else {
                 $update = $this->pdo->prepare(
                     'UPDATE cham_cong
                      SET thoi_gian_ra = NOW(),
@@ -1213,8 +1213,6 @@ class WorkforceModel extends BaseModel
                     'id' => $attendance['id'],
                 ]);
                 $punchType = 'check_out';
-            } else {
-                throw new InvalidArgumentException('Bạn đã hoàn tất chấm công cho ca này.');
             }
 
             $this->pdo->commit();

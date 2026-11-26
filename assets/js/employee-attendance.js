@@ -23,10 +23,7 @@
     let faceScanBusy = false;
     let faceReadyFrames = 0;
     let faceAutoProcessing = false;
-    let enrollmentSamples = [];
-    let enrollmentPoseFrames = [];
-    let enrollmentStep = 0;
-    let enrollmentFirstSide = 0;
+    let enrollmentFrames = [];
 
     const notify = (message, isError = false) => {
         const toast = document.createElement('div');
@@ -89,7 +86,7 @@
             String(now.getDate()).padStart(2, '0'),
         ].join('-');
         const isCurrentDate = dateInput.value === currentDate;
-        const nextType = isWorking ? 'check_out' : 'check_in';
+        const nextType = checkIn ? 'check_out' : 'check_in';
         const isAbsent = attendanceRecord.attendance_status === 'VANG_MAT';
         const shiftEnd = attendanceRecord.shift_end
             ? new Date(`${dateInput.value}T${attendanceRecord.shift_end}:00`)
@@ -126,7 +123,6 @@
         status.classList.toggle('is-complete', isComplete);
         punchButton.disabled = isLoading
             || !isCurrentDate
-            || isComplete
             || isAbsent
             || (faceProfile.enrolled && !attendanceRecord.has_assignment);
         punchButton.querySelector('span').textContent = !faceProfile.enrolled
@@ -134,7 +130,7 @@
             : !attendanceRecord.has_assignment
                 ? 'Chưa được phân ca'
                 : nextType === 'check_out'
-                    ? 'Chấm công ra bằng khuôn mặt'
+                    ? `${isComplete ? 'Cập nhật giờ ra' : 'Chấm công ra'} bằng khuôn mặt`
                     : 'Chấm công vào bằng khuôn mặt';
         punchButton.querySelector('i').className = 'bi bi-camera';
         document.getElementById('attendance-status-summary').textContent = attendanceLoadError
@@ -265,7 +261,9 @@
 
     const setFaceFeedback = (state, message) => {
         faceCameraWrap.classList.remove('is-ready', 'is-too-far', 'is-too-close', 'is-no-face', 'is-searching');
+        faceCameraStatus.classList.remove('is-ready', 'is-too-far', 'is-too-close', 'is-no-face', 'is-searching');
         if (state) faceCameraWrap.classList.add(`is-${state}`);
+        if (state) faceCameraStatus.classList.add(`is-${state}`);
         faceCameraStatus.textContent = message;
     };
 
@@ -322,12 +320,6 @@
         descriptors.reduce((sum, descriptor) => sum + descriptor[index], 0) / descriptors.length
     );
 
-    const enrollmentPrompt = () => {
-        if (enrollmentStep === 0) return 'Nhìn thẳng vào camera.';
-        if (enrollmentStep === 1) return 'Tốt rồi — xoay nhẹ mặt sang một bên.';
-        return 'Tốt rồi — xoay nhẹ mặt sang bên còn lại.';
-    };
-
     const stopFaceScan = () => {
         if (faceScanTimer !== null) {
             window.clearTimeout(faceScanTimer);
@@ -336,10 +328,7 @@
         faceReadyFrames = 0;
         faceScanBusy = false;
         faceAutoProcessing = false;
-        enrollmentSamples = [];
-        enrollmentPoseFrames = [];
-        enrollmentStep = 0;
-        enrollmentFirstSide = 0;
+        enrollmentFrames = [];
     };
 
     const stopFaceCamera = () => {
@@ -370,7 +359,7 @@
 
     const processFaceDescriptor = async (descriptor) => {
         if (faceDialogMode === 'enroll') {
-            setFaceFeedback('searching', 'Đã quét đủ 3 góc — đang lưu khuôn mặt...');
+            setFaceFeedback('searching', 'Đã quét đủ mẫu chính diện — đang lưu khuôn mặt...');
             try {
                 await window.lumiCineApi('attendance', {
                     method: 'POST',
@@ -380,19 +369,17 @@
                 stopFaceScan();
                 closeFaceDialog();
                 renderAttendance();
-                notify('Đã đăng ký khuôn mặt từ 3 góc. Bấm chấm công để xác thực.');
+                notify('Đã đăng ký khuôn mặt chính diện. Bấm chấm công để xác thực.');
             } catch (error) {
                 faceAutoProcessing = false;
-                enrollmentSamples = [];
-                enrollmentPoseFrames = [];
-                enrollmentStep = 0;
-                enrollmentFirstSide = 0;
+                enrollmentFrames = [];
                 setFaceFeedback('no-face', error instanceof Error ? error.message : 'Không thể đăng ký khuôn mặt.');
                 notify(error instanceof Error ? error.message : 'Không thể đăng ký khuôn mặt.', true);
             }
             return;
         }
 
+        const isUpdatingCheckOut = Boolean(attendanceRecord.check_out);
         isLoading = true;
         renderAttendance();
         setFaceFeedback('searching', 'Đã nhận diện. Đang ghi nhận chấm công...');
@@ -404,7 +391,9 @@
             attendanceRecord = punchResult.record;
             closeFaceDialog();
             notify(punchResult.type === 'check_out'
-                ? `Đã ghi nhận chấm công ra lúc ${attendanceRecord.check_out}.`
+                ? isUpdatingCheckOut
+                    ? `Đã cập nhật giờ ra cuối cùng lúc ${attendanceRecord.check_out}.`
+                    : `Đã ghi nhận chấm công ra lúc ${attendanceRecord.check_out}.`
                 : `Đã ghi nhận chấm công vào lúc ${attendanceRecord.check_in}.`);
             try {
                 const refreshed = await window.lumiCineApi('attendance', {
@@ -433,7 +422,7 @@
             const result = await detectFace();
             if (!result) {
                 faceReadyFrames = 0;
-                enrollmentPoseFrames = [];
+                enrollmentFrames = [];
                 clearFaceOverlay();
                 setFaceFeedback('no-face', 'Không thấy khuôn mặt. Hãy nhìn vào camera.');
             } else {
@@ -441,16 +430,16 @@
                 const position = getFacePosition(box);
                 if (!position) {
                     faceReadyFrames = 0;
-                    enrollmentPoseFrames = [];
+                    enrollmentFrames = [];
                     setFaceFeedback('searching', 'Đang căn chỉnh hình camera...');
                 } else if (position.faceWidthRatio < 0.24) {
                     faceReadyFrames = 0;
-                    enrollmentPoseFrames = [];
+                    enrollmentFrames = [];
                     drawFaceOverlay(result, false);
                     setFaceFeedback('too-far', 'Bạn đang ở xa — hãy tiến gần camera hơn.');
                 } else if (position.faceWidthRatio > 0.52) {
                     faceReadyFrames = 0;
-                    enrollmentPoseFrames = [];
+                    enrollmentFrames = [];
                     drawFaceOverlay(result, false);
                     setFaceFeedback('too-close', 'Bạn đang quá gần — hãy lùi ra một chút.');
                 } else if (
@@ -458,46 +447,26 @@
                     || Math.abs(position.centerY / position.containerHeight - 0.5) > 0.22
                 ) {
                     faceReadyFrames = 0;
-                    enrollmentPoseFrames = [];
+                    enrollmentFrames = [];
                     drawFaceOverlay(result, false);
                     setFaceFeedback('no-face', 'Hãy đưa khuôn mặt vào giữa khung.');
                 } else {
                     if (faceDialogMode === 'enroll') {
-                        const yaw = estimateFaceYaw(result);
-                        const isFrontal = Math.abs(yaw) <= 0.08;
-                        const isTurned = Math.abs(yaw) >= 0.12;
-                        const isExpectedPose = enrollmentStep === 0
-                            ? isFrontal
-                            : enrollmentStep === 1
-                                ? isTurned
-                                : isTurned && Math.sign(yaw) !== enrollmentFirstSide;
-                        drawFaceOverlay(result, true);
-
-                        if (!isExpectedPose) {
-                            enrollmentPoseFrames = [];
-                            const prompt = enrollmentStep === 0
-                                ? 'Nhìn thẳng chính diện để đăng ký góc đầu tiên.'
-                                : enrollmentStep === 1
-                                    ? 'Xoay nhẹ mặt sang một bên để đăng ký góc tiếp theo.'
-                                    : 'Xoay nhẹ mặt sang bên còn lại để hoàn tất.';
-                            setFaceFeedback('ready', `Khoảng cách phù hợp. ${prompt}`);
+                        const isFrontal = Math.abs(estimateFaceYaw(result)) <= 0.08;
+                        if (!isFrontal) {
+                            enrollmentFrames = [];
+                            drawFaceOverlay(result, false);
+                            setFaceFeedback('no-face', 'Hãy nhìn thẳng vào camera để đăng ký khuôn mặt.');
                         } else {
-                            enrollmentPoseFrames.push(Array.from(result.descriptor));
+                            drawFaceOverlay(result, true);
+                            enrollmentFrames.push(Array.from(result.descriptor));
                             const framesRequired = 3;
-                            if (enrollmentPoseFrames.length >= framesRequired) {
-                                enrollmentSamples.push(averageDescriptors(enrollmentPoseFrames));
-                                if (enrollmentStep === 1) enrollmentFirstSide = Math.sign(yaw);
-                                enrollmentStep += 1;
-                                enrollmentPoseFrames = [];
-
-                                if (enrollmentStep >= 3) {
-                                    faceAutoProcessing = true;
-                                    await processFaceDescriptor(enrollmentSamples);
-                                } else {
-                                    setFaceFeedback('ready', `${enrollmentPrompt()} (${enrollmentStep + 1}/3)`);
-                                }
+                            if (enrollmentFrames.length >= framesRequired) {
+                                faceAutoProcessing = true;
+                                await processFaceDescriptor([averageDescriptors(enrollmentFrames)]);
                             } else {
-                                setFaceFeedback('ready', `Giữ yên — đang lấy góc ${enrollmentStep + 1}/3.`);
+                                setFaceFeedback('ready',
+                                    `Nhìn thẳng và giữ yên — đang lấy mẫu chính diện (${enrollmentFrames.length}/${framesRequired}).`);
                             }
                         }
                     } else {
@@ -562,13 +531,10 @@
             faceDialogMode === 'enroll' ? 'Đăng ký khuôn mặt lần đầu' : 'Quét khuôn mặt';
         document.getElementById('face-dialog-description').textContent =
             faceDialogMode === 'enroll'
-                ? 'Nhìn thẳng rồi lần lượt xoay mặt sang hai bên. Camera sẽ tự lưu 3 góc khi khung chuyển xanh.'
+                ? 'Nhìn thẳng vào camera và giữ yên vài giây để đăng ký khuôn mặt.'
                 : 'Camera tự quét và chấm công khi nhận diện ổn định. Đèn xanh là khoảng cách phù hợp.';
         faceReadyFrames = 0;
-        enrollmentSamples = [];
-        enrollmentPoseFrames = [];
-        enrollmentStep = 0;
-        enrollmentFirstSide = 0;
+        enrollmentFrames = [];
         clearFaceOverlay();
         setFaceFeedback('searching', 'Đang yêu cầu quyền truy cập camera...');
         faceDialog.showModal();
@@ -583,7 +549,7 @@
             setFaceFeedback('searching', 'Đang tải mô hình nhận diện...');
             await loadFaceModels();
             setFaceFeedback('searching', faceDialogMode === 'enroll'
-                ? 'Đang quét góc chính diện (1/3)...'
+                ? 'Đang quét mẫu khuôn mặt chính diện...'
                 : 'Đang quét. Hãy nhìn thẳng vào camera.');
             scanFaceContinuously();
         } catch (error) {
