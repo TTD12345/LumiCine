@@ -18,6 +18,33 @@ $pages = [
 $page = $pages[$section] ?? $pages['overview'];
 $isOvertime = $section === 'overtime';
 $isSchedule = $section === 'schedule';
+$attendanceStatusFor = static function (array $employee): string {
+    if ((int) $employee['absent'] > 0) {
+        return 'absent';
+    }
+    if ((int) $employee['workingDays'] > 0 && (int) $employee['leave'] === (int) $employee['workingDays']) {
+        return 'leave';
+    }
+    if (
+        (int) $employee['workingDays'] > 0
+        && (int) $employee['worked'] + (int) $employee['leave'] === (int) $employee['workingDays']
+        && (int) $employee['incomplete'] === 0
+    ) {
+        return 'complete';
+    }
+
+    return 'incomplete';
+};
+$attendanceStatusLabels = [
+    'complete' => 'Đủ công',
+    'incomplete' => 'Thiếu công',
+    'leave' => 'Nghỉ phép',
+    'absent' => 'Vắng mặt',
+];
+$attendanceDepartments = array_values(array_unique(array_filter(array_column($employees, 'department'))));
+$attendancePositions = array_values(array_unique(array_filter(array_column($employees, 'position'))));
+sort($attendanceDepartments, SORT_NATURAL | SORT_FLAG_CASE);
+sort($attendancePositions, SORT_NATURAL | SORT_FLAG_CASE);
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -75,6 +102,26 @@ $isSchedule = $section === 'schedule';
         </header>
         <div class="page-container">
             <section class="page-intro"><div><div class="page-kicker"><span></span> <?= $escape($page['kicker']) ?></div><h1><?= $escape($page['title']) ?></h1><p><?= $escape($page['description']) ?></p></div></section>
+            <?php if ($section === 'attendance'): ?>
+                <form class="attendance-period-filter" method="get" aria-label="Chọn kỳ chấm công">
+                    <input type="hidden" name="action" value="admin-attendance">
+                    <label>Tháng
+                        <select name="month" aria-label="Tháng chấm công">
+                            <?php for ($monthOption = 1; $monthOption <= 12; $monthOption++): ?>
+                                <option value="<?= $monthOption ?>" <?= $monthOption === $attendanceMonth ? 'selected' : '' ?>>Tháng <?= $monthOption ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </label>
+                    <label>Năm
+                        <select name="year" aria-label="Năm chấm công">
+                            <?php for ($yearOption = max(2020, $attendanceYear - 3); $yearOption <= min(2100, $attendanceYear + 1); $yearOption++): ?>
+                                <option value="<?= $yearOption ?>" <?= $yearOption === $attendanceYear ? 'selected' : '' ?>><?= $yearOption ?></option>
+                            <?php endfor; ?>
+                        </select>
+                    </label>
+                    <button class="button button-primary" type="submit"><i class="bi bi-calendar-range"></i> Xem kỳ công</button>
+                </form>
+            <?php endif; ?>
             <?php if ($isSchedule): ?>
                 <section class="schedule-page">
                     <nav class="schedule-mode-switch" aria-label="Chế độ quản lý phân ca">
@@ -437,8 +484,86 @@ $isSchedule = $section === 'schedule';
                             <?php endforeach; ?>
                         </tbody></table></div>
                     </section>
-                <?php else: ?>
-                    <section class="data-card"><div class="table-card-header"><div><h2><?= $section === 'attendance' ? 'Dữ liệu chấm công' : 'Danh sách nhân viên' ?></h2><p><?= $section === 'attendance' ? 'Tổng hợp ngày công theo nhân viên.' : 'Thông tin nhân viên trong hệ thống.' ?></p></div></div><div class="table-wrap"><table class="employee-table"><thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th><?php if ($section === 'attendance'): ?><th>Ngày công</th><th>Nghỉ phép</th><th>Vắng không phép</th><th>Đi muộn</th><th>Phút về sớm</th><?php endif; ?></tr></thead><tbody><?php foreach ($employees as $employee): ?><tr><td><?= $escape($employee['id']) ?></td><td><?= $escape($employee['name']) ?></td><td><?= $escape($employee['department']) ?></td><td><?= $escape($employee['position']) ?></td><?php if ($section === 'attendance'): ?><td><?= (int) $employee['worked'] ?> ngày</td><td><?= (int) $employee['leave'] ?> ngày</td><td><?= (int) $employee['absent'] ?> ngày</td><td><?= (int) $employee['late'] ?> lượt / <?= (int) $employee['lateMinutes'] ?> phút</td><td><?= (int) $employee['earlyMinutes'] ?></td><?php endif; ?></tr><?php endforeach; ?></tbody></table></div></section>
+                <?php elseif ($section === 'attendance'): ?>
+                    <section class="data-card admin-attendance-report" aria-labelledby="admin-attendance-title">
+                        <div class="table-card-header attendance-report-header">
+                            <div><h2 id="admin-attendance-title">Dữ liệu chấm công</h2><p>Tổng hợp ngày công tháng <?= (int) $attendanceMonth ?>/<?= (int) $attendanceYear ?> theo kỳ lương đã chọn.</p></div>
+                            <div class="attendance-report-actions">
+                                <button class="button button-outline" id="print-attendance-report" type="button"><i class="bi bi-printer" aria-hidden="true"></i> In báo cáo</button>
+                                <button class="button button-primary" id="export-attendance-report" type="button"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Xuất Excel</button>
+                            </div>
+                        </div>
+                        <div class="filter-panel attendance-admin-filters" id="attendance-admin-filters">
+                            <label class="search-control">
+                                <i class="bi bi-search" aria-hidden="true"></i>
+                                <input id="admin-attendance-search" type="search" placeholder="Tìm mã nhân viên hoặc họ tên..." autocomplete="off" aria-label="Tìm mã nhân viên hoặc họ tên">
+                            </label>
+                            <label class="filter-select">
+                                <i class="bi bi-diagram-3" aria-hidden="true"></i>
+                                <select id="admin-attendance-department" aria-label="Lọc theo phòng ban">
+                                    <option value="">Tất cả phòng ban</option>
+                                    <?php foreach ($attendanceDepartments as $department): ?>
+                                        <option value="<?= $escape($department) ?>"><?= $escape($department) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <label class="filter-select">
+                                <i class="bi bi-person-badge" aria-hidden="true"></i>
+                                <select id="admin-attendance-position" aria-label="Lọc theo chức vụ">
+                                    <option value="">Tất cả chức vụ</option>
+                                    <?php foreach ($attendancePositions as $position): ?>
+                                        <option value="<?= $escape($position) ?>"><?= $escape($position) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <label class="filter-select">
+                                <i class="bi bi-funnel" aria-hidden="true"></i>
+                                <select id="admin-attendance-status" aria-label="Lọc theo trạng thái công">
+                                    <option value="">Tất cả trạng thái</option>
+                                    <?php foreach ($attendanceStatusLabels as $statusValue => $statusLabel): ?>
+                                        <option value="<?= $escape($statusValue) ?>"><?= $escape($statusLabel) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </label>
+                            <div class="filter-buttons">
+                                <button class="button button-primary filter-submit" id="apply-attendance-filters" type="button"><i class="bi bi-funnel-fill" aria-hidden="true"></i> Lọc</button>
+                                <button class="button button-light" id="reset-attendance-filters" type="button"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Làm mới</button>
+                            </div>
+                        </div>
+                        <div class="attendance-filter-count" id="attendance-filter-count" role="status" aria-live="polite">
+                            Hiển thị <?= count($employees) ?> trong <?= count($employees) ?> nhân viên
+                        </div>
+                        <div class="table-wrap attendance-admin-table-wrap">
+                            <table class="employee-table" id="admin-attendance-table">
+                                <thead><tr><th>Mã NV</th><th>Nhân viên</th><th>Bộ phận</th><th>Chức vụ</th><th>Ngày công</th><th>Nghỉ phép</th><th>Vắng không phép</th><th>Đi muộn</th><th>Phút về sớm</th><th>Trạng thái</th></tr></thead>
+                                <tbody id="admin-attendance-rows">
+                                    <?php foreach ($employees as $employee): ?>
+                                        <?php $attendanceStatus = $attendanceStatusFor($employee); ?>
+                                        <tr data-attendance-row
+                                            data-employee-search="<?= $escape($employee['id'] . ' ' . $employee['name']) ?>"
+                                            data-department="<?= $escape($employee['department']) ?>"
+                                            data-position="<?= $escape($employee['position']) ?>"
+                                            data-status="<?= $escape($attendanceStatus) ?>">
+                                            <td><?= $escape($employee['id']) ?></td>
+                                            <td><?= $escape($employee['name']) ?></td>
+                                            <td><?= $escape($employee['department']) ?></td>
+                                            <td><?= $escape($employee['position']) ?></td>
+                                            <td><?= (int) $employee['worked'] ?> ngày</td>
+                                            <td><?= (int) $employee['leave'] ?> ngày</td>
+                                            <td><?= (int) $employee['absent'] ?> ngày</td>
+                                            <td><?= (int) $employee['late'] ?> lượt / <?= (int) $employee['lateMinutes'] ?> phút</td>
+                                            <td><?= (int) $employee['earlyMinutes'] ?> phút</td>
+                                            <td><span class="status-badge status-<?= $escape($attendanceStatus) ?>"><?= $escape($attendanceStatusLabels[$attendanceStatus]) ?></span></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                            <div class="empty-state" id="admin-attendance-empty" hidden>
+                                <strong>Không tìm thấy dữ liệu chấm công</strong>
+                                <span>Thử đổi từ khóa hoặc điều kiện lọc.</span>
+                            </div>
+                        </div>
+                    </section>
                 <?php endif; ?>
             <?php elseif ($section === 'accounts'): ?>
                 <section class="data-card account-management" aria-labelledby="employee-accounts-title">

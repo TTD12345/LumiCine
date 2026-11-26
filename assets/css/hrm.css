@@ -230,6 +230,16 @@ h1, h2, p { margin-top: 0; }
 .holiday-source-tools .button { min-height: 31px; font-size: 9px; }
 
 .filter-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border-top: 1px solid #eff2f5; border-bottom: 1px solid #eff2f5; background: #fbfcfe; padding: 12px 19px; }
+.attendance-period-filter { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 9px; margin-top: 14px; border: 1px solid #e5ebf1; border-radius: 9px; background: #fff; padding: 11px 14px; }
+.attendance-period-filter label { display: grid; gap: 5px; color: #78899a; font-size: 9px; font-weight: 600; }
+.attendance-period-filter select { min-width: 115px; height: 34px; border: 1px solid #e3e9ef; border-radius: 6px; background: #fff; padding: 0 9px; color: #465e75; font: inherit; }
+.attendance-period-filter .button { min-height: 34px; }
+.attendance-report-actions { display: flex; flex: 0 0 auto; gap: 7px; }
+.attendance-report-actions .button { min-height: 32px; font-size: 9px; }
+.attendance-filter-count { border-top: 1px solid #edf1f5; padding: 9px 18px; color: #7e8d9c; font-size: 9px; }
+.attendance-admin-filters { border-top: 0; }
+.attendance-admin-filters .search-control { flex-basis: 210px; }
+.attendance-admin-filters .filter-select { flex-basis: 145px; }
 .search-control, .filter-select { display: flex; height: 35px; align-items: center; gap: 7px; border: 1px solid #e3e9ef; border-radius: 7px; background: #fff; padding: 0 9px; color: #8291a2; }
 .search-control { min-width: 220px; flex: 1 1 220px; }
 .search-control > i, .filter-select > i { flex: 0 0 auto; color: #7c91a6; font-size: 12px; }
@@ -467,6 +477,7 @@ h1, h2, p { margin-top: 0; }
     .payroll-settings-grid .button { justify-self: start; }
     .payroll-settings-feedback { margin-right: 14px; margin-left: 14px; }
     .data-card-heading { padding-right: 14px; padding-left: 14px; }
+    .attendance-report-header { align-items: flex-start; flex-direction: column; }
     .data-card-tools { width: 100%; justify-items: stretch; }
     .holiday-source-tools { justify-content: space-between; }
     #holiday-source-status { text-align: left; }
@@ -523,11 +534,14 @@ h1, h2, p { margin-top: 0; }
 @media print {
     @page { size: landscape; margin: 12mm; }
     body { background: #fff; font-size: 9px; }
-    .sidebar, .topbar, .page-actions, .filter-panel, .table-toolbar-note, .view-button, .pagination-nav, .page-size-control, .page-footer, .sidebar-backdrop { display: none !important; }
+    .sidebar, .topbar, .page-actions, .filter-panel, .attendance-period-filter, .attendance-report-actions, .table-toolbar-note, .view-button, .pagination-nav, .page-size-control, .page-footer, .sidebar-backdrop { display: none !important; }
     .main-content { margin: 0; }
     .page-container { width: 100%; max-width: none; padding: 0; }
     .page-intro { display: block; }
     .page-intro h1 { font-size: 19px; }
+    .admin-attendance-report .table-wrap { overflow: visible !important; }
+    .admin-attendance-report .employee-table { width: 100%; min-width: 0; font-size: 7px; }
+    .admin-attendance-report .employee-table th, .admin-attendance-report .employee-table td { padding: 5px 4px; }
     .summary-grid { gap: 8px; margin-top: 12px; }
     .summary-card { padding: 9px; }
     .data-card { margin-top: 10px; box-shadow: none; }

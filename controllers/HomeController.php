@@ -128,7 +128,19 @@ class HomeController
 
         $workforce = new WorkforceModel();
         $payrollStartDay = $section === 'settings' ? $workforce->payrollStartDay() : null;
-        $employees = $workforce->attendanceReport((int) date('n'), (int) date('Y'));
+        $attendanceMonth = (int) date('n');
+        $attendanceYear = (int) date('Y');
+        if ($section === 'attendance') {
+            $requestedMonth = filter_input(INPUT_GET, 'month', FILTER_VALIDATE_INT);
+            $requestedYear = filter_input(INPUT_GET, 'year', FILTER_VALIDATE_INT);
+            $attendanceMonth = $requestedMonth !== false && $requestedMonth >= 1 && $requestedMonth <= 12
+                ? $requestedMonth
+                : $attendanceMonth;
+            $attendanceYear = $requestedYear !== false && $requestedYear >= 2020 && $requestedYear <= 2100
+                ? $requestedYear
+                : $attendanceYear;
+        }
+        $employees = $workforce->attendanceReport($attendanceMonth, $attendanceYear);
         $employeeMappings = $section === 'employees'
             ? $workforce->listEmployeeAccountMappings()
             : [];
