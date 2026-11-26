@@ -19,6 +19,14 @@
     let faceStream = null;
     let faceModelsReady = false;
     let faceModelsLoading = null;
+    let faceScanTimer = null;
+    let faceScanBusy = false;
+    let faceReadyFrames = 0;
+    let faceAutoProcessing = false;
+    let enrollmentSamples = [];
+    let enrollmentPoseFrames = [];
+    let enrollmentStep = 0;
+    let enrollmentFirstSide = 0;
 
     const notify = (message, isError = false) => {
         const toast = document.createElement('div');
@@ -229,23 +237,109 @@
 
     const faceDialog = document.getElementById('face-attendance-dialog');
     const faceVideo = document.getElementById('face-video');
-    const faceActionButton = document.getElementById('face-action-button');
     const faceCameraStatus = document.getElementById('face-camera-status');
+    const faceCameraWrap = document.getElementById('face-camera-wrap');
+    const faceOverlay = document.getElementById('face-overlay');
+    const faceOverlayContext = faceOverlay.getContext('2d');
     let faceDialogMode = faceProfile.enrolled ? 'verify' : 'enroll';
 
     const loadFaceModels = async () => {
         if (faceModelsReady) return;
         if (!faceModelsLoading) {
             faceModelsLoading = (async () => {
-                if (!window.faceapi) throw new Error('Không thể tải thư viện nhận diện khuôn mặt.');
-                const modelUrl = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
-                await window.faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
-                await window.faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl);
-                await window.faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl);
-                faceModelsReady = true;
+                try {
+                    if (!window.faceapi) throw new Error('Không thể tải thư viện nhận diện khuôn mặt.');
+                    const modelUrl = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+                    await window.faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
+                    await window.faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl);
+                    await window.faceapi.nets.faceRecognitionNet.loadFromUri(modelUrl);
+                    faceModelsReady = true;
+                } catch (error) {
+                    faceModelsLoading = null;
+                    throw error;
+                }
             })();
         }
         await faceModelsLoading;
+    };
+
+    const setFaceFeedback = (state, message) => {
+        faceCameraWrap.classList.remove('is-ready', 'is-too-far', 'is-too-close', 'is-no-face', 'is-searching');
+        if (state) faceCameraWrap.classList.add(`is-${state}`);
+        faceCameraStatus.textContent = message;
+    };
+
+    const clearFaceOverlay = () => {
+        faceOverlayContext.clearRect(0, 0, faceOverlay.width, faceOverlay.height);
+    };
+
+    const drawFaceOverlay = (result, isReady) => {
+        const { width, height } = faceVideo;
+        if (!width || !height) return;
+        if (faceOverlay.width !== width || faceOverlay.height !== height) {
+            faceOverlay.width = width;
+            faceOverlay.height = height;
+        }
+        clearFaceOverlay();
+        const { x, y, width: faceWidth, height: faceHeight } = result.detection.box;
+        faceOverlayContext.strokeStyle = isReady ? '#45df91' : '#ff626b';
+        faceOverlayContext.lineWidth = Math.max(3, width / 180);
+        faceOverlayContext.strokeRect(x, y, faceWidth, faceHeight);
+    };
+
+    const getFacePosition = (box) => {
+        const videoWidth = faceVideo.videoWidth;
+        const videoHeight = faceVideo.videoHeight;
+        const containerWidth = faceCameraWrap.clientWidth;
+        const containerHeight = faceCameraWrap.clientHeight;
+        if (!videoWidth || !videoHeight || !containerWidth || !containerHeight) return null;
+
+        const scale = Math.max(containerWidth / videoWidth, containerHeight / videoHeight);
+        const cropX = (videoWidth * scale - containerWidth) / 2;
+        const cropY = (videoHeight * scale - containerHeight) / 2;
+
+        return {
+            faceWidthRatio: box.width * scale / containerWidth,
+            centerX: (box.x + box.width / 2) * scale - cropX,
+            centerY: (box.y + box.height / 2) * scale - cropY,
+            containerWidth,
+            containerHeight,
+        };
+    };
+
+    const estimateFaceYaw = (result) => {
+        const nose = result.landmarks.getNose();
+        const eyes = [
+            ...result.landmarks.getLeftEye(),
+            ...result.landmarks.getRightEye(),
+        ];
+        const noseCenter = nose.reduce((sum, point) => sum + point.x, 0) / nose.length;
+        const eyeCenter = eyes.reduce((sum, point) => sum + point.x, 0) / eyes.length;
+        return (noseCenter - eyeCenter) / result.detection.box.width;
+    };
+
+    const averageDescriptors = (descriptors) => descriptors[0].map((_, index) =>
+        descriptors.reduce((sum, descriptor) => sum + descriptor[index], 0) / descriptors.length
+    );
+
+    const enrollmentPrompt = () => {
+        if (enrollmentStep === 0) return 'Nhìn thẳng vào camera.';
+        if (enrollmentStep === 1) return 'Tốt rồi — xoay nhẹ mặt sang một bên.';
+        return 'Tốt rồi — xoay nhẹ mặt sang bên còn lại.';
+    };
+
+    const stopFaceScan = () => {
+        if (faceScanTimer !== null) {
+            window.clearTimeout(faceScanTimer);
+            faceScanTimer = null;
+        }
+        faceReadyFrames = 0;
+        faceScanBusy = false;
+        faceAutoProcessing = false;
+        enrollmentSamples = [];
+        enrollmentPoseFrames = [];
+        enrollmentStep = 0;
+        enrollmentFirstSide = 0;
     };
 
     const stopFaceCamera = () => {
@@ -257,6 +351,7 @@
     };
 
     const closeFaceDialog = () => {
+        stopFaceScan();
         stopFaceCamera();
         if (faceDialog.open) faceDialog.close();
     };
@@ -273,111 +368,35 @@
         return result;
     };
 
-    const openFaceDialog = async () => {
-        if (isLoading) return;
-        faceDialogMode = faceProfile.enrolled ? 'verify' : 'enroll';
-        if (faceDialogMode === 'verify' && (!attendanceRecord.has_assignment || dateInput.value !== [
-            new Date().getFullYear(),
-            String(new Date().getMonth() + 1).padStart(2, '0'),
-            String(new Date().getDate()).padStart(2, '0'),
-        ].join('-'))) {
-            notify('Chỉ có thể xác thực chấm công trong ngày hiện tại và khi đã được phân ca.', true);
-            return;
-        }
-
-        if (!window.isSecureContext) {
-            faceDialogMode = faceProfile.enrolled ? 'verify' : 'enroll';
-            document.getElementById('face-dialog-kicker').textContent = 'KHÔNG THỂ MỞ CAMERA';
-            document.getElementById('face-dialog-title').textContent = 'Cần truy cập an toàn';
-            document.getElementById('face-dialog-description').textContent =
-                'Camera chỉ hoạt động trên localhost hoặc HTTPS.';
-            faceActionButton.disabled = true;
-            faceActionButton.querySelector('span').textContent = 'Không thể mở camera';
-            faceCameraStatus.textContent =
-                'Hãy mở http://localhost hoặc https://ten-mien-cua-ban thay vì địa chỉ IP/Laragon.';
-            faceDialog.showModal();
-            notify('Trình duyệt yêu cầu truy cập qua localhost hoặc HTTPS để dùng camera.', true);
-            return;
-        }
-        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
-            faceActionButton.disabled = true;
-            faceActionButton.querySelector('span').textContent = 'Camera không được hỗ trợ';
-            faceCameraStatus.textContent =
-                'Trình duyệt không hỗ trợ camera. Hãy dùng Chrome, Edge hoặc Firefox bản mới.';
-            faceDialog.showModal();
-            notify('Trình duyệt không hỗ trợ camera.', true);
-            return;
-        }
-
-        document.getElementById('face-dialog-kicker').textContent =
-            faceDialogMode === 'enroll' ? 'ĐĂNG KÝ KHUÔN MẶT' : 'XÁC THỰC KHUÔN MẶT';
-        document.getElementById('face-dialog-title').textContent =
-            faceDialogMode === 'enroll' ? 'Đăng ký khuôn mặt lần đầu' : 'Quét khuôn mặt';
-        document.getElementById('face-dialog-description').textContent =
-            faceDialogMode === 'enroll'
-                ? 'Đăng ký một lần để xác thực các lần chấm công tiếp theo.'
-                : 'Nhìn thẳng vào camera và giữ khuôn mặt trong khung.';
-        faceActionButton.disabled = true;
-        faceActionButton.querySelector('span').textContent = 'Đang tải mô hình';
-        faceCameraStatus.textContent = 'Đang yêu cầu quyền truy cập camera...';
-        faceDialog.showModal();
-
-        try {
-            faceStream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-                audio: false,
-            });
-            faceVideo.srcObject = faceStream;
-            await faceVideo.play();
-            faceCameraStatus.textContent = 'Đang tải mô hình nhận diện...';
-            await loadFaceModels();
-            faceActionButton.disabled = false;
-            faceActionButton.querySelector('span').textContent =
-                faceDialogMode === 'enroll' ? 'Lưu khuôn mặt' : 'Xác nhận chấm công';
-            faceCameraStatus.textContent = 'Đã sẵn sàng. Nhìn thẳng vào camera.';
-        } catch (error) {
-            let message = error instanceof Error ? error.message : 'Không thể khởi tạo camera.';
-            if (error && error.name === 'NotAllowedError') {
-                message = 'Bạn đã từ chối quyền camera. Hãy cho phép camera trong biểu tượng ổ khóa của trình duyệt.';
-            } else if (error && error.name === 'NotFoundError') {
-                message = 'Không tìm thấy webcam. Hãy kết nối camera và thử lại.';
-            } else if (error && error.name === 'NotReadableError') {
-                message = 'Webcam đang được ứng dụng khác sử dụng. Hãy đóng ứng dụng khác và thử lại.';
-            } else if (error && error.name === 'SecurityError') {
-                message = 'Trình duyệt chặn camera. Hãy dùng localhost hoặc HTTPS.';
-            } else if (error && error.name === 'OverconstrainedError') {
-                message = 'Camera không hỗ trợ cấu hình yêu cầu. Hãy thử lại.';
-            }
-            faceCameraStatus.textContent = message;
-            notify(message, true);
-        }
-    };
-
-    const submitFaceAction = async () => {
-        if (faceActionButton.disabled || isLoading) return;
-        faceActionButton.disabled = true;
-        faceCameraStatus.textContent = 'Đang nhận diện khuôn mặt...';
-        try {
-            const result = await detectFace();
-            if (!result) {
-                throw new Error('Không tìm thấy khuôn mặt rõ ràng. Hãy vào sáng hơn và nhìn thẳng camera.');
-            }
-            const descriptor = Array.from(result.descriptor);
-            if (faceDialogMode === 'enroll') {
+    const processFaceDescriptor = async (descriptor) => {
+        if (faceDialogMode === 'enroll') {
+            setFaceFeedback('searching', 'Đã quét đủ 3 góc — đang lưu khuôn mặt...');
+            try {
                 await window.lumiCineApi('attendance', {
                     method: 'POST',
-                    body: { date: dateInput.value, operation: 'enroll', descriptor },
+                    body: { date: dateInput.value, operation: 'enroll', descriptors: descriptor },
                 });
                 faceProfile = { enrolled: true };
+                stopFaceScan();
                 closeFaceDialog();
                 renderAttendance();
-                notify('Đã đăng ký khuôn mặt. Bạn có thể tiếp tục chấm công.');
-                await openFaceDialog();
-                return;
+                notify('Đã đăng ký khuôn mặt từ 3 góc. Bấm chấm công để xác thực.');
+            } catch (error) {
+                faceAutoProcessing = false;
+                enrollmentSamples = [];
+                enrollmentPoseFrames = [];
+                enrollmentStep = 0;
+                enrollmentFirstSide = 0;
+                setFaceFeedback('no-face', error instanceof Error ? error.message : 'Không thể đăng ký khuôn mặt.');
+                notify(error instanceof Error ? error.message : 'Không thể đăng ký khuôn mặt.', true);
             }
+            return;
+        }
 
-            isLoading = true;
-            renderAttendance();
+        isLoading = true;
+        renderAttendance();
+        setFaceFeedback('searching', 'Đã nhận diện. Đang ghi nhận chấm công...');
+        try {
             const punchResult = await window.lumiCineApi('attendance', {
                 method: 'POST',
                 body: { date: dateInput.value, operation: 'punch', descriptor },
@@ -398,20 +417,201 @@
                 notify('Chấm công đã được ghi nhận, nhưng không thể tải lại lịch sử.', true);
             }
         } catch (error) {
-            faceCameraStatus.textContent = error instanceof Error ? error.message : 'Không thể xử lý khuôn mặt.';
-            notify(error instanceof Error ? error.message : 'Không thể xử lý khuôn mặt.', true);
+            faceReadyFrames = 0;
+            setFaceFeedback('no-face', 'Chấm công chưa thành công. Đóng cửa sổ và mở lại để thử lại.');
+            notify(error instanceof Error ? error.message : 'Không thể ghi nhận chấm công.', true);
         } finally {
             isLoading = false;
-            faceActionButton.disabled = false;
             renderAttendance();
+        }
+    };
+
+    const scanFaceContinuously = async () => {
+        if (!faceDialog.open || !faceStream || faceScanBusy || faceAutoProcessing) return;
+        faceScanBusy = true;
+        try {
+            const result = await detectFace();
+            if (!result) {
+                faceReadyFrames = 0;
+                enrollmentPoseFrames = [];
+                clearFaceOverlay();
+                setFaceFeedback('no-face', 'Không thấy khuôn mặt. Hãy nhìn vào camera.');
+            } else {
+                const box = result.detection.box;
+                const position = getFacePosition(box);
+                if (!position) {
+                    faceReadyFrames = 0;
+                    enrollmentPoseFrames = [];
+                    setFaceFeedback('searching', 'Đang căn chỉnh hình camera...');
+                } else if (position.faceWidthRatio < 0.24) {
+                    faceReadyFrames = 0;
+                    enrollmentPoseFrames = [];
+                    drawFaceOverlay(result, false);
+                    setFaceFeedback('too-far', 'Bạn đang ở xa — hãy tiến gần camera hơn.');
+                } else if (position.faceWidthRatio > 0.52) {
+                    faceReadyFrames = 0;
+                    enrollmentPoseFrames = [];
+                    drawFaceOverlay(result, false);
+                    setFaceFeedback('too-close', 'Bạn đang quá gần — hãy lùi ra một chút.');
+                } else if (
+                    Math.abs(position.centerX / position.containerWidth - 0.5) > 0.18
+                    || Math.abs(position.centerY / position.containerHeight - 0.5) > 0.22
+                ) {
+                    faceReadyFrames = 0;
+                    enrollmentPoseFrames = [];
+                    drawFaceOverlay(result, false);
+                    setFaceFeedback('no-face', 'Hãy đưa khuôn mặt vào giữa khung.');
+                } else {
+                    if (faceDialogMode === 'enroll') {
+                        const yaw = estimateFaceYaw(result);
+                        const isFrontal = Math.abs(yaw) <= 0.08;
+                        const isTurned = Math.abs(yaw) >= 0.12;
+                        const isExpectedPose = enrollmentStep === 0
+                            ? isFrontal
+                            : enrollmentStep === 1
+                                ? isTurned
+                                : isTurned && Math.sign(yaw) !== enrollmentFirstSide;
+                        drawFaceOverlay(result, true);
+
+                        if (!isExpectedPose) {
+                            enrollmentPoseFrames = [];
+                            const prompt = enrollmentStep === 0
+                                ? 'Nhìn thẳng chính diện để đăng ký góc đầu tiên.'
+                                : enrollmentStep === 1
+                                    ? 'Xoay nhẹ mặt sang một bên để đăng ký góc tiếp theo.'
+                                    : 'Xoay nhẹ mặt sang bên còn lại để hoàn tất.';
+                            setFaceFeedback('ready', `Khoảng cách phù hợp. ${prompt}`);
+                        } else {
+                            enrollmentPoseFrames.push(Array.from(result.descriptor));
+                            const framesRequired = 3;
+                            if (enrollmentPoseFrames.length >= framesRequired) {
+                                enrollmentSamples.push(averageDescriptors(enrollmentPoseFrames));
+                                if (enrollmentStep === 1) enrollmentFirstSide = Math.sign(yaw);
+                                enrollmentStep += 1;
+                                enrollmentPoseFrames = [];
+
+                                if (enrollmentStep >= 3) {
+                                    faceAutoProcessing = true;
+                                    await processFaceDescriptor(enrollmentSamples);
+                                } else {
+                                    setFaceFeedback('ready', `${enrollmentPrompt()} (${enrollmentStep + 1}/3)`);
+                                }
+                            } else {
+                                setFaceFeedback('ready', `Giữ yên — đang lấy góc ${enrollmentStep + 1}/3.`);
+                            }
+                        }
+                    } else {
+                        faceReadyFrames += 1;
+                        drawFaceOverlay(result, true);
+                        setFaceFeedback('ready', faceReadyFrames >= 3
+                            ? 'Khoảng cách phù hợp — đang xác thực...'
+                            : 'Khoảng cách phù hợp — giữ yên một chút.');
+                        if (faceReadyFrames >= 3) {
+                            faceAutoProcessing = true;
+                            await processFaceDescriptor(Array.from(result.descriptor));
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            faceReadyFrames = 0;
+            setFaceFeedback('no-face', error instanceof Error ? error.message : 'Không thể quét khuôn mặt.');
+        } finally {
+            faceScanBusy = false;
+            if (faceDialog.open && faceStream && !faceAutoProcessing) {
+                faceScanTimer = window.setTimeout(scanFaceContinuously, 350);
+            }
+        }
+    };
+
+    const openFaceDialog = async () => {
+        if (isLoading) return;
+        faceDialogMode = faceProfile.enrolled ? 'verify' : 'enroll';
+        if (faceDialogMode === 'verify' && (!attendanceRecord.has_assignment || dateInput.value !== [
+            new Date().getFullYear(),
+            String(new Date().getMonth() + 1).padStart(2, '0'),
+            String(new Date().getDate()).padStart(2, '0'),
+        ].join('-'))) {
+            notify('Chỉ có thể xác thực chấm công trong ngày hiện tại và khi đã được phân ca.', true);
+            return;
+        }
+
+        if (!window.isSecureContext) {
+            faceDialogMode = faceProfile.enrolled ? 'verify' : 'enroll';
+            document.getElementById('face-dialog-kicker').textContent = 'KHÔNG THỂ MỞ CAMERA';
+            document.getElementById('face-dialog-title').textContent = 'Cần truy cập an toàn';
+            document.getElementById('face-dialog-description').textContent =
+                'Camera chỉ hoạt động trên localhost hoặc HTTPS.';
+            setFaceFeedback('no-face',
+                'Hãy mở http://localhost hoặc https://ten-mien-cua-ban thay vì địa chỉ IP/Laragon.');
+            faceDialog.showModal();
+            notify('Trình duyệt yêu cầu truy cập qua localhost hoặc HTTPS để dùng camera.', true);
+            return;
+        }
+        if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+            setFaceFeedback('no-face',
+                'Trình duyệt không hỗ trợ camera. Hãy dùng Chrome, Edge hoặc Firefox bản mới.');
+            faceDialog.showModal();
+            notify('Trình duyệt không hỗ trợ camera.', true);
+            return;
+        }
+
+        document.getElementById('face-dialog-kicker').textContent =
+            faceDialogMode === 'enroll' ? 'ĐĂNG KÝ KHUÔN MẶT' : 'XÁC THỰC KHUÔN MẶT';
+        document.getElementById('face-dialog-title').textContent =
+            faceDialogMode === 'enroll' ? 'Đăng ký khuôn mặt lần đầu' : 'Quét khuôn mặt';
+        document.getElementById('face-dialog-description').textContent =
+            faceDialogMode === 'enroll'
+                ? 'Nhìn thẳng rồi lần lượt xoay mặt sang hai bên. Camera sẽ tự lưu 3 góc khi khung chuyển xanh.'
+                : 'Camera tự quét và chấm công khi nhận diện ổn định. Đèn xanh là khoảng cách phù hợp.';
+        faceReadyFrames = 0;
+        enrollmentSamples = [];
+        enrollmentPoseFrames = [];
+        enrollmentStep = 0;
+        enrollmentFirstSide = 0;
+        clearFaceOverlay();
+        setFaceFeedback('searching', 'Đang yêu cầu quyền truy cập camera...');
+        faceDialog.showModal();
+
+        try {
+            faceStream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+                audio: false,
+            });
+            faceVideo.srcObject = faceStream;
+            await faceVideo.play();
+            setFaceFeedback('searching', 'Đang tải mô hình nhận diện...');
+            await loadFaceModels();
+            setFaceFeedback('searching', faceDialogMode === 'enroll'
+                ? 'Đang quét góc chính diện (1/3)...'
+                : 'Đang quét. Hãy nhìn thẳng vào camera.');
+            scanFaceContinuously();
+        } catch (error) {
+            let message = error instanceof Error ? error.message : 'Không thể khởi tạo camera.';
+            if (error && error.name === 'NotAllowedError') {
+                message = 'Bạn đã từ chối quyền camera. Hãy cho phép camera trong biểu tượng ổ khóa của trình duyệt.';
+            } else if (error && error.name === 'NotFoundError') {
+                message = 'Không tìm thấy webcam. Hãy kết nối camera và thử lại.';
+            } else if (error && error.name === 'NotReadableError') {
+                message = 'Webcam đang được ứng dụng khác sử dụng. Hãy đóng ứng dụng khác và thử lại.';
+            } else if (error && error.name === 'SecurityError') {
+                message = 'Trình duyệt chặn camera. Hãy dùng localhost hoặc HTTPS.';
+            } else if (error && error.name === 'OverconstrainedError') {
+                message = 'Camera không hỗ trợ cấu hình yêu cầu. Hãy thử lại.';
+            }
+            setFaceFeedback('no-face', message);
+            notify(message, true);
         }
     };
 
     dateInput.addEventListener('change', loadAttendance);
     document.getElementById('attendance-punch').addEventListener('click', openFaceDialog);
-    faceActionButton.addEventListener('click', submitFaceAction);
     document.getElementById('close-face-dialog').addEventListener('click', closeFaceDialog);
     document.getElementById('cancel-face-dialog').addEventListener('click', closeFaceDialog);
+    faceDialog.addEventListener('close', () => {
+        stopFaceScan();
+        stopFaceCamera();
+    });
     document.getElementById('notifications-button').addEventListener('click', () => {
         window.location.href = '?action=notifications';
     });

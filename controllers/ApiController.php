@@ -326,11 +326,11 @@ class ApiController
                 }
                 $operation = $payload['operation'] ?? 'punch';
                 if ($operation === 'enroll') {
-                    $descriptor = $payload['descriptor'] ?? null;
-                    if (!is_array($descriptor)) {
+                    $descriptors = $payload['descriptors'] ?? $payload['descriptor'] ?? null;
+                    if (!is_array($descriptors)) {
                         throw new InvalidArgumentException('Chưa nhận diện được khuôn mặt.');
                     }
-                    $workforce->enrollFace($linkedEmployeeId, $descriptor);
+                    $workforce->enrollFace($linkedEmployeeId, $descriptors);
                     $this->respond([
                         'success' => true,
                         'face' => $workforce->faceProfileStatus($linkedEmployeeId),

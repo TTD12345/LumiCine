@@ -1033,9 +1033,29 @@ class WorkforceModel extends BaseModel
         return $normalized;
     }
 
-    public function enrollFace(int $employeeId, array $descriptor): void
+    private function normalizeFaceDescriptors(array $descriptors): array
     {
-        $descriptor = $this->validateFaceDescriptor($descriptor);
+        if (count($descriptors) === 128 && !is_array(reset($descriptors))) {
+            return [$this->validateFaceDescriptor($descriptors)];
+        }
+        if (count($descriptors) < 1 || count($descriptors) > 5) {
+            throw new InvalidArgumentException('Cần đăng ký từ 1 đến 5 góc khuôn mặt.');
+        }
+
+        $normalized = [];
+        foreach ($descriptors as $descriptor) {
+            if (!is_array($descriptor)) {
+                throw new InvalidArgumentException('Dữ liệu khuôn mặt không hợp lệ.');
+            }
+            $normalized[] = $this->validateFaceDescriptor($descriptor);
+        }
+
+        return $normalized;
+    }
+
+    public function enrollFace(int $employeeId, array $descriptors): void
+    {
+        $descriptors = $this->normalizeFaceDescriptors($descriptors);
         $statement = $this->pdo->prepare(
             'INSERT INTO lumicine_face_profiles (employee_id, face_descriptor)
              VALUES (:employee_id, :descriptor)
@@ -1044,7 +1064,7 @@ class WorkforceModel extends BaseModel
         );
         $statement->execute([
             'employee_id' => $employeeId,
-            'descriptor' => json_encode($descriptor, JSON_UNESCAPED_UNICODE),
+            'descriptor' => json_encode($descriptors, JSON_UNESCAPED_UNICODE),
         ]);
     }
 
@@ -1067,16 +1087,19 @@ class WorkforceModel extends BaseModel
         if (!is_array($savedDescriptor)) {
             throw new RuntimeException('Dữ liệu khuôn mặt đã đăng ký không hợp lệ.');
         }
-        $savedDescriptor = $this->validateFaceDescriptor($savedDescriptor);
 
-        $distance = 0.0;
-        foreach ($descriptor as $index => $value) {
-            $difference = $value - $savedDescriptor[$index];
-            $distance += $difference * $difference;
+        $savedDescriptors = $this->normalizeFaceDescriptors($savedDescriptor);
+        $minimumDistance = INF;
+        foreach ($savedDescriptors as $savedTemplate) {
+            $distance = 0.0;
+            foreach ($descriptor as $index => $value) {
+                $difference = $value - $savedTemplate[$index];
+                $distance += $difference * $difference;
+            }
+            $minimumDistance = min($minimumDistance, sqrt($distance));
         }
-        $distance = sqrt($distance);
 
-        return $distance <= 0.45;
+        return $minimumDistance <= 0.45;
     }
 
     public function punch(int $employeeId, string $date): array

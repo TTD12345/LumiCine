@@ -178,7 +178,7 @@ $currentUserInitials = $escape($currentUser['initials']);
         <div>
             <span class="page-kicker" id="face-dialog-kicker">XÁC THỰC KHUÔN MẶT</span>
             <h2 id="face-dialog-title">Quét khuôn mặt</h2>
-            <p id="face-dialog-description">Nhìn thẳng vào camera và giữ khuôn mặt trong khung.</p>
+            <p id="face-dialog-description">Nhìn thẳng, sau đó xoay mặt lần lượt sang hai bên để đăng ký nhiều góc.</p>
         </div>
         <button class="dialog-close" type="button" id="close-face-dialog" aria-label="Đóng"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
     </div>
@@ -186,11 +186,10 @@ $currentUserInitials = $escape($currentUser['initials']);
         <video id="face-video" autoplay muted playsinline></video>
         <canvas id="face-overlay"></canvas>
         <span class="face-guide" aria-hidden="true"></span>
-        <span class="face-camera-status" id="face-camera-status">Đang khởi tạo camera...</span>
+        <span class="face-camera-status" id="face-camera-status" role="status" aria-live="polite">Đang khởi tạo camera...</span>
     </div>
     <div class="face-dialog-actions">
         <button class="secondary-button" type="button" id="cancel-face-dialog">Hủy</button>
-        <button class="primary-button" type="button" id="face-action-button" disabled><i class="bi bi-camera" aria-hidden="true"></i><span>Đang tải mô hình</span></button>
     </div>
 </dialog>
 <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
