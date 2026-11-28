@@ -1012,9 +1012,6 @@
 
     document.getElementById('export-report').addEventListener('click', exportReport);
     document.getElementById('print-report').addEventListener('click', () => window.print());
-    document.getElementById('notification-button').addEventListener('click', () => {
-        showToast(`${employees.length} nhân viên đang có dữ liệu chấm công trong kỳ này.`);
-    });
     rowsElement.addEventListener('click', (event) => {
         const button = event.target.closest('[data-view-employee]');
         if (!button) return;

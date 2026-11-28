@@ -83,8 +83,6 @@
         adminRows.replaceChildren();
         const pendingCount = requests.filter((request) => request.status === 'pending').length;
         document.getElementById('overtime-pending-count').textContent = String(pendingCount);
-        const notificationIndicator = document.getElementById('notification-indicator');
-        if (notificationIndicator) notificationIndicator.hidden = pendingCount === 0;
         if (requests.length === 0) {
             const row = adminRows.insertRow();
             makeCell(row, 'Chưa có đơn đăng ký tăng ca.');

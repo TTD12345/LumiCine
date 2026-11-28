@@ -105,7 +105,7 @@ $statusFor = static function (array $employee): array {
                 </div>
             </div>
             <div class="topbar-actions">
-                <button class="icon-button notification-button" type="button" id="notification-button" aria-label="Thông báo">
+                <button class="icon-button notification-button" type="button" id="notification-button" data-notification-url="index.php?action=admin-overtime" aria-label="Thông báo">
                     <i class="bi bi-bell" aria-hidden="true"></i><span class="notification-indicator" id="notification-indicator" hidden></span>
                 </button>
                 <span class="topbar-divider"></span>
@@ -380,5 +380,6 @@ $statusFor = static function (array $employee): array {
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <?php require PATH_VIEW . 'api-config.php'; ?>
 <script src="assets/js/attendance.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/attendance.js') ?>" defer></script>
+<script src="assets/js/notification-badge.js" defer></script>
 </body>
 </html>
