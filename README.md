@@ -50,6 +50,8 @@ Get-Content -Raw .\database\migrations\2026-11-24-add-face-attendance.sql |
     & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
 Get-Content -Raw .\database\migrations\2026-11-24-create-auto-schedule-rules.sql |
     & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
+Get-Content -Raw .\database\migrations\2026-11-28-create-lumicine-notifications.sql |
+    & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
 Get-Content -Raw .\database\migrations\2026-11-24-add-schedule-rule-management.sql |
     & 'D:\laragon\bin\mysql\mysql-8.0.30-winx64\bin\mysql.exe' --host=localhost --port=3306 --user=root data_employments
 ```
@@ -120,6 +122,7 @@ Trang nhân viên và quản trị đọc/ghi dữ liệu qua PHP/MySQL; trình 
 - **Danh mục quy tắc phân ca** hiển thị 12 mã QT, tìm kiếm/lọc/phân trang và trạng thái cấu hình. Các quy tắc bắt buộc không thể tắt; cấu hình ca/phòng ban được ngừng áp dụng theo trạng thái để giữ lại lịch sử. Có thể bật/tắt và sắp thứ tự các tiêu chí ưu tiên được hỗ trợ.
 - Giới hạn tối đa giờ/ngày, giờ/tuần, nghỉ giữa ca và số ca đêm liên tiếp được thiết lập trong **Tự động phân ca**. Migration khởi tạo các giới hạn giờ/ca đêm ở trạng thái chưa áp dụng; chỉ các giới hạn quản trị viên cấu hình mới được dùng. QT012 ưu tiên người có ít ca đêm liên tiếp và, khi bật, chặn vượt số ca đêm tối đa. Nghỉ phép lấy từ `lumicine_leave_requests` với trạng thái đã duyệt. Database hiện chưa có chức năng lưu nguyện vọng ca/ngày không thể làm, nên QT011 được hiển thị là chưa khả dụng và không tác động đến kết quả.
 - **Quản lý phân ca** hỗ trợ xem lịch theo ngày, tuần hoặc tháng; lọc theo phòng ban, nhân viên và ca (kể cả loại ca đã ngừng hoạt động); lịch cá nhân hiển thị mã nhân viên, thứ trong tuần, tổng số ca và tổng giờ dự kiến sau khi trừ thời gian nghỉ giữa ca đã cấu hình.
+- Khi quản lý phân ca, cập nhật/hủy ca hoặc duyệt/từ chối đơn nghỉ phép và tăng ca, nhân viên có tài khoản liên kết sẽ nhận thông báo trong `lumicine_notifications`. Chuông số trên các trang nhân viên cập nhật định kỳ; mở trang Thông báo sẽ đánh dấu các thông báo đã đọc.
 - Khi lưu hoặc sửa ca, máy chủ khóa hồ sơ nhân viên trong transaction và kiểm tra lịch `DA_PHAN` của ngày liền trước, ngày được chọn và ngày liền sau; ca qua đêm, lịch bị sửa và thời gian nghỉ tối thiểu đã cấu hình đều được xử lý. Lịch tự động tiếp tục kiểm tra lịch hiện hữu và các lịch vừa thêm trong cùng transaction; lịch `HUY` không được tính là ca đang có hiệu lực.
 - Tại **Quản lý nhân viên**, quản trị viên có thể thêm/sửa hồ sơ nhân viên, phân phòng ban, ngừng hoạt động hoặc kích hoạt lại hồ sơ, đồng thời thêm/sửa/xóa phòng ban. Ngừng hoạt động là khóa mềm để giữ lịch sử phân ca và chấm công; phòng ban đang được gán cho nhân viên không thể xóa. Khi đổi mã nhân viên đã liên kết với tài khoản, mapping được cập nhật cùng giao dịch.
 - Tại **Quản lý tài khoản**, quản trị viên có thể tạo, sửa tên đăng nhập, đặt lại mật khẩu và xóa tài khoản nhân viên. Mỗi nhân viên chỉ có một tài khoản; mật khẩu luôn được lưu bằng `password_hash` và không thể xem lại. Xóa tài khoản không xóa hồ sơ nhân viên.

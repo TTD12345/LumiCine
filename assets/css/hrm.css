@@ -131,7 +131,7 @@ a { color: inherit; }
 .admin-account-menu button:hover { background: #fff0ef; }
 .icon-button { position: relative; display: grid; width: 35px; height: 35px; place-items: center; border: 1px solid #e8edf2; border-radius: 9px; background: #fff; color: #62758a; font-size: 16px; transition: background .16s ease, color .16s ease; }
 .icon-button:hover { background: #f4f8fc; color: var(--blue); }
-.notification-indicator { position: absolute; top: 7px; right: 7px; width: 6px; height: 6px; border: 1px solid #fff; border-radius: 50%; background: #eb796f; }
+.notification-indicator { position: absolute; top: -6px; right: -7px; min-width: 17px; height: 17px; padding: 0 4px; border: 1px solid #fff; border-radius: 999px; background: #e85353; color: #fff; font-size: 10px; font-weight: 700; line-height: 15px; text-align: center; }
 .notification-indicator[hidden] { display: none; }
 .topbar-divider { width: 1px; height: 27px; background: #e8edf2; }
 .user-menu { display: flex; align-items: center; gap: 9px; border: 0; background: transparent; padding: 0; text-align: left; }
@@ -374,6 +374,7 @@ h1, h2, p { margin-top: 0; }
 .detail-modal-footer > span i { margin-right: 4px; color: #6e99bf; }
 .detail-modal-footer .button { min-height: 31px; font-size: 9px; }
 .toast-container { z-index: 1100; }
+.notification-arrival-toast { border: 1px solid #e8edf2; border-radius: 9px; background: #fff; padding: 11px 13px; box-shadow: 0 12px 34px #1e293b20; color: #40566d; font-size: 10px; line-height: 1.5; }
 .table-card-header { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 17px 19px 14px; border-bottom: 1px solid #edf1f5; }
 .table-card-header h2 { margin: 0; color: #263d56; font-family: Manrope, sans-serif; font-size: 14px; font-weight: 800; }
 .table-card-header p { margin: 5px 0 0; color: #8b98a6; font-size: 9px; }

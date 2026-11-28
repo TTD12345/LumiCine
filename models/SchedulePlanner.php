@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/NotificationModel.php';
+
 class SchedulePlanner extends BaseModel
 {
     private const MAX_RANGE_DAYS = 31;
@@ -571,6 +573,20 @@ class SchedulePlanner extends BaseModel
                     'work_date' => $date,
                     'location' => trim($location),
                 ]);
+                NotificationModel::sendToEmployee(
+                    $this->pdo,
+                    $employeeId,
+                    'Bạn được phân ca làm việc',
+                    sprintf(
+                        'Quản lý đã phân ca %s cho bạn ngày %s, %s - %s tại %s.',
+                        $rule['shift_name'],
+                        (new DateTimeImmutable($date))->format('d/m/Y'),
+                        substr((string) $rule['start'], 0, 5),
+                        substr((string) $rule['end'], 0, 5),
+                        trim($location)
+                    ),
+                    'schedule'
+                );
                 $context['events'][$employeeId][] = $this->eventForRule($employee, $rule, $date);
             }
 

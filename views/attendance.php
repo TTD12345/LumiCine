@@ -8,6 +8,9 @@ $today = date('Y-m-d');
 $escape = static fn ($value) => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
 $currentUserName = $escape($currentUser['display_name']);
 $currentUserInitials = $escape($currentUser['initials']);
+$notificationTarget = in_array($currentUser['role'], ['accountant', 'hr', 'chairman'], true)
+    ? '?action=admin-overtime'
+    : '?action=notifications';
 ?>
 <!DOCTYPE html>
 <html lang="vi">
@@ -37,7 +40,7 @@ $currentUserInitials = $escape($currentUser['initials']);
             <a class="employee-nav-link" href="index.php?action=leave"><i class="bi bi-calendar2-minus" aria-hidden="true"></i><span>Xin nghỉ phép</span></a>
             <a class="employee-nav-link" href="index.php?action=overtime"><i class="bi bi-clock-history" aria-hidden="true"></i><span>Đăng ký tăng ca</span></a>
             <a class="employee-nav-link" href="index.php?action=requests"><i class="bi bi-inboxes" aria-hidden="true"></i><span>Đơn của tôi</span></a>
-            <a class="employee-nav-link" href="index.php?action=notifications"><i class="bi bi-bell" aria-hidden="true"></i><span>Thông báo</span></a>
+            <a class="employee-nav-link" href="<?= $escape($notificationTarget) ?>"><i class="bi bi-bell" aria-hidden="true"></i><span>Thông báo</span></a>
             <a class="employee-nav-link" href="index.php?action=profile"><i class="bi bi-person-circle" aria-hidden="true"></i><span>Hồ sơ cá nhân</span></a>
             <p class="nav-caption nav-caption-spaced">LỊCH LÀM VIỆC</p>
             <a class="employee-nav-link" href="index.php?action=schedule"><i class="bi bi-calendar-week" aria-hidden="true"></i><span>Lịch làm việc</span></a>
@@ -62,7 +65,7 @@ $currentUserInitials = $escape($currentUser['initials']);
                 <div><strong>Chấm công</strong><div class="breadcrumbs"><a href="?action=dashboard">Trang chủ</a><i class="bi bi-chevron-right" aria-hidden="true"></i><span>Chấm công</span></div></div>
             </div>
             <div class="topbar-trailing">
-                <button class="notification-button" type="button" id="notifications-button" aria-label="Thông báo"><i class="bi bi-bell" aria-hidden="true"></i></button>
+                <button class="notification-button" type="button" id="notifications-button" data-notification-url="<?= $escape($notificationTarget) ?>" aria-label="Thông báo"><i class="bi bi-bell" aria-hidden="true"></i><span id="notification-indicator" hidden></span></button>
                 <span class="topbar-divider"></span>
                 <div class="topbar-account">
                     <button class="topbar-profile" type="button" id="account-menu-button" aria-haspopup="menu" aria-expanded="false" aria-label="Tùy chọn tài khoản">
@@ -196,5 +199,6 @@ $currentUserInitials = $escape($currentUser['initials']);
 <?php require PATH_VIEW . 'api-config.php'; ?>
 <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
 <script src="assets/js/employee-attendance.js" defer></script>
+<script src="assets/js/notification-badge.js" defer></script>
 </body>
 </html>
