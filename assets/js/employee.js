@@ -124,8 +124,6 @@
         document.getElementById('summary-active').textContent = String(counts.active);
         document.getElementById('summary-upcoming').textContent = String(counts.upcoming);
         document.getElementById('summary-completed').textContent = String(counts.completed);
-        const notificationIndicator = document.getElementById('notification-indicator');
-        if (notificationIndicator) notificationIndicator.hidden = counts.upcoming === 0;
         document.querySelectorAll('[data-count]').forEach((element) => {
             const status = element.dataset.count;
             element.textContent = String(status === 'all' ? shifts.length : counts[status]);
@@ -326,9 +324,6 @@
             if (menu) menu.hidden = true;
             document.getElementById('account-menu-button').setAttribute('aria-expanded', 'false');
         }
-    });
-    document.getElementById('notifications-button').addEventListener('click', () => {
-        window.location.href = '?action=notifications';
     });
     document.getElementById('account-menu-button').addEventListener('click', () => {
         const menu = document.getElementById('account-menu');

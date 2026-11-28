@@ -24,14 +24,6 @@
             accountButton.setAttribute('aria-expanded', 'false');
         }
     });
-    document.getElementById('notification-button').addEventListener('click', () => {
-        const toast = document.createElement('div');
-        toast.className = 'employee-toast';
-        toast.textContent = 'Không có thông báo mới.';
-        document.getElementById('toast-container').append(toast);
-        window.setTimeout(() => toast.remove(), 4000);
-    });
-
     const mappingTable = document.getElementById('employee-account-mappings');
     const mappingFeedback = document.getElementById('mapping-feedback');
     if (mappingTable && mappingFeedback) {

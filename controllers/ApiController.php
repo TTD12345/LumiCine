@@ -98,6 +98,41 @@ class ApiController
                 $employeeId = $linkedEmployeeId;
             }
 
+            if ($resource === 'notification-count') {
+                if ($user['role'] !== 'employee') {
+                    $requests = array_merge(
+                        $workforce->leaveRequests(),
+                        $workforce->overtimeRequests()
+                    );
+                    $count = count(array_filter(
+                        $requests,
+                        static fn (array $request): bool => $request['status'] === 'pending'
+                    ));
+                    $this->respond(['count' => $count]);
+                }
+
+                $this->respond([
+                    'count' => $workforce->unreadNotificationsCount((int) $user['id']),
+                ]);
+            }
+            if ($resource === 'notifications') {
+                if ($user['role'] !== 'employee') {
+                    $this->respond(['error' => 'Chỉ nhân viên mới có thể xem thông báo tại đây.'], 403);
+                }
+                if ($method === 'GET') {
+                    $this->respond([
+                        'notifications' => $workforce->listNotifications((int) $user['id']),
+                    ]);
+                }
+
+                $payload = $this->readPayload();
+                if (($payload['operation'] ?? '') !== 'mark-read') {
+                    throw new InvalidArgumentException('Thao tác thông báo không hợp lệ.');
+                }
+                $workforce->markNotificationsRead((int) $user['id']);
+                $this->respond(['success' => true]);
+            }
+
             if ($resource === 'employees') {
                 $this->requireAdmin($user['role']);
                 if ($method === 'GET') {
