@@ -1340,12 +1340,15 @@ class WorkforceModel extends BaseModel
                 $assignmentCheck->execute(['id' => $id]);
                 $existingAssignment = $assignmentCheck->fetch();
                 if ($existingAssignment === false) {
+                    throw new InvalidArgumentException('Ca làm việc không tồn tại.');
+                }
+                $previousAssignmentStatement = $this->pdo->prepare(
                     'SELECT a.id, a.nhan_vien_id, a.ca_lam_viec_id, a.ngay_lam, a.dia_diem
                      FROM phan_ca a
                      WHERE a.id = :id AND a.trang_thai = \'DA_PHAN\' FOR UPDATE'
                 );
-                $assignmentCheck->execute(['id' => $id]);
-                $previousAssignment = $assignmentCheck->fetch();
+                $previousAssignmentStatement->execute(['id' => $id]);
+                $previousAssignment = $previousAssignmentStatement->fetch();
                 if ($previousAssignment === false) {
                     throw new InvalidArgumentException('Ca làm việc không tồn tại.');
                 }
@@ -1464,11 +1467,14 @@ class WorkforceModel extends BaseModel
             $assignment->execute(['id' => $assignmentId]);
             $assignmentRecord = $assignment->fetch();
             if ($assignmentRecord === false) {
+                throw new InvalidArgumentException('Ca làm việc không tồn tại hoặc đã bị hủy.');
+            }
+            $assignmentDetails = $this->pdo->prepare(
                 'SELECT id, nhan_vien_id, ngay_lam
                  FROM phan_ca WHERE id = :id AND trang_thai = \'DA_PHAN\' FOR UPDATE'
             );
-            $assignment->execute(['id' => $assignmentId]);
-            $assignmentRow = $assignment->fetch();
+            $assignmentDetails->execute(['id' => $assignmentId]);
+            $assignmentRow = $assignmentDetails->fetch();
             if ($assignmentRow === false) {
                 throw new InvalidArgumentException('Ca làm việc không tồn tại hoặc đã bị hủy.');
             }
