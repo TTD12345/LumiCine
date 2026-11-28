@@ -25,7 +25,11 @@ class HomeController
         }
 
         $initialDate = date('Y-m-d');
-        $shifts = $workforce->listAssignments($initialDate, $isAdmin ? null : $employeeId);
+        $shifts = $workforce->listAssignments(
+            $initialDate,
+            $isAdmin ? null : $employeeId,
+            !$isAdmin
+        );
         $employees = $isAdmin ? $workforce->listEmployees() : [];
         $canManageShifts = $isAdmin;
         $roleLabel = self::ROLE_LABELS[$currentUser['role']];
@@ -93,7 +97,8 @@ class HomeController
         $employeeRecords = $isAdmin ? $workforce->listEmployees() : [];
         $employeeShifts = $workforce->listAssignments(
             date('Y-m-d'),
-            $isAdmin ? null : $employeeId
+            $isAdmin ? null : $employeeId,
+            !$isAdmin
         );
         $overtimeRequests = $workforce->overtimeRequests($isAdmin ? null : $employeeId);
         $overtimeCount = count($overtimeRequests);
@@ -168,13 +173,19 @@ class HomeController
             ? 'auto'
             : 'manage';
         $scheduleAssignments = $section === 'schedule'
-            ? $workforce->listAssignments($scheduleDate)
+            ? $workforce->listAssignments($scheduleDate, null, false, true)
             : [];
         $scheduleEmployees = $section === 'schedule'
-            ? $workforce->listEmployees()
+            ? array_values(array_filter(
+                $workforce->listEmployees(),
+                static fn (array $employee): bool => $employee['employee_type'] === WorkSchedule::INTERN
+            ))
             : [];
         $scheduleFilterEmployees = $section === 'schedule'
-            ? $workforce->listManagedEmployees()
+            ? array_values(array_filter(
+                $workforce->listManagedEmployees(),
+                static fn (array $employee): bool => $employee['employee_type'] === WorkSchedule::INTERN
+            ))
             : [];
         $scheduleShiftTypes = $section === 'schedule'
             ? $workforce->listShiftTypes()

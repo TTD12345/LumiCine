@@ -694,7 +694,8 @@ class SchedulePlanner extends BaseModel
             'SELECT e.id, e.ho_ten AS name, COALESCE(e.chuc_vu, \'\') AS position,
                     e.ma_phong_ban AS department_id, e.trang_thai AS active,
                     e.ngay_nghi_viec AS termination_date
-             FROM nhan_vien e'
+             FROM nhan_vien e
+             WHERE e.loai_nhan_vien = \'INTERN\''
         )->fetchAll();
         foreach ($employees as &$employee) {
             $employee['id'] = (int) $employee['id'];

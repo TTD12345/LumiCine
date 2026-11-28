@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/SchedulePlanningEngine.php';
+require_once __DIR__ . '/WorkSchedule.php';
 
 class WorkforceModel extends BaseModel
 {
@@ -166,6 +167,17 @@ class WorkforceModel extends BaseModel
         );
         $periodEnd = $nextPeriodStart->modify('-1 day');
 
+        $employee = $this->employeeScheduleIdentity($employeeId);
+        if ($employee !== null && $employee['employee_type'] === WorkSchedule::FULLTIME) {
+            return $this->fulltimeEmployeeTimesheet(
+                $employeeId,
+                $periodStart,
+                $nextPeriodStart,
+                $periodEnd,
+                $employee['termination_date']
+            );
+        }
+
         $statement = $this->pdo->prepare(
             'SELECT a.ngay_lam AS date,
                     MIN(s.gio_bat_dau) AS shift_start, MAX(s.gio_ket_thuc) AS shift_end,
@@ -195,6 +207,7 @@ class WorkforceModel extends BaseModel
              LEFT JOIN cham_cong c ON c.phan_ca_id = a.id
              WHERE a.nhan_vien_id = :employee_id
                AND a.trang_thai = \'DA_PHAN\'
+               AND e.loai_nhan_vien = \'INTERN\'
                AND a.ngay_lam >= :month_start
                AND a.ngay_lam < :next_month
                AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)
@@ -262,6 +275,70 @@ class WorkforceModel extends BaseModel
         ];
     }
 
+    private function fulltimeEmployeeTimesheet(
+        int $employeeId,
+        DateTimeImmutable $periodStart,
+        DateTimeImmutable $nextPeriodStart,
+        DateTimeImmutable $periodEnd,
+        ?string $terminationDate
+    ): array {
+        $start = $periodStart->format('Y-m-d');
+        $end = $periodEnd->format('Y-m-d');
+        $attendance = $this->fulltimeAttendanceRecords($start, $end, [$employeeId])[$employeeId] ?? [];
+        $leavePeriods = $this->approvedLeavePeriods($start, $end, [$employeeId])[$employeeId] ?? [];
+        $overtimeMinutes = $this->overtimeMinutesByDate($employeeId, $start, $end);
+        $records = [];
+        $summary = ['work_days' => 0, 'overtime_minutes' => 0, 'leave_days' => 0];
+
+        for ($date = $periodStart; $date < $nextPeriodStart; $date = $date->modify('+1 day')) {
+            $workDate = $date->format('Y-m-d');
+            if ($terminationDate !== null && $workDate >= $terminationDate) {
+                continue;
+            }
+            $record = $this->fulltimeDayRecord(
+                $workDate,
+                $attendance[$workDate] ?? null,
+                $leavePeriods
+            );
+            if ($record === null) {
+                continue;
+            }
+            $record['overtime_minutes'] = $overtimeMinutes[$workDate] ?? 0;
+            if ($record['has_approved_leave'] && !$record['has_check_in']) {
+                $summary['leave_days']++;
+            }
+            if ($record['has_completed_shift']) {
+                $summary['work_days']++;
+            }
+            $summary['overtime_minutes'] += $record['overtime_minutes'];
+            $record['status'] = $record['state'];
+            $record['approved_leave'] = $record['has_approved_leave'];
+            $record['shift_start'] = substr($record['shift_start'], 0, 5);
+            $record['shift_end'] = substr($record['shift_end'], 0, 5);
+            unset(
+                $record['state'],
+                $record['is_absent'],
+                $record['attendance_status'],
+                $record['has_check_in'],
+                $record['has_completed_shift'],
+                $record['has_approved_leave'],
+                $record['full_leave_types']
+            );
+            $records[] = $record;
+        }
+
+        usort($records, static fn (array $left, array $right): int => $right['date'] <=> $left['date']);
+
+        return [
+            'records' => $records,
+            'summary' => $summary,
+            'period' => [
+                'start' => $start,
+                'end' => $end,
+            ],
+        ];
+    }
+
     public function findEmployeeIdByCode(?string $employeeCode): ?int
     {
         if ($employeeCode === null || $employeeCode === '') {
@@ -302,6 +379,7 @@ class WorkforceModel extends BaseModel
         return $this->pdo->query(
             'SELECT e.id, e.ma_nhan_vien AS code, e.ho_ten AS name,
                     COALESCE(e.chuc_vu, \'\') AS position,
+                    e.loai_nhan_vien AS employee_type,
                     COALESCE(d.ten_phong_ban, \'\') AS department
              FROM nhan_vien e
              LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
@@ -316,6 +394,7 @@ class WorkforceModel extends BaseModel
         return $this->pdo->query(
             'SELECT e.id, e.ma_nhan_vien AS code, e.ho_ten AS name,
                     COALESCE(e.chuc_vu, \'\') AS position,
+                    e.loai_nhan_vien AS employee_type,
                     e.ma_phong_ban AS department_id,
                     COALESCE(d.ten_phong_ban, \'\') AS department,
                     e.ngay_nghi_viec AS termination_date,
@@ -345,12 +424,16 @@ class WorkforceModel extends BaseModel
         $position = $data['position'] ?? '';
         $departmentId = $data['departmentId'] ?? null;
         $terminationDate = $data['terminationDate'] ?? null;
+        $employeeType = $data['employeeType'] ?? null;
 
         if (
             ($id !== null && (!$id || $id < 1))
             || !is_string($code)
             || !is_string($name)
             || !is_string($position)
+            || ($employeeType !== null && (
+                !is_string($employeeType) || !WorkSchedule::isValidEmployeeType($employeeType)
+            ))
             || ($terminationDate !== null && !is_string($terminationDate))
             || ($departmentId !== null && $departmentId !== '' && !is_string($departmentId) && !is_int($departmentId))
         ) {
@@ -401,15 +484,19 @@ class WorkforceModel extends BaseModel
         }
 
         if ($id === null) {
+            $employeeType = $employeeType ?? WorkSchedule::FULLTIME;
             $statement = $this->pdo->prepare(
                 'INSERT INTO nhan_vien
-                    (ma_nhan_vien, ho_ten, chuc_vu, ma_phong_ban, ngay_nghi_viec, trang_thai)
-                 VALUES (:code, :name, :position, :department_id, :termination_date, 1)'
+                    (ma_nhan_vien, ho_ten, chuc_vu, loai_nhan_vien,
+                     ma_phong_ban, ngay_nghi_viec, trang_thai)
+                 VALUES (:code, :name, :position, :employee_type,
+                         :department_id, :termination_date, 1)'
             );
             $statement->execute([
                 'code' => $code,
                 'name' => $name,
                 'position' => $position !== '' ? $position : null,
+                'employee_type' => $employeeType,
                 'department_id' => $department,
                 'termination_date' => $terminationDate,
             ]);
@@ -420,13 +507,16 @@ class WorkforceModel extends BaseModel
         $this->pdo->beginTransaction();
         try {
             $current = $this->pdo->prepare(
-                'SELECT ma_nhan_vien FROM nhan_vien WHERE id = :id LIMIT 1 FOR UPDATE'
+                'SELECT ma_nhan_vien, loai_nhan_vien
+                 FROM nhan_vien WHERE id = :id LIMIT 1 FOR UPDATE'
             );
             $current->execute(['id' => $id]);
-            $currentCode = $current->fetchColumn();
-            if ($currentCode === false) {
+            $currentEmployee = $current->fetch();
+            if ($currentEmployee === false) {
                 throw new InvalidArgumentException('Không tìm thấy hồ sơ nhân viên.');
             }
+            $currentCode = (string) $currentEmployee['ma_nhan_vien'];
+            $employeeType = $employeeType ?? (string) $currentEmployee['loai_nhan_vien'];
 
             if ((string) $currentCode !== $code) {
                 $mappedAccount = $this->pdo->prepare(
@@ -460,6 +550,7 @@ class WorkforceModel extends BaseModel
             $statement = $this->pdo->prepare(
                 'UPDATE nhan_vien
                  SET ma_nhan_vien = :code, ho_ten = :name, chuc_vu = :position,
+                     loai_nhan_vien = :employee_type,
                      ma_phong_ban = :department_id, ngay_nghi_viec = :termination_date
                  WHERE id = :id'
             );
@@ -467,6 +558,7 @@ class WorkforceModel extends BaseModel
                 'code' => $code,
                 'name' => $name,
                 'position' => $position !== '' ? $position : null,
+                'employee_type' => $employeeType,
                 'department_id' => $department,
                 'termination_date' => $terminationDate,
                 'id' => $id,
@@ -650,11 +742,307 @@ class WorkforceModel extends BaseModel
         }
     }
 
-    public function listAssignments(string $date, ?int $employeeId = null): array
+    private function employeeScheduleIdentity(int $employeeId, bool $forUpdate = false): ?array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT e.id AS employee_id, e.ma_nhan_vien AS employee_code,
+                    e.ho_ten AS name, COALESCE(e.chuc_vu, \'\') AS role,
+                    COALESCE(d.ten_phong_ban, \'\') AS department,
+                    e.loai_nhan_vien AS employee_type, e.trang_thai AS active,
+                    e.ngay_nghi_viec AS termination_date
+             FROM nhan_vien e
+             LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
+             WHERE e.id = :employee_id'
+             . ($forUpdate ? ' FOR UPDATE' : '')
+        );
+        $statement->execute(['employee_id' => $employeeId]);
+        $employee = $statement->fetch();
+
+        return $employee === false ? null : $employee;
+    }
+
+    private function resolveWorkSchedule(int $employeeId, string $date, bool $forUpdate = false): ?array
+    {
+        $employee = $this->employeeScheduleIdentity($employeeId, $forUpdate);
+        if (
+            $employee === null
+            || (int) $employee['active'] !== 1
+            || ($employee['termination_date'] !== null && $date >= $employee['termination_date'])
+        ) {
+            return null;
+        }
+
+        if ($employee['employee_type'] === WorkSchedule::FULLTIME) {
+            $schedule = WorkSchedule::fixedSchedule(WorkSchedule::FULLTIME, $date);
+            return $schedule === null
+                ? null
+                : $schedule + ['assignment_id' => null, 'location' => ''];
+        }
+
+        $statement = $this->pdo->prepare(
+            'SELECT a.id AS assignment_id, s.ten_ca AS shift_name,
+                    s.gio_bat_dau AS shift_start, s.gio_ket_thuc AS shift_end,
+                    COALESCE(a.dia_diem, \'\') AS location
+             FROM phan_ca a
+             INNER JOIN ca_lam_viec s ON s.id = a.ca_lam_viec_id
+             LEFT JOIN cham_cong attendance ON attendance.phan_ca_id = a.id
+             WHERE a.nhan_vien_id = :employee_id
+               AND a.ngay_lam = :work_date
+               AND a.trang_thai = \'DA_PHAN\'
+             ORDER BY CASE
+                          WHEN attendance.thoi_gian_vao IS NOT NULL AND attendance.thoi_gian_ra IS NULL THEN 0
+                          WHEN attendance.trang_thai = \'VANG_MAT\' THEN 2
+                          WHEN attendance.id IS NULL OR attendance.thoi_gian_vao IS NULL THEN 1
+                          ELSE 2
+                      END,
+                      s.gio_bat_dau, a.id
+             LIMIT 1'
+             . ($forUpdate ? ' FOR UPDATE' : '')
+        );
+        $statement->execute(['employee_id' => $employeeId, 'work_date' => $date]);
+        $schedule = $statement->fetch();
+
+        return $schedule === false ? null : $schedule;
+    }
+
+    private function fulltimeAttendanceRecords(
+        string $fromDate,
+        string $toDate,
+        array $employeeIds = []
+    ): array {
+        $sql = 'SELECT c.nhan_vien_id AS employee_id, c.ngay_lam AS work_date,
+                       MIN(DATE_FORMAT(c.thoi_gian_vao, \'%H:%i\')) AS check_in,
+                       MAX(DATE_FORMAT(c.thoi_gian_ra, \'%H:%i\')) AS check_out,
+                       COALESCE(SUM(c.tong_phut_lam), 0) AS worked_minutes,
+                       MAX(c.trang_thai = \'VANG_MAT\') AS is_absent,
+                       MAX(c.trang_thai) AS attendance_status
+                FROM cham_cong c
+                INNER JOIN nhan_vien e ON e.id = c.nhan_vien_id
+                WHERE e.loai_nhan_vien = \'FULLTIME\'
+                  AND c.ngay_lam BETWEEN :from_date AND :to_date';
+        $parameters = ['from_date' => $fromDate, 'to_date' => $toDate];
+        if ($employeeIds !== []) {
+            $placeholders = [];
+            foreach (array_values($employeeIds) as $index => $employeeId) {
+                $placeholder = 'employee_' . $index;
+                $placeholders[] = ':' . $placeholder;
+                $parameters[$placeholder] = (int) $employeeId;
+            }
+            $sql .= ' AND e.id IN (' . implode(', ', $placeholders) . ')';
+        }
+        $sql .= ' GROUP BY c.nhan_vien_id, c.ngay_lam';
+
+        $statement = $this->pdo->prepare($sql);
+        $statement->execute($parameters);
+        $records = [];
+        foreach ($statement->fetchAll() as $record) {
+            $records[(int) $record['employee_id']][(string) $record['work_date']] = $record;
+        }
+
+        return $records;
+    }
+
+    private function approvedLeavePeriods(string $fromDate, string $toDate, array $employeeIds = []): array
+    {
+        $sql = 'SELECT nhan_vien_id AS employee_id, gio_bat_dau AS start_at,
+                       gio_ket_thuc AS end_at, loai_nghi AS leave_type
+                FROM lumicine_leave_requests
+                WHERE trang_thai = \'DA_DUYET\'
+                  AND gio_bat_dau < :range_end
+                  AND gio_ket_thuc > :range_start';
+        $parameters = [
+            'range_start' => $fromDate . ' 00:00:00',
+            'range_end' => $toDate . ' 23:59:59',
+        ];
+        if ($employeeIds !== []) {
+            $placeholders = [];
+            foreach (array_values($employeeIds) as $index => $employeeId) {
+                $placeholder = 'leave_employee_' . $index;
+                $placeholders[] = ':' . $placeholder;
+                $parameters[$placeholder] = (int) $employeeId;
+            }
+            $sql .= ' AND nhan_vien_id IN (' . implode(', ', $placeholders) . ')';
+        }
+        $statement = $this->pdo->prepare($sql);
+        $statement->execute($parameters);
+        $periods = [];
+        foreach ($statement->fetchAll() as $period) {
+            $periods[(int) $period['employee_id']][] = $period;
+        }
+
+        return $periods;
+    }
+
+    private function leaveCoverage(
+        array $employeeLeavePeriods,
+        string $date,
+        string $startTime,
+        string $endTime
+    ): array {
+        $shiftStart = new DateTimeImmutable($date . ' ' . $startTime);
+        $shiftEnd = new DateTimeImmutable($date . ' ' . $endTime);
+        if ($shiftEnd <= $shiftStart) {
+            $shiftEnd = $shiftEnd->modify('+1 day');
+        }
+        $fullLeaveTypes = [];
+        $hasApprovedLeave = false;
+        foreach ($employeeLeavePeriods as $leave) {
+            $leaveStart = new DateTimeImmutable($leave['start_at']);
+            $leaveEnd = new DateTimeImmutable($leave['end_at']);
+            if ($leaveStart < $shiftEnd && $leaveEnd > $shiftStart) {
+                $hasApprovedLeave = true;
+                if ($leaveStart <= $shiftStart && $leaveEnd >= $shiftEnd) {
+                    $fullLeaveTypes[(string) $leave['leave_type']] = true;
+                }
+            }
+        }
+
+        return [
+            'has_approved_leave' => $hasApprovedLeave,
+            'full_leave_types' => array_keys($fullLeaveTypes),
+        ];
+    }
+
+    private function fulltimeDayRecord(
+        string $date,
+        ?array $attendance,
+        array $employeeLeavePeriods
+    ): ?array {
+        $schedule = WorkSchedule::fixedSchedule(WorkSchedule::FULLTIME, $date);
+        if ($schedule === null) {
+            return null;
+        }
+
+        $checkIn = (string) ($attendance['check_in'] ?? '');
+        $checkOut = (string) ($attendance['check_out'] ?? '');
+        $hasCheckIn = $checkIn !== '';
+        $hasCheckOut = $checkOut !== '';
+        $workedMinutes = (int) ($attendance['worked_minutes'] ?? 0);
+        if ($hasCheckIn && $hasCheckOut && $workedMinutes === 0) {
+            $checkInAt = strtotime($date . ' ' . $checkIn);
+            $checkOutAt = strtotime($date . ' ' . $checkOut);
+            if ($checkOutAt <= $checkInAt) {
+                $checkOutAt += 86400;
+            }
+            $workedMinutes = max(0, (int) (($checkOutAt - $checkInAt) / 60));
+        }
+
+        $lateMinutes = $hasCheckIn
+            ? max(0, (int) ((strtotime($date . ' ' . $checkIn) - strtotime($date . ' 09:00:00')) / 60))
+            : 0;
+        $earlyMinutes = $hasCheckOut
+            ? max(0, (int) ((strtotime($date . ' 17:00:00') - strtotime($date . ' ' . $checkOut)) / 60))
+            : 0;
+        $leave = $this->leaveCoverage(
+            $employeeLeavePeriods,
+            $date,
+            $schedule['shift_start'],
+            $schedule['shift_end']
+        );
+        if ($hasCheckIn && $hasCheckOut) {
+            $state = $lateMinutes > 0 ? 'late' : ($earlyMinutes > 0 ? 'early' : 'on-time');
+        } elseif ($hasCheckIn) {
+            $state = $date < date('Y-m-d') ? 'incomplete' : 'working';
+        } elseif ($leave['full_leave_types'] !== []) {
+            $state = 'leave';
+        } elseif ($leave['has_approved_leave']) {
+            $state = 'partial-leave';
+        } elseif ((int) ($attendance['is_absent'] ?? 0) === 1 || $date < date('Y-m-d')) {
+            $state = 'absent';
+        } else {
+            $state = 'not_started';
+        }
+
+        return [
+            'date' => $date,
+            'shift_start' => $schedule['shift_start'],
+            'shift_end' => $schedule['shift_end'],
+            'check_in' => $checkIn,
+            'check_out' => $checkOut,
+            'worked_minutes' => $workedMinutes,
+            'late_minutes' => $lateMinutes,
+            'early_minutes' => $earlyMinutes,
+            'is_absent' => (int) ($attendance['is_absent'] ?? 0),
+            'attendance_status' => $attendance['attendance_status'] ?? null,
+            'has_check_in' => $hasCheckIn,
+            'has_completed_shift' => $hasCheckIn && $hasCheckOut,
+            'has_approved_leave' => $leave['has_approved_leave'],
+            'full_leave_types' => $leave['full_leave_types'],
+            'state' => $state,
+        ];
+    }
+
+    private function overtimeMinutesByDate(int $employeeId, string $fromDate, string $toDate): array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT DATE(t.gio_bat_dau) AS overtime_date,
+                    SUM(COALESCE(t.tong_phut_tang_ca, 0)) AS overtime_minutes
+             FROM tang_ca t
+             LEFT JOIN cham_cong c ON c.id = t.cham_cong_id
+             WHERE COALESCE(t.nhan_vien_id, c.nhan_vien_id) = :employee_id
+               AND t.trang_thai = \'DA_DUYET\'
+               AND DATE(t.gio_bat_dau) BETWEEN :from_date AND :to_date
+             GROUP BY DATE(t.gio_bat_dau)'
+        );
+        $statement->execute([
+            'employee_id' => $employeeId,
+            'from_date' => $fromDate,
+            'to_date' => $toDate,
+        ]);
+        $minutesByDate = [];
+        foreach ($statement->fetchAll() as $row) {
+            $minutesByDate[(string) $row['overtime_date']] = (int) $row['overtime_minutes'];
+        }
+
+        return $minutesByDate;
+    }
+
+    public function listAssignments(
+        string $date,
+        ?int $employeeId = null,
+        bool $includeFulltimeDefault = false,
+        bool $includeUnassignedInterns = false
+    ): array
     {
         $this->validateDate($date);
+        if ($includeFulltimeDefault && $employeeId !== null) {
+            $employee = $this->employeeScheduleIdentity($employeeId);
+            if (
+                $employee !== null
+                && (int) $employee['active'] === 1
+                && ($employee['termination_date'] === null || $date < $employee['termination_date'])
+                && $employee['employee_type'] === WorkSchedule::FULLTIME
+            ) {
+                $schedule = WorkSchedule::fixedSchedule(WorkSchedule::FULLTIME, $date);
+                if ($schedule === null) {
+                    return [];
+                }
+                $now = new DateTimeImmutable();
+                $start = new DateTimeImmutable($date . ' ' . $schedule['shift_start']);
+                $end = new DateTimeImmutable($date . ' ' . $schedule['shift_end']);
+                return [[
+                    'id' => 'fulltime-' . $employeeId . '-' . $date,
+                    'work_date' => $date,
+                    'employee_id' => $employeeId,
+                    'employee_code' => $employee['employee_code'],
+                    'name' => $employee['name'],
+                    'role' => $employee['role'],
+                    'department' => $employee['department'],
+                    'shift_id' => 0,
+                    'shift_name' => $schedule['shift_name'],
+                    'start' => $schedule['shift_start'],
+                    'end' => $schedule['shift_end'],
+                    'break_start' => null,
+                    'break_end' => null,
+                    'location' => '',
+                    'status' => $now < $start ? 'upcoming' : ($now < $end ? 'active' : 'completed'),
+                    'expected_minutes' => 480,
+                ]];
+            }
+        }
         $sql = $this->assignmentQuery()
             . ' WHERE a.ngay_lam = :work_date AND a.trang_thai = \'DA_PHAN\'
+                    AND e.loai_nhan_vien = \'INTERN\'
                     AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)';
         $parameters = ['work_date' => $date];
         if ($employeeId !== null) {
@@ -665,7 +1053,52 @@ class WorkforceModel extends BaseModel
 
         $statement = $this->pdo->prepare($sql);
         $statement->execute($parameters);
-        return $this->prepareAssignments($statement->fetchAll());
+        $assignments = $this->prepareAssignments($statement->fetchAll());
+        if ($includeUnassignedInterns && $employeeId === null) {
+            $unassignedStatement = $this->pdo->prepare(
+                'SELECT e.id AS employee_id, e.ma_nhan_vien AS employee_code,
+                        e.ho_ten AS name, COALESCE(e.chuc_vu, \'\') AS role,
+                        COALESCE(d.ten_phong_ban, \'\') AS department
+                 FROM nhan_vien e
+                 LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
+                 WHERE e.loai_nhan_vien = \'INTERN\'
+                   AND e.trang_thai = 1
+                   AND (e.ngay_nghi_viec IS NULL OR :work_date < e.ngay_nghi_viec)
+                   AND NOT EXISTS (
+                       SELECT 1 FROM phan_ca a
+                       WHERE a.nhan_vien_id = e.id
+                         AND a.ngay_lam = :assignment_date
+                         AND a.trang_thai = \'DA_PHAN\'
+                   )
+                 ORDER BY e.ho_ten'
+            );
+            $unassignedStatement->execute([
+                'work_date' => $date,
+                'assignment_date' => $date,
+            ]);
+            foreach ($unassignedStatement->fetchAll() as $employee) {
+                $assignments[] = [
+                    'id' => 'unassigned-' . (int) $employee['employee_id'] . '-' . $date,
+                    'work_date' => $date,
+                    'employee_id' => (int) $employee['employee_id'],
+                    'employee_code' => $employee['employee_code'],
+                    'name' => $employee['name'],
+                    'role' => $employee['role'],
+                    'department' => $employee['department'],
+                    'shift_id' => null,
+                    'shift_name' => 'Chưa phân ca',
+                    'start' => '',
+                    'end' => '',
+                    'break_start' => null,
+                    'break_end' => null,
+                    'location' => '',
+                    'status' => 'unassigned',
+                    'expected_minutes' => 0,
+                ];
+            }
+        }
+
+        return $assignments;
     }
 
     public function listAssignmentsRange(
@@ -690,6 +1123,7 @@ class WorkforceModel extends BaseModel
         $sql = $this->assignmentQuery()
             . ' WHERE a.ngay_lam BETWEEN :from_date AND :to_date
                     AND a.trang_thai = \'DA_PHAN\'
+                    AND e.loai_nhan_vien = \'INTERN\'
                     AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)';
         $parameters = ['from_date' => $fromDate, 'to_date' => $toDate];
         $employeeId = $scopeEmployeeId ?? $selectedEmployeeId;
@@ -821,23 +1255,35 @@ class WorkforceModel extends BaseModel
         $this->pdo->beginTransaction();
         try {
             $employeeCheck = $this->pdo->prepare(
-                'SELECT id FROM nhan_vien
+                'SELECT id, loai_nhan_vien FROM nhan_vien
                  WHERE id = :id AND trang_thai = 1
                    AND (ngay_nghi_viec IS NULL OR :work_date < ngay_nghi_viec)
                  FOR UPDATE'
             );
             $employeeCheck->execute(['id' => $employeeId, 'work_date' => $date]);
-            if ($employeeCheck->fetchColumn() === false) {
+            $employee = $employeeCheck->fetch();
+            if ($employee === false) {
                 throw new InvalidArgumentException('Nhân viên không tồn tại hoặc đã ngừng hoạt động.');
+            }
+            if ($employee['loai_nhan_vien'] !== WorkSchedule::INTERN) {
+                throw new InvalidArgumentException('Chỉ nhân viên Intern mới được phân ca thủ công.');
             }
 
             if ($id !== null) {
                 $assignmentCheck = $this->pdo->prepare(
-                    'SELECT id FROM phan_ca WHERE id = :id AND trang_thai = \'DA_PHAN\' FOR UPDATE'
+                    'SELECT a.id, e.loai_nhan_vien
+                     FROM phan_ca a
+                     INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
+                     WHERE a.id = :id AND a.trang_thai = \'DA_PHAN\'
+                     FOR UPDATE'
                 );
                 $assignmentCheck->execute(['id' => $id]);
-                if ($assignmentCheck->fetchColumn() === false) {
+                $existingAssignment = $assignmentCheck->fetch();
+                if ($existingAssignment === false) {
                     throw new InvalidArgumentException('Ca làm việc không tồn tại.');
+                }
+                if ($existingAssignment['loai_nhan_vien'] !== WorkSchedule::INTERN) {
+                    throw new InvalidArgumentException('Không thể sửa ca thủ công của nhân viên Fulltime.');
                 }
                 $attendanceCheck = $this->pdo->prepare(
                     'SELECT COUNT(*) FROM cham_cong WHERE phan_ca_id = :assignment_id'
@@ -903,11 +1349,19 @@ class WorkforceModel extends BaseModel
         $this->pdo->beginTransaction();
         try {
             $assignment = $this->pdo->prepare(
-                'SELECT id FROM phan_ca WHERE id = :id AND trang_thai = \'DA_PHAN\' FOR UPDATE'
+                'SELECT a.id, e.loai_nhan_vien
+                 FROM phan_ca a
+                 INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
+                 WHERE a.id = :id AND a.trang_thai = \'DA_PHAN\'
+                 FOR UPDATE'
             );
             $assignment->execute(['id' => $assignmentId]);
-            if ($assignment->fetchColumn() === false) {
+            $assignmentRecord = $assignment->fetch();
+            if ($assignmentRecord === false) {
                 throw new InvalidArgumentException('Ca làm việc không tồn tại hoặc đã bị hủy.');
+            }
+            if ($assignmentRecord['loai_nhan_vien'] !== WorkSchedule::INTERN) {
+                throw new InvalidArgumentException('Chỉ được hủy ca phân công thủ công của nhân viên Intern.');
             }
             $attendance = $this->pdo->prepare(
                 'SELECT COUNT(*) FROM cham_cong WHERE phan_ca_id = :assignment_id'
@@ -932,37 +1386,9 @@ class WorkforceModel extends BaseModel
     public function getAttendance(int $employeeId, string $date): array
     {
         $this->validateDate($date);
-        $statement = $this->pdo->prepare(
-            'SELECT DATE_FORMAT(c.thoi_gian_vao, \'%H:%i\') AS check_in,
-                    DATE_FORMAT(c.thoi_gian_ra, \'%H:%i\') AS check_out,
-                    c.trang_thai AS attendance_status,
-                    COALESCE(c.so_phut_di_muon, 0) AS late_minutes,
-                    COALESCE(c.so_phut_ve_som, 0) AS early_minutes,
-                    s.ten_ca AS shift_name,
-                    DATE_FORMAT(s.gio_bat_dau, \'%H:%i\') AS shift_start,
-                    DATE_FORMAT(s.gio_ket_thuc, \'%H:%i\') AS shift_end,
-                    COALESCE(a.dia_diem, \'\') AS location
-             FROM phan_ca a
-             INNER JOIN ca_lam_viec s ON s.id = a.ca_lam_viec_id
-             INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
-             LEFT JOIN cham_cong c ON c.phan_ca_id = a.id
-             WHERE a.nhan_vien_id = :employee_id AND a.ngay_lam = :work_date
-                   AND a.trang_thai = \'DA_PHAN\'
-                   AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)
-             ORDER BY CASE
-                          WHEN c.thoi_gian_vao IS NOT NULL AND c.thoi_gian_ra IS NULL THEN 0
-                          WHEN c.trang_thai = \'VANG_MAT\' THEN 2
-                          WHEN c.id IS NULL OR c.thoi_gian_vao IS NULL THEN 1
-                          ELSE 2
-                      END,
-                      s.gio_bat_dau, a.id
-             LIMIT 1'
-        );
-        $statement->execute(['employee_id' => $employeeId, 'work_date' => $date]);
-        $record = $statement->fetch();
-
-        return $record === false
-            ? [
+        $schedule = $this->resolveWorkSchedule($employeeId, $date);
+        if ($schedule === null) {
+            return [
                 'check_in' => '',
                 'check_out' => '',
                 'late_minutes' => 0,
@@ -972,25 +1398,55 @@ class WorkforceModel extends BaseModel
                 'shift_start' => '',
                 'shift_end' => '',
                 'location' => '',
-            ]
-            : [
-                'check_in' => $record['check_in'] ?? '',
-                'check_out' => $record['check_out'] ?? '',
-                'late_minutes' => (int) $record['late_minutes'],
-                'early_minutes' => (int) $record['early_minutes'],
-                'has_assignment' => true,
-                'attendance_status' => $record['attendance_status'],
-                'shift_name' => $record['shift_name'] ?? 'Ca làm việc',
-                'shift_start' => $record['shift_start'] ?? '',
-                'shift_end' => $record['shift_end'] ?? '',
-                'location' => $record['location'] ?? '',
             ];
+        }
+
+        $attendanceSql = 'SELECT DATE_FORMAT(c.thoi_gian_vao, \'%H:%i\') AS check_in,
+                                 DATE_FORMAT(c.thoi_gian_ra, \'%H:%i\') AS check_out,
+                                 c.trang_thai AS attendance_status,
+                                 COALESCE(c.so_phut_di_muon, 0) AS late_minutes,
+                                 COALESCE(c.so_phut_ve_som, 0) AS early_minutes
+                          FROM cham_cong c
+                          WHERE c.nhan_vien_id = :employee_id
+                            AND c.ngay_lam = :work_date';
+        $parameters = ['employee_id' => $employeeId, 'work_date' => $date];
+        if ($schedule['assignment_id'] !== null) {
+            $attendanceSql .= ' AND c.phan_ca_id = :assignment_id';
+            $parameters['assignment_id'] = $schedule['assignment_id'];
+        }
+        $attendanceSql .= ' ORDER BY
+                                CASE
+                                    WHEN c.thoi_gian_vao IS NOT NULL AND c.thoi_gian_ra IS NULL THEN 0
+                                    WHEN c.trang_thai = \'VANG_MAT\' THEN 2
+                                    WHEN c.id IS NULL OR c.thoi_gian_vao IS NULL THEN 1
+                                    ELSE 2
+                                END,
+                                c.id
+                            LIMIT 1';
+        $statement = $this->pdo->prepare(
+            $attendanceSql
+        );
+        $statement->execute($parameters);
+        $record = $statement->fetch();
+
+        return [
+            'check_in' => $record['check_in'] ?? '',
+            'check_out' => $record['check_out'] ?? '',
+            'late_minutes' => (int) ($record['late_minutes'] ?? 0),
+            'early_minutes' => (int) ($record['early_minutes'] ?? 0),
+            'has_assignment' => true,
+            'attendance_status' => $record['attendance_status'] ?? null,
+            'shift_name' => $schedule['shift_name'],
+            'shift_start' => substr((string) $schedule['shift_start'], 0, 5),
+            'shift_end' => substr((string) $schedule['shift_end'], 0, 5),
+            'location' => $schedule['location'] ?? '',
+        ];
     }
 
     public function attendanceHistory(int $employeeId): array
     {
         $statement = $this->pdo->prepare(
-            'SELECT a.ngay_lam AS date,
+            'SELECT COALESCE(c.ngay_lam, a.ngay_lam) AS date,
                     DATE_FORMAT(c.thoi_gian_vao, \'%H:%i\') AS check_in,
                     DATE_FORMAT(c.thoi_gian_ra, \'%H:%i\') AS check_out,
                     c.tong_phut_lam AS worked_minutes,
@@ -998,11 +1454,11 @@ class WorkforceModel extends BaseModel
                     COALESCE(c.so_phut_ve_som, 0) AS early_minutes,
                     c.trang_thai AS attendance_status
              FROM cham_cong c
-             INNER JOIN phan_ca a ON a.id = c.phan_ca_id
-             INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
-             WHERE a.nhan_vien_id = :employee_id
-                   AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)
-             ORDER BY a.ngay_lam DESC LIMIT 90'
+             LEFT JOIN phan_ca a ON a.id = c.phan_ca_id
+             INNER JOIN nhan_vien e ON e.id = c.nhan_vien_id
+             WHERE c.nhan_vien_id = :employee_id
+                   AND (e.ngay_nghi_viec IS NULL OR COALESCE(c.ngay_lam, a.ngay_lam) < e.ngay_nghi_viec)
+             ORDER BY COALESCE(c.ngay_lam, a.ngay_lam) DESC LIMIT 90'
         );
         $statement->execute(['employee_id' => $employeeId]);
 
@@ -1124,50 +1580,64 @@ class WorkforceModel extends BaseModel
 
         $this->pdo->beginTransaction();
         try {
-            $assignmentStatement = $this->pdo->prepare(
-                'SELECT a.id AS assignment_id, c.gio_bat_dau, c.gio_ket_thuc,
-                        attendance.id AS attendance_id,
-                        attendance.thoi_gian_vao AS check_in,
-                        attendance.thoi_gian_ra AS check_out,
-                        attendance.trang_thai AS attendance_status
-                 FROM phan_ca a
-                 INNER JOIN ca_lam_viec c ON c.id = a.ca_lam_viec_id
-                 INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
-                 LEFT JOIN cham_cong attendance ON attendance.phan_ca_id = a.id
-                 WHERE a.nhan_vien_id = :employee_id AND a.ngay_lam = :work_date
-                       AND a.trang_thai = \'DA_PHAN\'
-                       AND e.trang_thai = 1
-                       AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)
-                 ORDER BY CASE
-                              WHEN attendance.thoi_gian_vao IS NOT NULL AND attendance.thoi_gian_ra IS NULL THEN 0
-                              WHEN attendance.trang_thai = \'VANG_MAT\' THEN 2
-                              WHEN attendance.id IS NULL OR attendance.thoi_gian_vao IS NULL THEN 1
-                              ELSE 2
-                          END,
-                          c.gio_bat_dau, a.id
-                 LIMIT 1 FOR UPDATE'
-            );
-            $assignmentStatement->execute(['employee_id' => $employeeId, 'work_date' => $date]);
-            $assignment = $assignmentStatement->fetch();
-            if ($assignment === false) {
-                throw new InvalidArgumentException('Bạn chưa được phân ca trong ngày hôm nay.');
+            $employee = $this->employeeScheduleIdentity($employeeId, true);
+            if (
+                $employee === null
+                || (int) $employee['active'] !== 1
+                || ($employee['termination_date'] !== null && $date >= $employee['termination_date'])
+            ) {
+                throw new InvalidArgumentException('Hồ sơ nhân viên không hoạt động trong ngày chấm công.');
             }
+            $schedule = $employee['employee_type'] === WorkSchedule::FULLTIME
+                ? WorkSchedule::fixedSchedule(WorkSchedule::FULLTIME, $date)
+                : $this->resolveWorkSchedule($employeeId, $date, true);
+            if ($schedule === null) {
+                throw new InvalidArgumentException(
+                    $employee['employee_type'] === WorkSchedule::FULLTIME
+                        ? 'Fulltime không có lịch làm việc mặc định vào cuối tuần.'
+                        : 'Bạn chưa được phân ca trong ngày hôm nay.'
+                );
+            }
+            $assignmentId = $schedule['assignment_id'] ?? null;
 
-            $createAttendance = $this->pdo->prepare(
-                'INSERT INTO cham_cong (nhan_vien_id, phan_ca_id, trang_thai)
-                 VALUES (:employee_id, :assignment_id, \'CHUA_CHECK_IN\')
-                 ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)'
-            );
-            $createAttendance->execute([
-                'employee_id' => $employeeId,
-                'assignment_id' => $assignment['assignment_id'],
-            ]);
-            $attendanceStatement = $this->pdo->prepare(
-                'SELECT id, thoi_gian_vao, thoi_gian_ra, trang_thai
-                 FROM cham_cong WHERE phan_ca_id = :assignment_id FOR UPDATE'
-            );
-            $attendanceStatement->execute(['assignment_id' => $assignment['assignment_id']]);
+            $attendanceSql = 'SELECT id, thoi_gian_vao, thoi_gian_ra, trang_thai
+                              FROM cham_cong
+                              WHERE nhan_vien_id = :employee_id
+                                AND ngay_lam = :work_date';
+            $attendanceParameters = ['employee_id' => $employeeId, 'work_date' => $date];
+            if ($assignmentId !== null) {
+                $attendanceSql .= ' AND phan_ca_id = :assignment_id';
+                $attendanceParameters['assignment_id'] = $assignmentId;
+            }
+            $attendanceSql .= ' ORDER BY
+                                    CASE
+                                        WHEN thoi_gian_vao IS NOT NULL AND thoi_gian_ra IS NULL THEN 0
+                                        WHEN trang_thai = \'VANG_MAT\' THEN 2
+                                        WHEN thoi_gian_vao IS NULL THEN 1
+                                        ELSE 2
+                                    END,
+                                    id
+                                LIMIT 1 FOR UPDATE';
+            $attendanceStatement = $this->pdo->prepare($attendanceSql);
+            $attendanceStatement->execute($attendanceParameters);
             $attendance = $attendanceStatement->fetch();
+            if ($attendance === false) {
+                $createAttendance = $this->pdo->prepare(
+                    'INSERT INTO cham_cong (nhan_vien_id, phan_ca_id, ngay_lam, trang_thai)
+                     VALUES (:employee_id, :assignment_id, :work_date, \'CHUA_CHECK_IN\')'
+                );
+                $createAttendance->execute([
+                    'employee_id' => $employeeId,
+                    'assignment_id' => $assignmentId,
+                    'work_date' => $date,
+                ]);
+                $attendance = [
+                    'id' => (int) $this->pdo->lastInsertId(),
+                    'thoi_gian_vao' => null,
+                    'thoi_gian_ra' => null,
+                    'trang_thai' => 'CHUA_CHECK_IN',
+                ];
+            }
             if ($attendance === false) {
                 throw new RuntimeException('Không thể tạo bản ghi chấm công.');
             }
@@ -1192,7 +1662,7 @@ class WorkforceModel extends BaseModel
                 );
                 $update->execute([
                     'work_date' => $date,
-                    'start_time' => $assignment['gio_bat_dau'],
+                    'start_time' => $schedule['shift_start'],
                     'id' => $attendance['id'],
                 ]);
                 $punchType = 'check_in';
@@ -1220,10 +1690,10 @@ class WorkforceModel extends BaseModel
                      WHERE id = :id'
                 );
                 $update->execute([
-                    'end_time_compare' => $assignment['gio_ket_thuc'],
-                    'start_time_compare' => $assignment['gio_bat_dau'],
+                    'end_time_compare' => $schedule['shift_end'],
+                    'start_time_compare' => $schedule['shift_start'],
                     'work_date_end' => $date,
-                    'end_time_value' => $assignment['gio_ket_thuc'],
+                    'end_time_value' => $schedule['shift_end'],
                     'id' => $attendance['id'],
                 ]);
                 $punchType = 'check_out';
@@ -1284,7 +1754,7 @@ class WorkforceModel extends BaseModel
         $this->pdo->beginTransaction();
         try {
             $employeeCheck = $this->pdo->prepare(
-                'SELECT id FROM nhan_vien
+                'SELECT id, loai_nhan_vien FROM nhan_vien
                  WHERE id = :id AND trang_thai = 1
                    AND (
                        ngay_nghi_viec IS NULL
@@ -1296,83 +1766,89 @@ class WorkforceModel extends BaseModel
                 'start_date' => $startDate->format('Y-m-d'),
                 'end_date' => $endDate->format('Y-m-d'),
             ]);
-            if ($employeeCheck->fetchColumn() === false) {
+            $employee = $employeeCheck->fetch();
+            if ($employee === false) {
                 throw new InvalidArgumentException('Không thể đăng ký tăng ca sau ngày nghỉ việc.');
             }
 
-            $assignmentStatement = $this->pdo->prepare(
-                'SELECT a.id, a.ngay_lam AS work_date,
-                        c.gio_bat_dau AS shift_start, c.gio_ket_thuc AS shift_end
-                 FROM phan_ca a
-                 INNER JOIN ca_lam_viec c ON c.id = a.ca_lam_viec_id
-                 INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
-                 WHERE a.nhan_vien_id = :employee_id
-                       AND a.ngay_lam BETWEEN :from_date AND :work_date
-                       AND a.trang_thai = \'DA_PHAN\'
-                       AND e.trang_thai = 1
-                       AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)
-                 ORDER BY a.ngay_lam, c.gio_bat_dau, a.id
-                 FOR UPDATE'
-            );
-            $assignmentStatement->execute([
-                'employee_id' => $employeeId,
-                'work_date' => $startDate->format('Y-m-d'),
-                'from_date' => $startDate->modify('-1 day')->format('Y-m-d'),
-            ]);
-            $assignments = $assignmentStatement->fetchAll();
-            if ($assignments === []) {
-                throw new InvalidArgumentException('Bạn chưa được phân ca trong ngày tăng ca.');
-            }
-
             $matchingAssignmentId = null;
-            foreach ($assignments as $assignment) {
-                if ((string) $assignment['work_date'] === $startDate->format('Y-m-d')) {
-                    $matchingAssignmentId = (int) $assignment['id'];
-                    break;
-                }
-            }
-            if ($matchingAssignmentId === null) {
-                $matchingAssignmentId = (int) $assignments[0]['id'];
-            }
-
-            foreach ($assignments as $assignment) {
-                $shiftStart = $this->parseDateTime(
-                    (string) $assignment['work_date'] . 'T' . substr((string) $assignment['shift_start'], 0, 5)
+            if ($employee['loai_nhan_vien'] === WorkSchedule::INTERN) {
+                $assignmentStatement = $this->pdo->prepare(
+                    'SELECT a.id, a.ngay_lam AS work_date,
+                            c.gio_bat_dau AS shift_start, c.gio_ket_thuc AS shift_end
+                     FROM phan_ca a
+                     INNER JOIN ca_lam_viec c ON c.id = a.ca_lam_viec_id
+                     WHERE a.nhan_vien_id = :employee_id
+                           AND a.ngay_lam BETWEEN :from_date AND :work_date
+                           AND a.trang_thai = \'DA_PHAN\'
+                     ORDER BY a.ngay_lam, c.gio_bat_dau, a.id
+                     FOR UPDATE'
                 );
-                $shiftEnd = $this->parseDateTime(
-                    (string) $assignment['work_date'] . 'T' . substr((string) $assignment['shift_end'], 0, 5)
-                );
-                if ($shiftEnd <= $shiftStart) {
-                    $shiftEnd = $shiftEnd->modify('+1 day');
+                $assignmentStatement->execute([
+                    'employee_id' => $employeeId,
+                    'work_date' => $startDate->format('Y-m-d'),
+                    'from_date' => $startDate->modify('-1 day')->format('Y-m-d'),
+                ]);
+                $assignments = $assignmentStatement->fetchAll();
+                if ($assignments === []) {
+                    throw new InvalidArgumentException('Bạn chưa được phân ca trong ngày tăng ca.');
                 }
 
-                if ($startDate < $shiftEnd && $endDate > $shiftStart) {
-                    throw new InvalidArgumentException(
-                        'Thời gian tăng ca không hợp lệ vì trùng hoặc nằm trong giờ làm việc '
-                        . $shiftStart->format('H:i') . ' - ' . $shiftEnd->format('H:i') . ' ngày '
-                        . $assignment['work_date'] . '.'
+                foreach ($assignments as $assignment) {
+                    if ((string) $assignment['work_date'] === $startDate->format('Y-m-d')) {
+                        $matchingAssignmentId = (int) $assignment['id'];
+                        break;
+                    }
+                }
+                if ($matchingAssignmentId === null) {
+                    $matchingAssignmentId = (int) $assignments[0]['id'];
+                }
+
+                foreach ($assignments as $assignment) {
+                    $shiftStart = $this->parseDateTime(
+                        (string) $assignment['work_date'] . 'T' . substr((string) $assignment['shift_start'], 0, 5)
                     );
+                    $shiftEnd = $this->parseDateTime(
+                        (string) $assignment['work_date'] . 'T' . substr((string) $assignment['shift_end'], 0, 5)
+                    );
+                    if ($shiftEnd <= $shiftStart) {
+                        $shiftEnd = $shiftEnd->modify('+1 day');
+                    }
+
+                    if ($startDate < $shiftEnd && $endDate > $shiftStart) {
+                        throw new InvalidArgumentException(
+                            'Thời gian tăng ca không hợp lệ vì trùng hoặc nằm trong giờ làm việc '
+                            . $shiftStart->format('H:i') . ' - ' . $shiftEnd->format('H:i') . ' ngày '
+                            . $assignment['work_date'] . '.'
+                        );
+                    }
                 }
+            } elseif (WorkSchedule::fixedSchedule(
+                WorkSchedule::FULLTIME,
+                $startDate->format('Y-m-d')
+            ) === null) {
+                throw new InvalidArgumentException('Fulltime không có lịch làm việc mặc định vào cuối tuần.');
             }
-
-            $assignmentId = $matchingAssignmentId;
-
-            $createAttendance = $this->pdo->prepare(
-                'INSERT INTO cham_cong (nhan_vien_id, phan_ca_id, trang_thai)
-                 VALUES (:employee_id, :assignment_id, \'CHUA_CHECK_IN\')
-                 ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)'
-            );
-            $createAttendance->execute([
-                'employee_id' => $employeeId,
-                'assignment_id' => $assignmentId,
-            ]);
-            $attendanceStatement = $this->pdo->prepare(
-                'SELECT id FROM cham_cong WHERE phan_ca_id = :assignment_id'
-            );
-            $attendanceStatement->execute(['assignment_id' => $assignmentId]);
-            $attendanceId = $attendanceStatement->fetchColumn();
-            if ($attendanceId === false) {
-                throw new RuntimeException('Không thể liên kết đơn tăng ca với lịch chấm công.');
+            $attendanceId = null;
+            if ($matchingAssignmentId !== null) {
+                $createAttendance = $this->pdo->prepare(
+                    'INSERT INTO cham_cong (nhan_vien_id, phan_ca_id, ngay_lam, trang_thai)
+                     VALUES (:employee_id, :assignment_id, :work_date, \'CHUA_CHECK_IN\')
+                     ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)'
+                );
+                $createAttendance->execute([
+                    'employee_id' => $employeeId,
+                    'assignment_id' => $matchingAssignmentId,
+                    'work_date' => $startDate->format('Y-m-d'),
+                ]);
+                $attendanceStatement = $this->pdo->prepare(
+                    'SELECT id FROM cham_cong WHERE phan_ca_id = :assignment_id'
+                );
+                $attendanceStatement->execute(['assignment_id' => $matchingAssignmentId]);
+                $attendanceId = $attendanceStatement->fetchColumn();
+                if ($attendanceId === false) {
+                    throw new RuntimeException('Không thể liên kết đơn tăng ca với lịch chấm công.');
+                }
             }
 
             $insert = $this->pdo->prepare(
@@ -1724,6 +2200,7 @@ class WorkforceModel extends BaseModel
             'SELECT e.id, e.ma_nhan_vien AS employee_code, e.ho_ten AS name,
                     COALESCE(d.ten_phong_ban, \'\') AS department,
                     COALESCE(e.chuc_vu, \'\') AS position,
+                    e.loai_nhan_vien AS employee_type,
                     e.ngay_nghi_viec AS termination_date
              FROM nhan_vien e
              LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
@@ -1748,6 +2225,7 @@ class WorkforceModel extends BaseModel
                 'name' => $row['name'],
                 'department' => $row['department'],
                 'position' => $row['position'],
+                'employeeType' => $row['employee_type'],
                 'terminationDate' => $row['termination_date'],
                 'workingDays' => 0,
                 'worked' => 0,
@@ -1810,6 +2288,7 @@ class WorkforceModel extends BaseModel
              INNER JOIN ca_lam_viec s ON s.id = a.ca_lam_viec_id
              LEFT JOIN cham_cong c ON c.phan_ca_id = a.id
              WHERE a.trang_thai = \'DA_PHAN\'
+               AND e.loai_nhan_vien = \'INTERN\'
                AND a.ngay_lam BETWEEN :period_start AND :period_end
                AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)
                AND (a.dia_diem IS NULL OR a.dia_diem <> \'Tăng ca\')
@@ -1919,6 +2398,89 @@ class WorkforceModel extends BaseModel
         }
         unset($employee);
 
+        $fulltimeIds = [];
+        foreach ($employees as $employeeId => $employee) {
+            if ($employee['employeeType'] === WorkSchedule::FULLTIME) {
+                $fulltimeIds[] = (int) $employeeId;
+            }
+        }
+        if ($fulltimeIds !== []) {
+            $fulltimeAttendance = $this->fulltimeAttendanceRecords(
+                $periodStartValue,
+                $periodEnd,
+                $fulltimeIds
+            );
+            $approvedLeavePeriods = $this->approvedLeavePeriods(
+                $periodStartValue,
+                $periodEnd,
+                $fulltimeIds
+            );
+            $today = date('Y-m-d');
+            $isCurrentShiftFinished = date('H:i:s') >= '17:00:00';
+            foreach ($fulltimeIds as $employeeId) {
+                $employee =& $employees[$employeeId];
+                $cursor = new DateTimeImmutable($periodStartValue);
+                $last = new DateTimeImmutable($periodEnd);
+                while ($cursor <= $last) {
+                    $workDate = $cursor->format('Y-m-d');
+                    $cursor = $cursor->modify('+1 day');
+                    if (
+                        $employee['terminationDate'] !== null
+                        && $workDate >= $employee['terminationDate']
+                    ) {
+                        continue;
+                    }
+                    $day = $this->fulltimeDayRecord(
+                        $workDate,
+                        $fulltimeAttendance[$employeeId][$workDate] ?? null,
+                        $approvedLeavePeriods[$employeeId] ?? []
+                    );
+                    if ($day === null) {
+                        continue;
+                    }
+                    if (
+                        $workDate < $today
+                        || ($workDate === $today && $isCurrentShiftFinished)
+                        || $day['has_completed_shift']
+                    ) {
+                        $employee['workingDays']++;
+                        if ($day['has_check_in'] && $day['has_completed_shift']) {
+                            $employee['worked']++;
+                            $employee['lateMinutes'] += $day['late_minutes'];
+                            $employee['earlyMinutes'] += $day['early_minutes'];
+                            if ($day['late_minutes'] > 0) {
+                                $employee['late']++;
+                            }
+                        } elseif ($day['has_check_in']) {
+                            $employee['incomplete']++;
+                        } elseif ($day['full_leave_types'] !== []) {
+                            $employee['leave']++;
+                            foreach ($day['full_leave_types'] as $leaveType) {
+                                if (isset($employee['leaveByType'][$leaveType])) {
+                                    $employee['leaveByType'][$leaveType]++;
+                                }
+                            }
+                        } elseif ($day['has_approved_leave']) {
+                            $employee['partialLeave']++;
+                        } else {
+                            $employee['absent']++;
+                        }
+                    }
+                    $employee['dailyRecords'][] = [
+                        'date' => $day['date'],
+                        'checkIn' => $day['check_in'],
+                        'checkOut' => $day['check_out'],
+                        'state' => $day['state'],
+                        'lateMinutes' => $day['late_minutes'],
+                        'earlyMinutes' => $day['early_minutes'],
+                        'leaveTypes' => $day['full_leave_types'],
+                        'attendanceStatus' => $day['attendance_status'],
+                    ];
+                }
+                unset($employee);
+            }
+        }
+
         $overtimeStatement = $this->pdo->prepare(
             'SELECT COALESCE(t.nhan_vien_id, c.nhan_vien_id) AS employee_id,
                     SUM(t.tong_phut_tang_ca) AS overtime_minutes
@@ -1984,6 +2546,8 @@ class WorkforceModel extends BaseModel
         $attendanceStatement = $this->pdo->prepare(
             'SELECT a.ngay_lam AS work_date,
                     a.nhan_vien_id AS employee_id,
+                    e.ho_ten AS employee_name,
+                    COALESCE(d.ten_phong_ban, \'Chưa phân công\') AS department_name,
                     COUNT(DISTINCT a.id) AS assignment_count,
                     COUNT(DISTINCT CASE
                         WHEN c.thoi_gian_vao IS NOT NULL AND c.thoi_gian_ra IS NOT NULL
@@ -2001,12 +2565,14 @@ class WorkforceModel extends BaseModel
                     ) AS is_leave
              FROM phan_ca a
              INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
+             LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
              LEFT JOIN cham_cong c ON c.phan_ca_id = a.id
              WHERE a.trang_thai = \'DA_PHAN\'
+               AND e.loai_nhan_vien = \'INTERN\'
                AND a.ngay_lam BETWEEN :start AND :end
                AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)'
                . $departmentClause
-               . ' GROUP BY a.ngay_lam, a.nhan_vien_id
+               . ' GROUP BY a.ngay_lam, a.nhan_vien_id, e.ho_ten, d.ten_phong_ban
                  ORDER BY a.ngay_lam, a.nhan_vien_id'
         );
         $attendanceStatement->execute($employeeParams);
@@ -2032,7 +2598,15 @@ class WorkforceModel extends BaseModel
                 } else {
                     $daily[$date]['on_time']++;
                 }
-                $topEmployees[$employeeId] = ($topEmployees[$employeeId] ?? 0) + 1;
+                if (!isset($topEmployees[$employeeId])) {
+                    $topEmployees[$employeeId] = [
+                        'name' => (string) $row['employee_name'],
+                        'work_days' => 0,
+                    ];
+                }
+                $topEmployees[$employeeId]['work_days']++;
+                $departmentName = (string) $row['department_name'];
+                $departmentWork[$departmentName] = ($departmentWork[$departmentName] ?? 0) + 1;
             } elseif ((int) $row['is_leave'] === 1) {
                 $leaveKey = $date . ':' . $employeeId;
                 if (!isset($leaveSeen[$leaveKey])) {
@@ -2041,6 +2615,82 @@ class WorkforceModel extends BaseModel
                 }
             } else {
                 $daily[$date]['absent']++;
+            }
+        }
+
+        $fulltimeEmployeeStatement = $this->pdo->prepare(
+            'SELECT e.id, e.ho_ten AS name, e.ngay_nghi_viec AS termination_date,
+                    COALESCE(d.ten_phong_ban, \'Chưa phân công\') AS department_name
+             FROM nhan_vien e
+             LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
+             WHERE e.loai_nhan_vien = \'FULLTIME\'
+               AND e.trang_thai = 1
+               AND (e.ngay_nghi_viec IS NULL OR e.ngay_nghi_viec > :start)'
+               . ($departmentId !== null ? ' AND e.ma_phong_ban = :department_id' : '')
+        );
+        $fulltimeEmployeeParams = ['start' => $fromDate];
+        if ($departmentId !== null) {
+            $fulltimeEmployeeParams['department_id'] = $departmentId;
+        }
+        $fulltimeEmployeeStatement->execute($fulltimeEmployeeParams);
+        $fulltimeEmployees = $fulltimeEmployeeStatement->fetchAll();
+        $fulltimeIds = array_map(static fn (array $employee): int => (int) $employee['id'], $fulltimeEmployees);
+        $fulltimeAttendance = $fulltimeIds === []
+            ? []
+            : $this->fulltimeAttendanceRecords($fromDate, $toDate, $fulltimeIds);
+        $fulltimeLeavePeriods = $fulltimeIds === []
+            ? []
+            : $this->approvedLeavePeriods($fromDate, $toDate, $fulltimeIds);
+        $today = date('Y-m-d');
+        $currentShiftFinished = date('H:i:s') >= '17:00:00';
+        foreach ($fulltimeEmployees as $employee) {
+            $employeeId = (int) $employee['id'];
+            $cursor = new DateTimeImmutable($fromDate);
+            while ($cursor <= $end) {
+                $date = $cursor->format('Y-m-d');
+                $cursor = $cursor->modify('+1 day');
+                if (
+                    $employee['termination_date'] !== null
+                    && $date >= $employee['termination_date']
+                ) {
+                    continue;
+                }
+                $day = $this->fulltimeDayRecord(
+                    $date,
+                    $fulltimeAttendance[$employeeId][$date] ?? null,
+                    $fulltimeLeavePeriods[$employeeId] ?? []
+                );
+                if ($day === null) {
+                    continue;
+                }
+                if (!isset($daily[$date])) {
+                    $daily[$date] = ['date' => $date, 'on_time' => 0, 'late' => 0, 'absent' => 0];
+                }
+                if ($day['has_completed_shift']) {
+                    $worked++;
+                    if ($day['late_minutes'] > 0) {
+                        $late++;
+                        $daily[$date]['late']++;
+                    } else {
+                        $daily[$date]['on_time']++;
+                    }
+                    if (!isset($topEmployees[$employeeId])) {
+                        $topEmployees[$employeeId] = ['name' => (string) $employee['name'], 'work_days' => 0];
+                    }
+                    $topEmployees[$employeeId]['work_days']++;
+                    $departmentName = (string) $employee['department_name'];
+                    $departmentWork[$departmentName] = ($departmentWork[$departmentName] ?? 0) + 1;
+                } elseif ($day['has_approved_leave']) {
+                    if ($date < $today || ($date === $today && $currentShiftFinished)) {
+                        $leaveKey = $date . ':' . $employeeId;
+                        if (!isset($leaveSeen[$leaveKey])) {
+                            $leaveSeen[$leaveKey] = true;
+                            $leaveDays++;
+                        }
+                    }
+                } elseif ($date < $today || ($date === $today && $currentShiftFinished)) {
+                    $daily[$date]['absent']++;
+                }
             }
         }
 
@@ -2089,54 +2739,21 @@ class WorkforceModel extends BaseModel
             $overtimeDaily[$date][$key] += round($minutes / 60, 2);
         }
 
-        $departmentStatement = $this->pdo->prepare(
-            'SELECT COALESCE(d.ten_phong_ban, \'Chưa phân công\') AS department,
-                    COUNT(DISTINCT CONCAT(a.ngay_lam, "-", a.nhan_vien_id)) AS work_days
-             FROM phan_ca a
-             INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
-             LEFT JOIN phong_ban d ON d.id = e.ma_phong_ban
-             INNER JOIN cham_cong c ON c.phan_ca_id = a.id
-             WHERE a.trang_thai = \'DA_PHAN\'
-               AND c.thoi_gian_vao IS NOT NULL
-               AND c.thoi_gian_ra IS NOT NULL
-               AND a.ngay_lam BETWEEN :start AND :end
-               AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)'
-               . $departmentClause
-               . ' GROUP BY d.id, d.ten_phong_ban
-                 ORDER BY d.ten_phong_ban'
+        $departmentWorkRows = [];
+        foreach ($departmentWork as $department => $workDays) {
+            $departmentWorkRows[] = ['department' => $department, 'work_days' => $workDays];
+        }
+        usort(
+            $departmentWorkRows,
+            static fn (array $left, array $right): int => strcasecmp($left['department'], $right['department'])
         );
-        $departmentStatement->execute($employeeParams);
-        $departmentWork = array_map(
-            static fn (array $row): array => [
-                'department' => (string) $row['department'],
-                'work_days' => (int) $row['work_days'],
-            ],
-            $departmentStatement->fetchAll()
-        );
-
-        $topStatement = $this->pdo->prepare(
-            'SELECT e.id, e.ho_ten AS name, COUNT(DISTINCT a.ngay_lam) AS work_days
-             FROM phan_ca a
-             INNER JOIN nhan_vien e ON e.id = a.nhan_vien_id
-             INNER JOIN cham_cong c ON c.phan_ca_id = a.id
-             WHERE a.trang_thai = \'DA_PHAN\'
-               AND c.thoi_gian_vao IS NOT NULL
-               AND c.thoi_gian_ra IS NOT NULL
-               AND a.ngay_lam BETWEEN :start AND :end
-               AND (e.ngay_nghi_viec IS NULL OR a.ngay_lam < e.ngay_nghi_viec)'
-               . $departmentClause
-               . ' GROUP BY e.id, e.ho_ten
-                 ORDER BY work_days DESC, e.ho_ten ASC
-                 LIMIT 5'
-        );
-        $topStatement->execute($employeeParams);
-        $topEmployees = array_map(
-            static fn (array $row): array => [
-                'name' => (string) $row['name'],
-                'work_days' => (int) $row['work_days'],
-            ],
-            $topStatement->fetchAll()
-        );
+        $departmentWork = $departmentWorkRows;
+        $topEmployees = array_values($topEmployees);
+        usort($topEmployees, static function (array $left, array $right): int {
+            return $right['work_days'] <=> $left['work_days']
+                ?: strcasecmp($left['name'], $right['name']);
+        });
+        $topEmployees = array_slice($topEmployees, 0, 5);
 
         $cursor = new DateTimeImmutable($fromDate);
         $last = new DateTimeImmutable($toDate);

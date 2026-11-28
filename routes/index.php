@@ -12,7 +12,7 @@ match ($action) {
     '/' => (new HomeController())->index(),
     'admin' => (new HomeController())->admin(),
     'attendance' => (new HomeController())->attendance(),
-    'schedu le' => (new HomeController())->index(),
+    'schedule' => (new HomeController())->index(),
     'dashboard' => (new HomeController())->employeeSection('dashboard'),
     'timesheet' => (new HomeController())->employeeSection('timesheet'),
     'shift' => (new HomeController())->employeeSection('shift'),

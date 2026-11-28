@@ -27,3 +27,8 @@ CREATE TABLE IF NOT EXISTS lumicine_attendance (
     CONSTRAINT lumicine_attendance_user_fk
         FOREIGN KEY (user_id) REFERENCES lumicine_users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE nhan_vien
+ADD COLUMN loai_nhan_vien ENUM('FULLTIME', 'INTERN')
+NOT NULL DEFAULT 'FULLTIME'
+AFTER chuc_vu;

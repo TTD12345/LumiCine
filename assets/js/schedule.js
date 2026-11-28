@@ -17,7 +17,14 @@
     let editingId = null;
     let editingDate = null;
 
-    const statusLabel = (status) => status === 'active' ? 'Đang diễn ra' : (status === 'upcoming' ? 'Sắp bắt đầu' : 'Hoàn thành');
+    const progressLabels = {
+        active: 'Đang diễn ra',
+        upcoming: 'Sắp bắt đầu',
+        completed: 'Hoàn thành',
+    };
+    const statusLabel = (status) => status === 'unassigned'
+        ? 'Chưa phân ca'
+        : `Đã phân ca · ${progressLabels[status] || progressLabels.completed}`;
     const initials = (name) => Array.from(String(name).trim())[0] || '?';
     const formatDate = (date) => new Intl.DateTimeFormat('vi-VN', {
         weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
@@ -60,9 +67,13 @@
 
     const updateSummary = () => {
         const counts = { active: 0, upcoming: 0, completed: 0 };
-        assignments.forEach((item) => { counts[item.status] = (counts[item.status] || 0) + 1; });
-        const expectedMinutes = assignments.reduce((total, item) => total + Number(item.expected_minutes || 0), 0);
-        document.getElementById('schedule-total').textContent = assignments.length;
+        assignments.forEach((item) => {
+            if (item.status !== 'unassigned') counts[item.status] = (counts[item.status] || 0) + 1;
+        });
+        const assigned = assignments.filter((item) => item.status !== 'unassigned');
+        const unassignedCount = assignments.length - assigned.length;
+        const expectedMinutes = assigned.reduce((total, item) => total + Number(item.expected_minutes || 0), 0);
+        document.getElementById('schedule-total').textContent = assigned.length;
         document.getElementById('schedule-active').textContent = counts.active;
         document.getElementById('schedule-upcoming').textContent = counts.upcoming;
         document.getElementById('schedule-hours').textContent =
@@ -71,6 +82,7 @@
         document.getElementById('filter-active').textContent = counts.active;
         document.getElementById('filter-upcoming').textContent = counts.upcoming;
         document.getElementById('filter-completed').textContent = counts.completed;
+        document.getElementById('filter-unassigned').textContent = unassignedCount;
     };
 
     const render = () => {
@@ -84,10 +96,12 @@
             <tr data-assignment-id="${escapeHtml(item.id)}">
                 <td><div class="schedule-employee"><span>${escapeHtml(initials(item.name))}</span><div><strong>${escapeHtml(item.name)}</strong><small>${item.employee_code ? `Mã: ${escapeHtml(item.employee_code)} · ` : ''}${escapeHtml(item.role)}</small></div></div></td>
                 <td>${escapeHtml(formatDate(item.work_date))}</td><td>${escapeHtml(item.department)}</td><td><strong>${escapeHtml(item.shift_name || `Ca ${index + 1}`)}</strong></td>
-                <td><strong>${escapeHtml(item.start.slice(0, 5))} - ${escapeHtml(item.end.slice(0, 5))}</strong></td>
+                <td><strong>${item.start ? `${escapeHtml(item.start.slice(0, 5))} - ${escapeHtml(item.end.slice(0, 5))}` : '—'}</strong></td>
                 <td>${escapeHtml(item.location || '—')}</td>
                 <td><span class="schedule-status ${escapeHtml(item.status)}">${statusLabel(item.status)}</span></td>
-                <td><div class="schedule-row-actions"><button type="button" data-action="edit" title="Chỉnh sửa"><i class="bi bi-pencil"></i></button><button type="button" data-action="cancel" title="Hủy ca"><i class="bi bi-trash3"></i></button></div></td>
+                <td><div class="schedule-row-actions">${item.status === 'unassigned'
+                    ? '<button type="button" data-action="assign" title="Phân ca"><i class="bi bi-plus-lg"></i></button>'
+                    : '<button type="button" data-action="edit" title="Chỉnh sửa"><i class="bi bi-pencil"></i></button><button type="button" data-action="cancel" title="Hủy ca"><i class="bi bi-trash3"></i></button>'}</div></td>
             </tr>`).join('') :
             `<tr class="schedule-empty-row"><td colspan="8">${assignments.length ? 'Không tìm thấy ca làm việc phù hợp.' : 'Chưa có lịch phân ca trong khoảng thời gian này.'}</td></tr>`;
         document.getElementById('schedule-result-count').textContent = `Hiển thị ${visible.length} ca`;
@@ -119,7 +133,7 @@
     };
 
     const openDialog = (assignment = null) => {
-        editingId = assignment ? assignment.id : null;
+        editingId = assignment && assignment.status !== 'unassigned' ? assignment.id : null;
         editingDate = assignment ? assignment.work_date : dateInput.value;
         form.reset();
         document.getElementById('schedule-dialog-title').textContent = assignment
@@ -128,7 +142,9 @@
         document.getElementById('schedule-save').textContent = assignment ? 'Lưu thay đổi' : 'Lưu ca làm việc';
         if (assignment) {
             form.elements.employeeId.value = String(assignment.employee_id);
-            form.elements.shiftId.value = String(assignment.shift_id);
+            if (assignment.status !== 'unassigned') {
+                form.elements.shiftId.value = String(assignment.shift_id);
+            }
             form.elements.location.value = assignment.location;
         }
         dialog.showModal();
@@ -250,6 +266,8 @@
         const assignment = assignments.find((item) => String(item.id) === row.dataset.assignmentId);
         if (!assignment) return;
         if (button.dataset.action === 'edit') {
+            openDialog(assignment);
+        } else if (button.dataset.action === 'assign') {
             openDialog(assignment);
         } else if (window.confirm(`Bạn có chắc muốn hủy ca của ${assignment.name}?`)) {
             try {
