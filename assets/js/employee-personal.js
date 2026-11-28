@@ -60,10 +60,6 @@
         cell.append(badge);
     };
 
-    document.getElementById('notifications-button')?.addEventListener('click', () => {
-        window.location.href = '?action=notifications';
-    });
-
     const monthInput = document.getElementById('timesheet-month');
     const timesheetRows = document.getElementById('employee-timesheet-rows');
     if (monthInput && timesheetRows) {
@@ -381,15 +377,35 @@
                     String(now.getMonth() + 1).padStart(2, '0'),
                     String(now.getDate()).padStart(2, '0'),
                 ].join('-');
-                const [attendanceResult, leaveResult, overtimeResult] = await Promise.all([
+                const [attendanceResult, notificationResult] = await Promise.all([
                     window.lumiCineApi('attendance', { query: { date: today } }),
-                    window.lumiCineApi('leave', { query: { mine: 1 } }),
-                    window.lumiCineApi('overtime', { query: { mine: 1 } }),
+                    window.lumiCineApi('notifications'),
                 ]);
                 const items = [];
+                const notificationTones = {
+                    schedule: 'info',
+                    schedule_updated: 'info',
+                    schedule_cancelled: 'danger',
+                    leave_approved: 'success',
+                    leave_rejected: 'danger',
+                    overtime_approved: 'success',
+                    overtime_rejected: 'danger',
+                };
+                notificationResult.notifications.forEach((notification) => {
+                    items.push({
+                        tone: notificationTones[notification.type] || 'info',
+                        title: notification.title,
+                        message: notification.message,
+                        createdAt: notification.created_at,
+                    });
+                });
                 const attendance = attendanceResult.record;
                 if (Number(attendance.late_minutes) >= 15) {
-                    items.push(['warning', `Bạn đi làm muộn ${attendance.late_minutes} phút hôm nay.`]);
+                    items.push({
+                        tone: 'warning',
+                        title: 'Nhắc chấm công',
+                        message: `Bạn đi làm muộn ${attendance.late_minutes} phút hôm nay.`,
+                    });
                 }
                 if (attendance.has_assignment && !attendance.check_in && attendance.shift_end) {
                     const shiftEnd = new Date(`${today}T${attendance.shift_end}:00`);
@@ -397,46 +413,65 @@
                         shiftEnd.setDate(shiftEnd.getDate() + 1);
                     }
                     if (now >= shiftEnd) {
-                        items.push(['warning', 'Bạn chưa chấm công vào hôm nay.']);
+                        items.push({
+                            tone: 'warning',
+                            title: 'Nhắc chấm công',
+                            message: 'Bạn chưa chấm công vào hôm nay.',
+                        });
                     }
                 }
                 if (attendance.check_in && !attendance.check_out) {
-                    items.push(['warning', 'Bạn chưa chấm công ra.']);
+                    items.push({
+                        tone: 'warning',
+                        title: 'Nhắc chấm công',
+                        message: 'Bạn chưa chấm công ra.',
+                    });
                 }
-                leaveResult.requests.forEach((request) => {
-                    if (request.status !== 'pending') {
-                        items.push([
-                            request.status === 'approved' ? 'success' : 'danger',
-                            `Đơn nghỉ phép ${request.status === 'approved' ? 'đã được duyệt' : 'bị từ chối'}: ${formatDateTime(request.start)}.`,
-                        ]);
-                    }
-                });
-                overtimeResult.requests.forEach((request) => {
-                    if (request.status !== 'pending') {
-                        items.push([
-                            request.status === 'approved' ? 'success' : 'danger',
-                            `Đơn tăng ca ${request.status === 'approved' ? 'đã được duyệt' : 'bị từ chối'}: ${formatDateTime(request.start)}.`,
-                        ]);
-                    }
-                });
                 if (items.length === 0) {
                     const empty = document.createElement('p');
                     empty.className = 'notification-empty';
-                    empty.textContent = 'Chưa có thông báo cá nhân mới.';
+                    empty.textContent = 'Bạn chưa có thông báo mới.';
                     notifications.append(empty);
                     return;
                 }
-                items.slice(0, 30).forEach(([tone, message]) => {
+                items.slice(0, 30).forEach(({ tone, title, message, createdAt }) => {
                     const item = document.createElement('article');
                     item.className = `personal-notification ${tone}`;
                     const icon = document.createElement('i');
-                    icon.className = `bi ${tone === 'success' ? 'bi-check-circle' : tone === 'warning' ? 'bi-exclamation-circle' : 'bi-x-circle'}`;
+                    icon.className = `bi ${
+                        tone === 'success'
+                            ? 'bi-check-circle'
+                            : tone === 'warning'
+                                ? 'bi-exclamation-circle'
+                                : tone === 'danger'
+                                    ? 'bi-x-circle'
+                                    : 'bi-calendar-event'
+                    }`;
                     icon.setAttribute('aria-hidden', 'true');
+                    const copy = document.createElement('span');
+                    copy.className = 'personal-notification-copy';
+                    const heading = document.createElement('strong');
+                    heading.textContent = title;
                     const text = document.createElement('span');
                     text.textContent = message;
-                    item.append(icon, text);
+                    copy.append(heading, text);
+                    if (createdAt) {
+                        const timestamp = document.createElement('small');
+                        timestamp.textContent = formatDateTime(createdAt);
+                        copy.append(timestamp);
+                    }
+                    item.append(icon, copy);
                     notifications.append(item);
                 });
+                try {
+                    await window.lumiCineApi('notifications', {
+                        method: 'POST',
+                        body: { operation: 'mark-read' },
+                    });
+                    window.dispatchEvent(new Event('lumicine:notifications-read'));
+                } catch (error) {
+                    toast(error instanceof Error ? error.message : 'Không thể đánh dấu thông báo đã đọc.', true);
+                }
             } catch (error) {
                 const message = document.createElement('p');
                 message.className = 'notification-empty error';
@@ -445,6 +480,7 @@
             }
         };
         loadNotifications();
+        window.setInterval(loadNotifications, 30000);
     }
 
     const profileForm = document.getElementById('employee-profile-form');

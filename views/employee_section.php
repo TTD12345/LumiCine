@@ -16,7 +16,7 @@ $sections = [
     'overtime' => ['kicker' => 'ĐĂNG KÝ LÀM THÊM', 'title' => 'Đăng ký tăng ca', 'description' => 'Tạo và theo dõi các đơn tăng ca của bạn.'],
     'leave' => ['kicker' => 'NGHỈ PHÉP', 'title' => 'Đăng ký nghỉ phép', 'description' => 'Tạo đơn xin nghỉ và theo dõi trạng thái duyệt.'],
     'requests' => ['kicker' => 'YÊU CẦU CỦA TÔI', 'title' => 'Đơn của tôi', 'description' => 'Theo dõi trạng thái xử lý các đơn bạn đã gửi.'],
-    'notifications' => ['kicker' => 'CẬP NHẬT CÁ NHÂN', 'title' => 'Thông báo', 'description' => 'Thông tin liên quan đến chấm công và các đơn của bạn.'],
+    'notifications' => ['kicker' => 'CẬP NHẬT CÁ NHÂN', 'title' => 'Thông báo', 'description' => 'Nhận cập nhật khi quản lý phân ca hoặc xử lý đơn của bạn.'],
     'profile' => ['kicker' => 'HỒ SƠ CÁ NHÂN', 'title' => 'Hồ sơ cá nhân', 'description' => 'Xem hồ sơ, cập nhật thông tin liên hệ và đổi mật khẩu.'],
     'schedule' => ['kicker' => 'LỊCH LÀM VIỆC', 'title' => 'Lịch làm việc', 'description' => 'Xem lịch làm việc cá nhân.'],
     'employees' => ['kicker' => 'DANH SÁCH NHÂN VIÊN', 'title' => 'Nhân viên', 'description' => 'Thông tin nhân viên trong tổ chức.'],
@@ -24,6 +24,10 @@ $sections = [
 ];
 $page = $sections[$section] ?? $sections['dashboard'];
 $mustChangePassword = !empty($currentUser['must_change_password']);
+$adminRoles = ['accountant', 'hr', 'chairman'];
+$notificationTarget = in_array($currentUser['role'], $adminRoles, true)
+    ? '?action=admin-overtime'
+    : '?action=notifications';
 $isOvertime = $section === 'overtime';
 $isLeave = $section === 'leave';
 $isTimesheet = $section === 'timesheet';
@@ -105,7 +109,7 @@ $attendanceSummary = !$attendanceToday
             <a class="employee-nav-link <?= $isLeave ? 'active' : '' ?>" href="?action=leave"><i class="bi bi-calendar2-minus"></i><span>Xin nghỉ phép</span></a>
             <a class="employee-nav-link <?= $isOvertime ? 'active' : '' ?>" href="?action=overtime"><i class="bi bi-clock-history"></i><span>Đăng ký tăng ca</span></a>
             <a class="employee-nav-link <?= $isRequests ? 'active' : '' ?>" href="?action=requests"><i class="bi bi-inboxes"></i><span>Đơn của tôi</span></a>
-            <a class="employee-nav-link <?= $isNotifications ? 'active' : '' ?>" href="?action=notifications"><i class="bi bi-bell"></i><span>Thông báo</span></a>
+            <a class="employee-nav-link <?= $isNotifications ? 'active' : '' ?>" href="<?= $escape($notificationTarget) ?>"><i class="bi bi-bell"></i><span>Thông báo</span></a>
             <a class="employee-nav-link <?= $isProfile ? 'active' : '' ?>" href="?action=profile"><i class="bi bi-person-circle"></i><span>Hồ sơ cá nhân</span></a>
             <p class="nav-caption nav-caption-spaced">LỊCH LÀM VIỆC</p>
             <a class="employee-nav-link <?= $section === 'schedule' ? 'active' : '' ?>" href="?action=schedule"><i class="bi bi-calendar-week"></i><span>Lịch làm việc</span></a>
@@ -123,7 +127,7 @@ $attendanceSummary = !$attendanceToday
         <header class="employee-topbar">
             <div class="topbar-leading"><button class="mobile-menu" type="button" id="mobile-menu-button" aria-label="Mở menu"><i class="bi bi-list"></i></button><div><strong><?= $escape($page['title']) ?></strong><div class="breadcrumbs"><a href="?action=dashboard">Trang chủ</a><i class="bi bi-chevron-right"></i><span><?= $escape($page['title']) ?></span></div></div></div>
             <div class="topbar-trailing">
-                <button class="notification-button" type="button" id="notifications-button" aria-label="Thông báo"><i class="bi bi-bell"></i></button>
+                <button class="notification-button" type="button" id="notifications-button" data-notification-url="<?= $escape($notificationTarget) ?>" aria-label="Thông báo"><i class="bi bi-bell"></i><span id="notification-indicator" hidden></span></button>
                 <span class="topbar-divider"></span>
                 <div class="topbar-account">
                     <button class="topbar-profile" type="button" id="account-menu-button" aria-haspopup="menu" aria-expanded="false"><span class="profile-avatar"><?= $currentUserInitials ?></span><span class="topbar-profile-copy"><strong><?= $currentUserName ?></strong><small><?= $escape($roleLabel) ?></small></span><i class="bi bi-chevron-down"></i></button>
@@ -201,7 +205,7 @@ $attendanceSummary = !$attendanceToday
                     <div class="employee-table-wrap"><table class="employee-table requests-table"><thead><tr><th>Mã đơn</th><th>Loại đơn</th><th>Ngày</th><th>Nội dung</th><th>Thời gian gửi</th><th>Người duyệt</th><th>Trạng thái</th></tr></thead><tbody id="employee-request-rows"><tr><td colspan="7">Đang tải danh sách đơn...</td></tr></tbody></table></div>
                 </section>
             <?php elseif ($isNotifications): ?>
-                <section class="schedule-card"><div class="schedule-heading"><div><h2>Thông báo của bạn</h2><p>Thông báo được tổng hợp từ trạng thái chấm công và các đơn cá nhân.</p></div></div><div id="employee-notification-list" class="personal-notification-list" aria-live="polite"><p>Đang tải thông báo...</p></div></section>
+                <section class="schedule-card"><div class="schedule-heading"><div><h2>Thông báo của bạn</h2><p>Cập nhật phân ca, duyệt đơn và nhắc chấm công.</p></div></div><div id="employee-notification-list" class="personal-notification-list" aria-live="polite"><p>Đang tải thông báo...</p></div></section>
             <?php elseif ($isProfile): ?>
                 <section class="schedule-card profile-card">
                     <div class="schedule-heading"><div><h2>Thông tin nhân viên</h2><p>Thông tin hồ sơ liên kết với tài khoản đang đăng nhập.</p></div></div>
@@ -272,17 +276,16 @@ $attendanceSummary = !$attendanceToday
 </dialog>
 <?php endif; ?>
 <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
+<?php require PATH_VIEW . 'api-config.php'; ?>
 <script src="assets/js/employee-section.js" defer></script>
+<script src="assets/js/notification-badge.js" defer></script>
 <?php if ($isTimesheet || $isRequests || $isNotifications || $isProfile): ?>
-    <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/employee-personal.js" defer></script>
 <?php endif; ?>
 <?php if ($isOvertime): ?>
-    <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/overtime.js" defer></script>
 <?php endif; ?>
 <?php if ($isLeave): ?>
-    <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/leave.js" defer></script>
 <?php endif; ?>
 </body>

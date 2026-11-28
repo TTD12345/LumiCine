@@ -92,7 +92,7 @@ sort($attendancePositions, SORT_NATURAL | SORT_FLAG_CASE);
         <header class="topbar">
             <div class="topbar-left"><button class="mobile-menu-button" type="button" id="sidebar-toggle"><i class="bi bi-list"></i></button><div class="topbar-title"><strong><?= $escape($page['title']) ?></strong><div class="breadcrumbs"><a href="?action=admin-overview">Trang chủ</a><i class="bi bi-chevron-right"></i><span><?= $escape($page['title']) ?></span></div></div></div>
             <div class="topbar-actions">
-                <button class="icon-button notification-button" type="button" id="notification-button" aria-label="Thông báo"><i class="bi bi-bell"></i><span class="notification-indicator" id="notification-indicator" hidden></span></button>
+                <button class="icon-button notification-button" type="button" id="notification-button" data-notification-url="?action=admin-overtime" aria-label="Thông báo"><i class="bi bi-bell"></i><span class="notification-indicator" id="notification-indicator" hidden></span></button>
                 <span class="topbar-divider"></span>
                 <button class="user-menu" type="button" id="admin-account-menu-button" aria-haspopup="menu" aria-expanded="false"><span class="avatar avatar-admin"><?= $escape($currentUser['initials']) ?></span><span class="user-copy"><strong><?= $escape($currentUser['display_name']) ?></strong><small><?= $escape($roleLabel) ?></small></span><i class="bi bi-chevron-down user-chevron"></i></button>
                 <div class="admin-account-menu" id="admin-account-menu" role="menu" hidden>
@@ -677,10 +677,10 @@ sort($attendancePositions, SORT_NATURAL | SORT_FLAG_CASE);
     </dialog>
 <?php endif; ?>
 <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-container" aria-live="polite"></div>
+<?php require PATH_VIEW . 'api-config.php'; ?>
 <script src="assets/js/admin-section.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/admin-section.js') ?>" defer></script>
-<script src="assets/js/admin-section.js?v=20261121" defer></script>
+<script src="assets/js/notification-badge.js" defer></script>
 <?php if ($isSchedule): ?>
-    <?php require PATH_VIEW . 'api-config.php'; ?>
     <?php if ($scheduleMode === 'auto'): ?>
         <script src="assets/js/auto-schedule.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/auto-schedule.js') ?>" defer></script>
     <?php else: ?>
@@ -691,19 +691,13 @@ sort($attendancePositions, SORT_NATURAL | SORT_FLAG_CASE);
         <script src="assets/js/schedule.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/schedule.js') ?>" defer></script>
     <?php endif; ?>
 <?php elseif ($isOvertime): ?>
-    <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/overtime.js" defer></script>
     <script src="assets/js/leave.js" defer></script>
 <?php elseif ($section === 'employees'): ?>
-    <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/workforce-management.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/workforce-management.js') ?>" defer></script>
-<?php elseif ($section === 'settings'): ?>
-    <?php require PATH_VIEW . 'api-config.php'; ?>
 <?php elseif ($section === 'accounts'): ?>
-    <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="assets/js/employee-accounts.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/employee-accounts.js') ?>" defer></script>
 <?php elseif ($section === 'reports'): ?>
-    <?php require PATH_VIEW . 'api-config.php'; ?>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
     <script src="assets/js/reports.js?v=<?= (int) filemtime(__DIR__ . '/../assets/js/reports.js') ?>" defer></script>
 <?php endif; ?>

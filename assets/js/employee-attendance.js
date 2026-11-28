@@ -578,9 +578,6 @@
         stopFaceScan();
         stopFaceCamera();
     });
-    document.getElementById('notifications-button').addEventListener('click', () => {
-        window.location.href = '?action=notifications';
-    });
     document.addEventListener('click', (event) => {
         const menu = document.getElementById('account-menu');
         const button = document.getElementById('account-menu-button');

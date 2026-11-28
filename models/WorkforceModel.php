@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/SchedulePlanningEngine.php';
+require_once __DIR__ . '/NotificationModel.php';
 
 class WorkforceModel extends BaseModel
 {
@@ -19,6 +20,7 @@ class WorkforceModel extends BaseModel
         $this->ensureEmployeeProfilesTable();
         $this->ensureFaceProfilesTable();
         $this->ensureUserEmployeeIdColumn();
+        $this->ensureNotificationsTable();
     }
 
     private function ensureFaceProfilesTable(): void
@@ -76,6 +78,62 @@ class WorkforceModel extends BaseModel
                 KEY idx_leave_employee_period (nhan_vien_id, gio_bat_dau, gio_ket_thuc)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
         );
+    }
+
+    private function ensureNotificationsTable(): void
+    {
+        $this->pdo->exec(
+            'CREATE TABLE IF NOT EXISTS lumicine_notifications (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                user_id BIGINT UNSIGNED NOT NULL,
+                title VARCHAR(150) NOT NULL,
+                message VARCHAR(1000) NOT NULL,
+                type VARCHAR(32) NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                read_at DATETIME NULL,
+                PRIMARY KEY (id),
+                KEY idx_notifications_user_read_created (user_id, read_at, created_at),
+                CONSTRAINT fk_notifications_user
+                    FOREIGN KEY (user_id) REFERENCES lumicine_users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+        );
+    }
+
+    public function unreadNotificationsCount(int $userId): int
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT COUNT(*) FROM lumicine_notifications
+             WHERE user_id = :user_id AND read_at IS NULL'
+        );
+        $statement->execute(['user_id' => $userId]);
+
+        return (int) $statement->fetchColumn();
+    }
+
+    public function listNotifications(int $userId): array
+    {
+        $statement = $this->pdo->prepare(
+            'SELECT id, title, message, type,
+                    DATE_FORMAT(created_at, \'%Y-%m-%d %H:%i:%s\') AS created_at,
+                    read_at IS NULL AS unread
+             FROM lumicine_notifications
+             WHERE user_id = :user_id
+             ORDER BY created_at DESC, id DESC
+             LIMIT 50'
+        );
+        $statement->execute(['user_id' => $userId]);
+
+        return $statement->fetchAll();
+    }
+
+    public function markNotificationsRead(int $userId): void
+    {
+        $statement = $this->pdo->prepare(
+            'UPDATE lumicine_notifications
+             SET read_at = CURRENT_TIMESTAMP
+             WHERE user_id = :user_id AND read_at IS NULL'
+        );
+        $statement->execute(['user_id' => $userId]);
     }
 
     private function ensureEmployeeProfilesTable(): void
@@ -817,6 +875,7 @@ class WorkforceModel extends BaseModel
         if ($location === '' || mb_strlen($location) > 100) {
             throw new InvalidArgumentException('Địa điểm làm việc không hợp lệ.');
         }
+        $isNewAssignment = $id === null;
 
         $this->pdo->beginTransaction();
         try {
@@ -831,12 +890,16 @@ class WorkforceModel extends BaseModel
                 throw new InvalidArgumentException('Nhân viên không tồn tại hoặc đã ngừng hoạt động.');
             }
 
+            $previousAssignment = null;
             if ($id !== null) {
                 $assignmentCheck = $this->pdo->prepare(
-                    'SELECT id FROM phan_ca WHERE id = :id AND trang_thai = \'DA_PHAN\' FOR UPDATE'
+                    'SELECT a.id, a.nhan_vien_id, a.ca_lam_viec_id, a.ngay_lam, a.dia_diem
+                     FROM phan_ca a
+                     WHERE a.id = :id AND a.trang_thai = \'DA_PHAN\' FOR UPDATE'
                 );
                 $assignmentCheck->execute(['id' => $id]);
-                if ($assignmentCheck->fetchColumn() === false) {
+                $previousAssignment = $assignmentCheck->fetch();
+                if ($previousAssignment === false) {
                     throw new InvalidArgumentException('Ca làm việc không tồn tại.');
                 }
                 $attendanceCheck = $this->pdo->prepare(
@@ -853,6 +916,11 @@ class WorkforceModel extends BaseModel
             $shiftNameStatement->execute(['id' => $shiftId]);
             $shiftName = (string) $shiftNameStatement->fetchColumn();
             $this->assertScheduleAvailable($employeeId, $date, $start, $end, $shiftName, $id);
+            $assignmentChanged = $isNewAssignment
+                || (int) $previousAssignment['nhan_vien_id'] !== $employeeId
+                || (int) $previousAssignment['ca_lam_viec_id'] !== $shiftId
+                || (string) $previousAssignment['ngay_lam'] !== $date
+                || (string) $previousAssignment['dia_diem'] !== $location;
             if ($id === null) {
                 $statement = $this->pdo->prepare(
                     'INSERT INTO phan_ca (nhan_vien_id, ca_lam_viec_id, ngay_lam, dia_diem, trang_thai)
@@ -880,6 +948,40 @@ class WorkforceModel extends BaseModel
                     'id' => $id,
                 ]);
             }
+            if ($assignmentChanged) {
+                if (
+                    !$isNewAssignment
+                    && (int) $previousAssignment['nhan_vien_id'] !== $employeeId
+                ) {
+                    $previousDate = (new DateTimeImmutable(
+                        (string) $previousAssignment['ngay_lam']
+                    ))->format('d/m/Y');
+                    NotificationModel::sendToEmployee(
+                        $this->pdo,
+                        (int) $previousAssignment['nhan_vien_id'],
+                        'Lịch làm việc đã thay đổi',
+                        'Ca làm việc ngày ' . $previousDate . ' đã được quản lý điều chỉnh.',
+                        'schedule_updated'
+                    );
+                }
+                $dateLabel = (new DateTimeImmutable($date))->format('d/m/Y');
+                $title = $isNewAssignment ? 'Bạn được phân ca làm việc' : 'Lịch làm việc đã cập nhật';
+                $message = sprintf(
+                    'Ca %s ngày %s, %s - %s tại %s.',
+                    $shiftName,
+                    $dateLabel,
+                    substr($start, 0, 5),
+                    substr($end, 0, 5),
+                    $location
+                );
+                NotificationModel::sendToEmployee(
+                    $this->pdo,
+                    $employeeId,
+                    $title,
+                    $message,
+                    $isNewAssignment ? 'schedule' : 'schedule_updated'
+                );
+            }
             $this->pdo->commit();
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
@@ -903,10 +1005,12 @@ class WorkforceModel extends BaseModel
         $this->pdo->beginTransaction();
         try {
             $assignment = $this->pdo->prepare(
-                'SELECT id FROM phan_ca WHERE id = :id AND trang_thai = \'DA_PHAN\' FOR UPDATE'
+                'SELECT id, nhan_vien_id, ngay_lam
+                 FROM phan_ca WHERE id = :id AND trang_thai = \'DA_PHAN\' FOR UPDATE'
             );
             $assignment->execute(['id' => $assignmentId]);
-            if ($assignment->fetchColumn() === false) {
+            $assignmentRow = $assignment->fetch();
+            if ($assignmentRow === false) {
                 throw new InvalidArgumentException('Ca làm việc không tồn tại hoặc đã bị hủy.');
             }
             $attendance = $this->pdo->prepare(
@@ -920,6 +1024,15 @@ class WorkforceModel extends BaseModel
                 'UPDATE phan_ca SET trang_thai = \'HUY\' WHERE id = :id'
             );
             $update->execute(['id' => $assignmentId]);
+            NotificationModel::sendToEmployee(
+                $this->pdo,
+                (int) $assignmentRow['nhan_vien_id'],
+                'Ca làm việc đã bị hủy',
+                'Ca làm việc ngày '
+                    . (new DateTimeImmutable((string) $assignmentRow['ngay_lam']))->format('d/m/Y')
+                    . ' đã được quản lý hủy.',
+                'schedule_cancelled'
+            );
             $this->pdo->commit();
         } catch (Throwable $exception) {
             if ($this->pdo->inTransaction()) {
@@ -1516,18 +1629,49 @@ class WorkforceModel extends BaseModel
     public function reviewLeave(int $requestId, string $status, ?int $reviewerId): void
     {
         $databaseStatus = $status === 'approved' ? 'DA_DUYET' : 'TU_CHOI';
-        $statement = $this->pdo->prepare(
-            'UPDATE lumicine_leave_requests
-             SET trang_thai = :status, nguoi_duyet_id = :reviewer_id
-             WHERE id = :id AND trang_thai = \'CHO_DUYET\''
-        );
-        $statement->execute([
-            'status' => $databaseStatus,
-            'reviewer_id' => $reviewerId,
-            'id' => $requestId,
-        ]);
-        if ($statement->rowCount() === 0) {
-            throw new InvalidArgumentException('Đơn nghỉ phép không tồn tại hoặc đã được xử lý.');
+        $this->pdo->beginTransaction();
+        try {
+            $requestStatement = $this->pdo->prepare(
+                'SELECT nhan_vien_id, gio_bat_dau
+                 FROM lumicine_leave_requests
+                 WHERE id = :id AND trang_thai = \'CHO_DUYET\' FOR UPDATE'
+            );
+            $requestStatement->execute(['id' => $requestId]);
+            $request = $requestStatement->fetch();
+            if ($request === false) {
+                throw new InvalidArgumentException('Đơn nghỉ phép không tồn tại hoặc đã được xử lý.');
+            }
+
+            $statement = $this->pdo->prepare(
+                'UPDATE lumicine_leave_requests
+                 SET trang_thai = :status, nguoi_duyet_id = :reviewer_id
+                 WHERE id = :id AND trang_thai = \'CHO_DUYET\''
+            );
+            $statement->execute([
+                'status' => $databaseStatus,
+                'reviewer_id' => $reviewerId,
+                'id' => $requestId,
+            ]);
+            if ($statement->rowCount() === 0) {
+                throw new InvalidArgumentException('Đơn nghỉ phép không tồn tại hoặc đã được xử lý.');
+            }
+
+            $approved = $status === 'approved';
+            $start = (new DateTimeImmutable((string) $request['gio_bat_dau']))->format('d/m/Y H:i');
+            NotificationModel::sendToEmployee(
+                $this->pdo,
+                (int) $request['nhan_vien_id'],
+                $approved ? 'Đơn nghỉ phép đã được duyệt' : 'Đơn nghỉ phép bị từ chối',
+                'Đơn nghỉ phép bắt đầu lúc ' . $start . ' đã '
+                    . ($approved ? 'được duyệt.' : 'bị từ chối.'),
+                $approved ? 'leave_approved' : 'leave_rejected'
+            );
+            $this->pdo->commit();
+        } catch (Throwable $exception) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $exception;
         }
     }
 
@@ -1563,15 +1707,17 @@ class WorkforceModel extends BaseModel
                 throw new InvalidArgumentException('Đơn tăng ca không tồn tại hoặc đã được xử lý.');
             }
 
+            $notificationEmployeeId = (int) ($request['nhan_vien_id'] ?? 0);
+            if ($notificationEmployeeId === 0 && $request['cham_cong_id'] !== null) {
+                $legacyStatement = $this->pdo->prepare(
+                    'SELECT nhan_vien_id FROM cham_cong WHERE id = :attendance_id'
+                );
+                $legacyStatement->execute(['attendance_id' => $request['cham_cong_id']]);
+                $notificationEmployeeId = (int) ($legacyStatement->fetchColumn() ?: 0);
+            }
+
             if ($status === 'approved') {
-                $employeeId = (int) ($request['nhan_vien_id'] ?? 0);
-                if ($employeeId === 0 && $request['cham_cong_id'] !== null) {
-                    $legacyStatement = $this->pdo->prepare(
-                        'SELECT nhan_vien_id FROM cham_cong WHERE id = :attendance_id'
-                    );
-                    $legacyStatement->execute(['attendance_id' => $request['cham_cong_id']]);
-                    $employeeId = (int) ($legacyStatement->fetchColumn() ?: 0);
-                }
+                $employeeId = $notificationEmployeeId;
                 if ($employeeId < 1) {
                     throw new InvalidArgumentException('Đơn tăng ca chưa gắn hồ sơ nhân viên.');
                 }
@@ -1610,6 +1756,18 @@ class WorkforceModel extends BaseModel
             ]);
             if ($statement->rowCount() === 0) {
                 throw new InvalidArgumentException('Đơn tăng ca không tồn tại hoặc đã được xử lý.');
+            }
+            if ($notificationEmployeeId > 0) {
+                $approved = $status === 'approved';
+                $start = (new DateTimeImmutable((string) $request['gio_bat_dau']))->format('d/m/Y H:i');
+                NotificationModel::sendToEmployee(
+                    $this->pdo,
+                    $notificationEmployeeId,
+                    $approved ? 'Đơn tăng ca đã được duyệt' : 'Đơn tăng ca bị từ chối',
+                    'Đơn tăng ca bắt đầu lúc ' . $start . ' đã '
+                        . ($approved ? 'được duyệt.' : 'bị từ chối.'),
+                    $approved ? 'overtime_approved' : 'overtime_rejected'
+                );
             }
             $this->pdo->commit();
         } catch (Throwable $exception) {
