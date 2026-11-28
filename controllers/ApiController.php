@@ -266,7 +266,13 @@ class ApiController
                             $shiftId
                         );
                     } else {
-                        $assignments = $workforce->listAssignments($date, $employeeId);
+                        $isAdmin = in_array($user['role'], self::ADMIN_ROLES, true);
+                        $assignments = $workforce->listAssignments(
+                            $date,
+                            $employeeId,
+                            !$isAdmin,
+                            $isAdmin && $employeeId === null
+                        );
                     }
                     $this->respond([
                         'assignments' => $assignments,

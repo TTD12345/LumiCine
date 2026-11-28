@@ -12,6 +12,7 @@
     const employeeDialogFeedback = document.getElementById('employee-dialog-feedback');
     const departmentDialogFeedback = document.getElementById('department-dialog-feedback');
     const departmentSelect = document.getElementById('employee-department');
+    const employeeTypeSelect = document.getElementById('employee-type');
 
     const setFeedback = (element, message, state = '') => {
         element.textContent = message;
@@ -30,7 +31,7 @@
         body.replaceChildren();
         if (employees.length === 0) {
             const row = document.createElement('tr');
-            appendCell(row, 'Chưa có hồ sơ nhân viên.').colSpan = 7;
+            appendCell(row, 'Chưa có hồ sơ nhân viên.').colSpan = 8;
             body.append(row);
             return;
         }
@@ -43,6 +44,7 @@
             row.dataset.code = employee.code;
             row.dataset.name = employee.name;
             row.dataset.position = employee.position;
+            row.dataset.employeeType = employee.employee_type;
             row.dataset.departmentId = employee.department_id === null ? '' : String(employee.department_id);
             row.dataset.terminationDate = employee.termination_date || '';
             row.dataset.active = active ? '1' : '0';
@@ -50,6 +52,7 @@
             appendCell(row, employee.name);
             appendCell(row, employee.department || 'Chưa phân công');
             appendCell(row, employee.position || '—');
+            appendCell(row, employee.employee_type === 'INTERN' ? 'Intern' : 'Fulltime');
             appendCell(row, employee.termination_date || '—');
 
             const statusCell = document.createElement('td');
@@ -139,6 +142,7 @@
         document.getElementById('employee-code').value = row ? row.dataset.code : '';
         document.getElementById('employee-name').value = row ? row.dataset.name : '';
         document.getElementById('employee-position').value = row ? row.dataset.position : '';
+        employeeTypeSelect.value = row ? row.dataset.employeeType : 'FULLTIME';
         document.getElementById('employee-termination-date').value = row ? row.dataset.terminationDate : '';
         departmentSelect.value = row ? row.dataset.departmentId : '';
         employeeDialog.showModal();
@@ -236,6 +240,7 @@
                     code: document.getElementById('employee-code').value,
                     name: document.getElementById('employee-name').value,
                     position: document.getElementById('employee-position').value,
+                    employeeType: employeeTypeSelect.value,
                     departmentId: departmentSelect.value || null,
                     terminationDate: document.getElementById('employee-termination-date').value || null,
                 },

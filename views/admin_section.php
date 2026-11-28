@@ -202,7 +202,7 @@ sort($attendancePositions, SORT_NATURAL | SORT_FLAG_CASE);
 
                             <section class="schedule-board auto-schedule-card">
                                 <header class="schedule-board-header">
-                                    <div><h2>Tạo lịch dự kiến</h2><p>Lịch hiện có được giữ nguyên; hệ thống chỉ bổ sung đến mức nhân sự tối thiểu.</p></div>
+                                    <div><h2>Tạo lịch dự kiến</h2><p>Chỉ nhân viên Intern được xét phân ca; lịch hiện có được giữ nguyên và hệ thống chỉ bổ sung đến mức nhân sự tối thiểu.</p></div>
                                 </header>
                                 <form class="auto-generate-form" id="auto-generate-form">
                                     <label>Từ ngày<input id="auto-from-date" type="date" value="<?= $escape($scheduleDate) ?>" required></label>
@@ -233,7 +233,7 @@ sort($attendancePositions, SORT_NATURAL | SORT_FLAG_CASE);
                         </div>
                     <?php else: ?>
                     <div class="schedule-stats">
-                        <article><span class="schedule-stat-icon blue"><i class="bi bi-calendar2-week"></i></span><div><span>Tổng ca trong kỳ</span><strong id="schedule-total"><?= count($scheduleAssignments) ?></strong></div></article>
+                        <article><span class="schedule-stat-icon blue"><i class="bi bi-calendar2-week"></i></span><div><span>Tổng ca trong kỳ</span><strong id="schedule-total"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] !== 'unassigned')) ?></strong></div></article>
                         <article><span class="schedule-stat-icon green"><i class="bi bi-clock-history"></i></span><div><span>Đang diễn ra</span><strong id="schedule-active"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] === 'active')) ?></strong></div></article>
                         <article><span class="schedule-stat-icon orange"><i class="bi bi-hourglass-split"></i></span><div><span>Sắp bắt đầu</span><strong id="schedule-upcoming"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] === 'upcoming')) ?></strong></div></article>
                         <article><span class="schedule-stat-icon purple"><i class="bi bi-hourglass-split"></i></span><div><span>Tổng giờ dự kiến</span><strong id="schedule-hours">0 giờ</strong></div></article>
@@ -261,6 +261,7 @@ sort($attendancePositions, SORT_NATURAL | SORT_FLAG_CASE);
                                 <button type="button" data-status="active">Đang diễn ra <span id="filter-active"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] === 'active')) ?></span></button>
                                 <button type="button" data-status="upcoming">Sắp bắt đầu <span id="filter-upcoming"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] === 'upcoming')) ?></span></button>
                                 <button type="button" data-status="completed">Hoàn thành <span id="filter-completed"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] === 'completed')) ?></span></button>
+                                <button type="button" data-status="unassigned">Chưa phân ca <span id="filter-unassigned"><?= count(array_filter($scheduleAssignments, static fn ($item) => $item['status'] === 'unassigned')) ?></span></button>
                             </div>
                         </div>
                         <div class="schedule-table-wrap">
@@ -274,10 +275,10 @@ sort($attendancePositions, SORT_NATURAL | SORT_FLAG_CASE);
                                             <tr data-assignment-id="<?= $escape($assignment['id']) ?>">
                                                 <td><div class="schedule-employee"><span><?= $escape(lumicineUtf8Substring($assignment['name'], 0, 1)) ?></span><div><strong><?= $escape($assignment['name']) ?></strong><small><?= !empty($assignment['employee_code']) ? 'Mã: ' . $escape($assignment['employee_code']) . ' · ' : '' ?><?= $escape($assignment['role']) ?></small></div></div></td>
                                                 <td><?= $escape($assignment['work_date']) ?></td><td><?= $escape($assignment['department']) ?></td><td><strong><?= $escape($assignment['shift_name'] ?? ('Ca ' . ($index + 1))) ?></strong></td>
-                                                <td><strong><?= $escape(substr($assignment['start'], 0, 5)) ?> - <?= $escape(substr($assignment['end'], 0, 5)) ?></strong></td>
+                                                <td><strong><?= $assignment['start'] !== '' ? $escape(substr($assignment['start'], 0, 5) . ' - ' . substr($assignment['end'], 0, 5)) : '—' ?></strong></td>
                                                 <td><?= $escape($assignment['location']) ?></td>
-                                                <td><span class="schedule-status <?= $escape($assignment['status']) ?>"><?= $assignment['status'] === 'active' ? 'Đang diễn ra' : ($assignment['status'] === 'upcoming' ? 'Sắp bắt đầu' : 'Hoàn thành') ?></span></td>
-                                                <td><div class="schedule-row-actions"><button type="button" data-action="edit" title="Chỉnh sửa"><i class="bi bi-pencil"></i></button><button type="button" data-action="cancel" title="Hủy ca"><i class="bi bi-trash3"></i></button></div></td>
+                                                <td><span class="schedule-status <?= $escape($assignment['status']) ?>"><?= $assignment['status'] === 'unassigned' ? 'Chưa phân ca' : 'Đã phân ca · ' . ($assignment['status'] === 'active' ? 'Đang diễn ra' : ($assignment['status'] === 'upcoming' ? 'Sắp bắt đầu' : 'Hoàn thành')) ?></span></td>
+                                                <td><div class="schedule-row-actions"><?php if ($assignment['status'] === 'unassigned'): ?><button type="button" data-action="assign" title="Phân ca"><i class="bi bi-plus-lg"></i></button><?php else: ?><button type="button" data-action="edit" title="Chỉnh sửa"><i class="bi bi-pencil"></i></button><button type="button" data-action="cancel" title="Hủy ca"><i class="bi bi-trash3"></i></button><?php endif; ?></div></td>
                                             </tr>
                                         <?php endforeach; ?>
                                     <?php endif; ?>
@@ -380,18 +381,19 @@ sort($attendancePositions, SORT_NATURAL | SORT_FLAG_CASE);
                         <p class="mapping-feedback" id="employee-management-feedback" role="status" aria-live="polite"></p>
                         <div class="table-wrap">
                             <table class="employee-table" id="workforce-employee-table">
-                                <thead><tr><th>Mã nhân viên</th><th>Họ và tên</th><th>Phòng ban</th><th>Chức vụ</th><th>Ngày nghỉ việc</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
+                                <thead><tr><th>Mã nhân viên</th><th>Họ và tên</th><th>Phòng ban</th><th>Chức vụ</th><th>Loại nhân viên</th><th>Ngày nghỉ việc</th><th>Trạng thái</th><th>Thao tác</th></tr></thead>
                                 <tbody>
                                     <?php if ($managedEmployees === []): ?>
-                                        <tr data-empty-row>                                        <td colspan="7">Chưa có hồ sơ nhân viên.</td></tr>
+                                        <tr data-empty-row><td colspan="8">Chưa có hồ sơ nhân viên.</td></tr>
                                     <?php else: ?>
                                         <?php foreach ($managedEmployees as $employee): ?>
                                             <?php $active = (int) $employee['active'] === 1; ?>
-                                            <tr data-employee-row data-id="<?= (int) $employee['id'] ?>" data-code="<?= $escape($employee['code']) ?>" data-name="<?= $escape($employee['name']) ?>" data-position="<?= $escape($employee['position']) ?>" data-department-id="<?= $employee['department_id'] === null ? '' : (int) $employee['department_id'] ?>" data-termination-date="<?= $escape($employee['termination_date'] ?? '') ?>" data-active="<?= $active ? '1' : '0' ?>">
+                                            <tr data-employee-row data-id="<?= (int) $employee['id'] ?>" data-code="<?= $escape($employee['code']) ?>" data-name="<?= $escape($employee['name']) ?>" data-position="<?= $escape($employee['position']) ?>" data-employee-type="<?= $escape($employee['employee_type']) ?>" data-department-id="<?= $employee['department_id'] === null ? '' : (int) $employee['department_id'] ?>" data-termination-date="<?= $escape($employee['termination_date'] ?? '') ?>" data-active="<?= $active ? '1' : '0' ?>">
                                                 <td><?= $escape($employee['code']) ?></td>
                                                 <td><?= $escape($employee['name']) ?></td>
                                                 <td><?= $escape($employee['department'] !== '' ? $employee['department'] : 'Chưa phân công') ?></td>
                                                 <td><?= $escape($employee['position'] !== '' ? $employee['position'] : '—') ?></td>
+                                                <td><?= $employee['employee_type'] === WorkSchedule::INTERN ? 'Intern' : 'Fulltime' ?></td>
                                                 <td><?= $escape($employee['termination_date'] ?? '—') ?></td>
                                                 <td><span class="status-badge <?= $active ? 'status-complete' : 'status-incomplete' ?>"><?= $active ? 'Đang làm việc' : 'Ngừng hoạt động' ?></span></td>
                                                 <td class="workforce-row-actions">
@@ -634,6 +636,7 @@ sort($attendancePositions, SORT_NATURAL | SORT_FLAG_CASE);
                 <label class="dialog-field">Họ và tên<input id="employee-name" type="text" maxlength="100" required></label>
                 <label class="dialog-field">Phòng ban<select id="employee-department"><option value="">Chưa phân công</option><?php foreach ($departments as $department): ?><option value="<?= (int) $department['id'] ?>"><?= $escape($department['name']) ?></option><?php endforeach; ?></select></label>
                 <label class="dialog-field">Chức vụ<input id="employee-position" type="text" maxlength="100"></label>
+                <label class="dialog-field">Loại nhân viên<select id="employee-type" required><option value="FULLTIME">Fulltime</option><option value="INTERN">Intern</option></select></label>
                 <label class="dialog-field">Ngày nghỉ việc<input id="employee-termination-date" type="date"></label>
             </div>
             <p class="workforce-dialog-feedback" id="employee-dialog-feedback" role="status" aria-live="polite"></p>
